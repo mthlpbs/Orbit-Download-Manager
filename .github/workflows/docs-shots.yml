@@ -50,7 +50,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install nasm --version 2.16.3 --no-progress -y
+          $installer = Join-Path $env:RUNNER_TEMP 'nasm-2.16.03-installer-x64.exe'
+          Invoke-WebRequest 'https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-installer-x64.exe' -OutFile $installer
+          if ((Get-FileHash $installer -Algorithm SHA256).Hash -ne '657E1252676CFB26A008835C20A760F731C8E0414469A4ED0F83F0FB059CDD35') { throw 'NASM installer checksum mismatch' }
+          $process = Start-Process $installer -ArgumentList '/S' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "NASM installer failed: $($process.ExitCode)" }
           "C:\Program Files\NASM" >> $env:GITHUB_PATH
 
       - name: Build
@@ -60,15 +64,6 @@ jobs:
           # The torrent's progress window: a swarm of seeders and a tracker on this runner.
           cargo build -p mdm-torrent --example swarm
           if ($LASTEXITCODE) { throw "swarm $LASTEXITCODE" }
-
-      # The video's progress window: yt-dlp brings a lab server file in (pinned and checked).
-      - name: yt-dlp
-        run: |
-          $ErrorActionPreference = "Stop"
-          $url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.exe"
-          Invoke-WebRequest -UseBasicParsing $url -OutFile "$env:RUNNER_TEMP\yt-dlp.exe"
-          $sum = (Get-FileHash "$env:RUNNER_TEMP\yt-dlp.exe" -Algorithm SHA256).Hash
-          if ($sum -ne "F5389D3698ECDE4EF06F4E6B1CE0294FE9AC1396228C8990B8D3416D6D177A7D") { throw "yt-dlp checksum $sum" }
 
       # The runner has no GPU and only Windows' OpenGL 1.1; the app needs 3.x. Mesa's llvmpipe
       # (software OpenGL 4.6) is put beside the program for this job only (mesa-dist-win,
@@ -140,21 +135,7 @@ jobs:
           & target\debug\orbitdownloadmanager-nmhost.exe --register
           # On the screen, as nobody watches it: llvmpipe draws nothing off the screens.
           $at = "40,40"
-          # Every window of docs-shots.ps1's own list, light (docs/images) and dark (the site's
-          # night pictures, and the README's dark main window), in English.
-          tools\lab\docs-shots.ps1 -Exe $exe -Server $srv -Torrent $torrent -Work $work -At $at @net -OutDir "$out\docs"
-          tools\lab\docs-shots.ps1 -Exe $exe -Server $srv -Torrent $torrent -Work $work -At $at @net -Dark -OutDir "$out\site-dark"
-          # A video's and a torrent's progress window (with the torrent's Pieces tab), light and dark.
-          $bin = "target\debug"
-          # One that fails is reported, and the help pages' pictures are still taken.
-          foreach ($mode in "docs", "site-dark") {
-            $d = if ($mode -eq "site-dark") { @{ Dark = $true } } else { @{} }
-            try { tools\lab\progress-shots.ps1 -Bin $bin -OutDir "$out\$mode" -YtDlp "$env:RUNNER_TEMP\yt-dlp.exe" -Work "$work\p" -At $at -TorrentTabs pieces @d }
-            catch { Write-Warning "progress-shots ($mode): $_" }
-          }
-          # The help pages' pictures (tools/shots/shots.toml), light and dark, raw: a person runs
-          # `python tools/shots/make.py build` on them (crop, annotate, WebP) and commits that.
-          python tools\shots\make.py shoot --bin target\debug --work $work --at $at --url-host downloads.example --port $port
+          python tools\shots\make.py shoot --only video-lookup,video-qualities,video-helpers,video-playlist --bin target\debug --work $work --at $at --url-host downloads.example --port $port
           if ($LASTEXITCODE) { throw "make.py shoot $LASTEXITCODE" }
           Copy-Item -Recurse target\shots\raw "$out\help-raw"
 
