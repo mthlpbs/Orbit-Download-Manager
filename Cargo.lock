@@ -4523,7 +4523,7 @@ dependencies = [
  "regex",
  "reqwest 0.13.5",
  "rfd",
- "roxmltree 0.20.0",
+ "roxmltree 0.21.2",
  "serde",
  "serde_json",
  "skrifa",

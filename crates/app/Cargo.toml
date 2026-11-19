@@ -69,7 +69,7 @@ mdm-debrid.workspace = true
 tracing.workspace = true
 # RSS feeds (rss.rs): reading them (no DTDs), and the rules' regular expressions; both already
 # in the tree (resvg's SVG, the engine's dependencies).
-roxmltree = "0.20.0"
+roxmltree = "0.21.2"
 regex = "1.13.1"
 
 [target.'cfg(windows)'.dependencies]
