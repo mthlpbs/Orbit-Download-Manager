@@ -1185,18 +1185,28 @@ enum Pane {
     List,
 }
 
-const TOOLBAR_LABELS: [&str; 11] = [
-    "Add URL",
-    "Add Torrent",
-    "Resume",
-    "Stop",
-    "Stop All",
-    "Delete",
-    "Delete Completed",
-    "Settings",
-    "Scheduler",
-    "Start Queue",
-    "Stop Queue",
+// Keep this order stable: the settings store one visibility bit per button.
+const TOOLBAR_BUTTONS: [(Icon, &str, Cmd); 11] = [
+    (Icon::AddUrl, "Add URL", Cmd::AddUrl),
+    (Icon::AddTorrent, "Add Torrent", Cmd::OpenTorrentFile),
+    // i18n: verb: continue the selected downloads
+    (Icon::Resume, "Resume", Cmd::Resume),
+    // i18n: verb: stop the selected downloads
+    (Icon::Stop, "Stop", Cmd::Stop),
+    (Icon::StopAll, "Stop All", Cmd::StopAll),
+    // i18n: verb: delete the selected downloads
+    (Icon::Delete, "Delete", Cmd::Remove),
+    (
+        Icon::DeleteCompleted,
+        "Delete Completed",
+        Cmd::DeleteCompleted,
+    ),
+    // i18n: plural noun: opens the Options window (settings)
+    (Icon::Options, "Settings", Cmd::Options),
+    // i18n: noun: the tool that starts and stops queues on time
+    (Icon::Scheduler, "Scheduler", Cmd::Scheduler),
+    (Icon::StartQueue, "Start Queue", Cmd::StartQueue(0)),
+    (Icon::StopQueue, "Stop Queue", Cmd::StopQueue(0)),
 ];
 
 /// Where Tab (Shift+Tab: `back`) takes the keys from `from` (`None`: nothing had them, after a
@@ -9209,10 +9219,10 @@ impl App {
     }
 
     fn toolbar_entries(&self) -> Vec<MenuEntry<Cmd>> {
-        let mut entries: Vec<_> = TOOLBAR_LABELS
+        let mut entries: Vec<_> = TOOLBAR_BUTTONS
             .iter()
             .enumerate()
-            .map(|(i, label)| {
+            .map(|(i, (_, label, _))| {
                 let translated = crate::i18n::tc("toolbar", label);
                 MenuEntry::Item(
                     crate::chrome::label(&translated.replace('&', "&&")),
@@ -9925,7 +9935,7 @@ impl App {
             }
         }
 
-        let visible_toolbar_bits = (1 << TOOLBAR_LABELS.len()) - 1;
+        let visible_toolbar_bits = (1 << TOOLBAR_BUTTONS.len()) - 1;
         let toolbar_shown =
             self.settings.hidden_toolbar_items & visible_toolbar_bits != visible_toolbar_bits;
         let pane_top = if toolbar_shown {
@@ -9974,39 +9984,24 @@ impl App {
         let deletable = picked.iter().any(|i| i.live.is_none());
         let can_stop_all = self.can_stop_all();
         let any_complete = self.items.iter().any(|i| i.status == Status::Complete);
-        let actions = [
-            (Icon::AddUrl, true, Cmd::AddUrl),
-            (Icon::AddTorrent, true, Cmd::OpenTorrentFile),
-            // i18n: verb: continue the selected downloads
-            (Icon::Resume, resumable, Cmd::Resume),
-            // i18n: verb: stop the selected downloads
-            (Icon::Stop, running, Cmd::Stop),
-            (Icon::StopAll, can_stop_all, Cmd::StopAll),
-            // i18n: verb: delete the selected downloads
-            (Icon::Delete, deletable, Cmd::Remove),
-            (Icon::DeleteCompleted, any_complete, Cmd::DeleteCompleted),
-            // i18n: plural noun: opens the Options window (settings)
-            (Icon::Options, true, Cmd::Options),
-            // i18n: noun: the tool that starts and stops queues on time
-            (Icon::Scheduler, true, Cmd::Scheduler),
-            (
-                Icon::StartQueue,
-                // The button acts on the main queue (the others: its arrow, the menus).
-                self.queues.first().is_some_and(|q| !q.running),
-                Cmd::StartQueue(0),
-            ),
-            (
-                Icon::StopQueue,
-                self.queues.first().is_some_and(|q| q.running),
-                Cmd::StopQueue(0),
-            ),
-        ];
-        let buttons: Vec<_> = actions
+        let buttons: Vec<_> = TOOLBAR_BUTTONS
             .into_iter()
-            .zip(TOOLBAR_LABELS)
             .enumerate()
             .filter(|(i, _)| self.settings.hidden_toolbar_items & (1 << i) == 0)
-            .map(|(_, ((icon, enabled, cmd), label))| (icon, label, enabled, cmd))
+            .map(|(_, (icon, label, cmd))| {
+                let enabled = match cmd {
+                    Cmd::Resume => resumable,
+                    Cmd::Stop => running,
+                    Cmd::StopAll => can_stop_all,
+                    Cmd::Remove => deletable,
+                    Cmd::DeleteCompleted => any_complete,
+                    // The buttons act on the main queue. Their arrows offer the others.
+                    Cmd::StartQueue(_) => self.queues.first().is_some_and(|q| !q.running),
+                    Cmd::StopQueue(_) => self.queues.first().is_some_and(|q| q.running),
+                    _ => true,
+                };
+                (icon, label, enabled, cmd)
+            })
             .collect();
         let tb: Vec<_> = buttons.iter().map(|(i, l, e, _)| (*i, *l, *e)).collect();
         let tb_keys = (self.toolbar_keys && free && toolbar_shown)

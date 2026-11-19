@@ -943,7 +943,7 @@ impl Programs {
                 winui::tahoma_bold(),
                 o.x + 14.0,
                 y + 16.0,
-                h.name(),
+                if h == Helper::Deno { "Deno" } else { h.name() },
                 winui::TEXT(),
             );
             let found = self.found[i].as_ref();
@@ -1036,13 +1036,13 @@ impl Programs {
             );
             let busy = self.checking.is_some() || self.installing.is_some();
             let action = if mine {
-                "Use detected / Orbit copy"
+                crate::i18n::mark("Use detected / Orbit copy")
             } else if found.is_none() && has_own {
-                "Download and install"
+                crate::i18n::mark("Download and install")
             } else if found.is_none() && h == Helper::Deno {
-                "Deno installation page"
+                crate::i18n::mark("Deno installation page")
             } else {
-                "Detect again"
+                crate::i18n::mark("Detect again")
             };
             // As wide as their labels in this language (#192), side by side from the left.
             let [other_at, own_at] = winui::button_row_from_left(

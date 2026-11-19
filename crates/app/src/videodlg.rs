@@ -125,6 +125,7 @@ pub struct VideoDialog {
     asking: crate::dialogs::FolderGate<()>,
     /// Helpers...: where yt-dlp and ffmpeg come from (#51).
     helpers: Option<crate::helpers::Programs>,
+    saved_cookies: Option<(String, String)>,
     /// The looked-up video's subtitle languages (#68) and the one chosen in the Subtitles list
     /// (0: none, then "All the uploader's" when offered, then `subs` in order).
     subs: Vec<SubChoice>,
@@ -265,6 +266,7 @@ impl VideoDialog {
             start_now: None,
             asking: Default::default(),
             helpers: None,
+            saved_cookies: None,
             subs: Vec::new(),
             sub_pick: 0,
             pref: Subs::default(),
@@ -595,13 +597,15 @@ impl VideoDialog {
         // A playlist's quality chosen, a list or a video looked up: Save to follows (#611).
         self.follow_sound();
         // Helpers... open: on Close, the helpers are read again (another program, or MDM's own).
-        if let Some(h) = &mut self.helpers
-            && !matches!(h.show(ctx, rt), Outcome::Open)
-        {
-            self.helpers = None;
-            self.tools = None;
-            if let Some((v, _)) = self.video.take() {
-                self.set_video(v);
+        if let Some(h) = &mut self.helpers {
+            let outcome = h.show(ctx, rt);
+            self.saved_cookies = h.take_saved_cookies();
+            if !matches!(outcome, Outcome::Open) {
+                self.helpers = None;
+                self.tools = None;
+                if let Some((v, _)) = self.video.take() {
+                    self.set_video(v);
+                }
             }
         }
         if self.use_config && matches!(out, Outcome::Done(())) {
@@ -630,7 +634,7 @@ impl VideoDialog {
     }
 
     pub fn take_saved_cookies(&mut self) -> Option<(String, String)> {
-        self.helpers.as_mut()?.take_saved_cookies()
+        self.saved_cookies.take()
     }
 
     /// What Download Now or Later adds: a playlist's videos, each its own download, or the
@@ -858,7 +862,7 @@ impl VideoDialog {
                 (self.video.is_some() || self.list.is_some()) && self.page.trim() == self.looked_up;
         }
         let was_config = self.use_config;
-        let config_label = "Use yt-dlp configuration file";
+        let config_label = crate::i18n::mark("Use yt-dlp configuration file");
         let path_x = winui::checkbox_caption_end(&p, o.x + FIELD_X, config_label)
             .min(o.x + RIGHT - 110.0)
             + 8.0;
@@ -966,9 +970,9 @@ impl VideoDialog {
         let offer = if self.use_config {
             None
         } else if ytdlp.is_none() && mdm_tools::ytdlp_asset().is_some() {
-            Some((Tool::YtDlp, "Install yt-dlp"))
+            Some((Tool::YtDlp, crate::i18n::mark("Install yt-dlp")))
         } else if ffmpeg.is_none() && mdm_tools::ffmpeg::available() {
-            Some((Tool::Ffmpeg, "Install ffmpeg"))
+            Some((Tool::Ffmpeg, crate::i18n::mark("Install ffmpeg")))
         } else {
             None
         };
@@ -976,31 +980,35 @@ impl VideoDialog {
             (Some(error.as_str()), true)
         } else if let Some(installing) = installing {
             (
-                Some(crate::i18n::t(if installing == Tool::YtDlp {
-                    "Downloading and verifying yt-dlp..."
+                Some(if installing == Tool::YtDlp {
+                    crate::i18n::t("Downloading and verifying yt-dlp...")
                 } else {
-                    "Downloading and verifying ffmpeg (about 80 MB)..."
-                })),
+                    crate::i18n::t("Downloading and verifying ffmpeg (about 80 MB)...")
+                }),
                 false,
             )
         } else if self.lookup.is_some() {
             (Some(crate::i18n::t("Looking the page up...")), false)
         } else if self.use_config {
             (
-                Some(crate::i18n::t(if config_path.is_some() {
-                    "Format, quality, save and embedding settings come from your yt-dlp configuration file."
+                Some(if config_path.is_some() {
+                    crate::i18n::t(
+                        "Format, quality, save and embedding settings come from your yt-dlp configuration file.",
+                    )
                 } else {
-                    "Select a configuration file in yt-dlp settings."
-                })),
+                    crate::i18n::t("Select a configuration file in yt-dlp settings.")
+                }),
                 false,
             )
         } else if ytdlp.is_none() {
             (
-                Some(crate::i18n::t(if offer.is_some() {
-                    "Video lookups use yt-dlp (about 23 MB, checked against its signature)."
+                Some(if offer.is_some() {
+                    crate::i18n::t(
+                        "Video lookups use yt-dlp (about 23 MB, checked against its signature).",
+                    )
                 } else {
-                    "Choose a yt-dlp executable in yt-dlp settings."
-                })),
+                    crate::i18n::t("Choose a yt-dlp executable in yt-dlp settings.")
+                }),
                 false,
             )
         } else if self
@@ -1080,7 +1088,14 @@ impl VideoDialog {
         self.save_card(ui, o + egui::vec2(0.0, top), options, ffmpeg.is_some());
         top += 108.0;
         let embedding = o + egui::vec2(0.0, top);
-        video_card(&p, embedding, 0.0, 93.0, Some("Embedding"), options);
+        video_card(
+            &p,
+            embedding,
+            0.0,
+            93.0,
+            Some(crate::i18n::mark("Embedding")),
+            options,
+        );
         let controls = embedding + egui::vec2(0.0, 31.0);
         let subtitles =
             self.list.is_none() && self.subtitles_row(ui, controls, options, ffmpeg.is_some());
@@ -1112,7 +1127,14 @@ impl VideoDialog {
 
     fn format_card(&mut self, ui: &mut Ui, o: Pos2, enabled: bool) {
         let p = ui.painter().clone();
-        video_card(&p, o, 0.0, 103.0, Some("Format"), enabled);
+        video_card(
+            &p,
+            o,
+            0.0,
+            103.0,
+            Some(crate::i18n::mark("Format")),
+            enabled,
+        );
         video_label(ui, o, 47.0, "Output container", enabled);
         video_label(ui, o, 82.0, "Preferred codec", enabled && !self.advanced);
         let containers = ["Matroska (MKV)", "MPEG-4 (MP4)", "WebM"];
@@ -1180,7 +1202,14 @@ impl VideoDialog {
     fn quality_card(&mut self, ui: &mut Ui, o: Pos2, enabled: bool) -> f32 {
         let p = ui.painter().clone();
         if let Some(list) = &mut self.list {
-            video_card(&p, o, 0.0, 236.0, Some("Quality"), enabled);
+            video_card(
+                &p,
+                o,
+                0.0,
+                236.0,
+                Some(crate::i18n::mark("Quality")),
+                enabled,
+            );
             ui.add_enabled_ui(enabled, |ui| {
                 list.middle(ui, o + egui::vec2(LEFT - 11.0, -35.0), Some(489.0));
             });
@@ -1192,8 +1221,15 @@ impl VideoDialog {
         } else {
             236.0
         };
-        video_card(&p, o, 0.0, height, Some("Quality"), enabled);
-        let shown = "Show all formats";
+        video_card(
+            &p,
+            o,
+            0.0,
+            height,
+            Some(crate::i18n::mark("Quality")),
+            enabled,
+        );
+        let shown = crate::i18n::mark("Show all formats");
         let x = (RIGHT - winui::text_width(&p, crate::i18n::t(shown)) - 23.0).max(FIELD_X);
         let before = self.advanced;
         winui::checkbox_until(
@@ -1368,7 +1404,7 @@ impl VideoDialog {
             .iter()
             .filter(|choice| mdm_tools::resolve::is_audio(choice))
             .collect();
-        let mut labels = vec!["Audio presets…".to_owned()];
+        let mut labels = vec![crate::i18n::mark("Audio presets…").to_owned()];
         labels.extend(presets.iter().map(|c| choice_label(&c.label)));
         let names: Vec<_> = labels.iter().map(String::as_str).collect();
         let selected = presets.iter().position(|c| c.selector == code.trim());
@@ -1389,12 +1425,16 @@ impl VideoDialog {
             && format_code_choice(video, code, &self.preferences.container).is_none();
         let (hint, color) = if invalid {
             (
-                "Choose a media ID, or combine a video-only and audio-only ID with +.",
+                crate::i18n::t(
+                    "Choose a media ID, or combine a video-only and audio-only ID with +.",
+                ),
                 winui::ERROR(),
             )
         } else {
             (
-                "Choose one format ID, or select video and audio to join their IDs with +.",
+                crate::i18n::t(
+                    "Choose one format ID, or select video and audio to join their IDs with +.",
+                ),
                 winui::MUTED(),
             )
         };
@@ -1402,7 +1442,7 @@ impl VideoDialog {
             &p,
             o.x + FIELD_X,
             o.y + 254.0,
-            crate::i18n::t(hint),
+            hint,
             color,
             o.x + RIGHT,
             14.0,
@@ -1411,7 +1451,7 @@ impl VideoDialog {
 
     fn save_card(&mut self, ui: &mut Ui, o: Pos2, enabled: bool, ffmpeg: bool) {
         let p = ui.painter().clone();
-        video_card(&p, o, 0.0, 98.0, Some("Save"), enabled);
+        video_card(&p, o, 0.0, 98.0, Some(crate::i18n::mark("Save")), enabled);
         video_label(ui, o, 47.0, "Save to", enabled);
         winui::edit(
             ui,
@@ -1654,7 +1694,7 @@ fn video_card(
     let surface = if enabled {
         colors.tab_page
     } else {
-        colors.window
+        colors.window.lerp_to_gamma(colors.tab_page, 0.45)
     };
     p.rect_filled(bounds, 5.0, surface);
     if let Some(title) = title {
