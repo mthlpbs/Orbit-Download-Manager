@@ -1244,7 +1244,7 @@ impl Programs {
                 &p,
                 o.x + 14.0,
                 o.y + 330.0,
-                "Cookies from browser",
+                crate::i18n::t("Cookies from browser"),
                 winui::TEXT(),
             );
             let browsers = mdm_tools::proc::cookie_browsers();
@@ -1269,7 +1269,7 @@ impl Programs {
                 &p,
                 o.x + 14.0,
                 o.y + 363.0,
-                "Profile (optional):",
+                crate::i18n::t("Profile (optional):"),
                 winui::TEXT(),
             );
             winui::edit(

@@ -134,40 +134,42 @@ pub(crate) fn installed(name: &str) -> Option<Installed> {
 /// Package installers can update PATH after Explorer or Orbit was started.
 #[cfg(windows)]
 fn windows_paths() -> impl Iterator<Item = PathBuf> {
-    use std::os::windows::ffi::OsStringExt;
-    use windows_sys::Win32::System::Registry::{
-        HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RRF_RT_REG_EXPAND_SZ, RRF_RT_REG_SZ, RegGetValueW,
-    };
+    use windows_registry::{CURRENT_USER, LOCAL_MACHINE};
 
     [
-        (HKEY_CURRENT_USER, windows_sys::w!("Environment")),
+        (CURRENT_USER, "Environment"),
         (
-            HKEY_LOCAL_MACHINE,
-            windows_sys::w!(r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"),
+            LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
         ),
     ]
     .into_iter()
-    .flat_map(|(key, subkey)| {
-        let mut path = vec![0u16; 32_768];
-        let mut bytes = (path.len() * size_of::<u16>()) as u32;
-        // SAFETY: the subkey and value name are terminated, and bytes is the buffer size.
-        let result = unsafe {
-            RegGetValueW(
-                key,
-                subkey,
-                windows_sys::w!("Path"),
-                RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ,
-                std::ptr::null_mut(),
-                path.as_mut_ptr().cast(),
-                &mut bytes,
-            )
-        };
-        if result != 0 {
-            return Vec::new();
-        }
-        let len = path.iter().position(|&ch| ch == 0).unwrap_or(path.len());
-        std::env::split_paths(&std::ffi::OsString::from_wide(&path[..len])).collect()
+    .filter_map(|(root, subkey)| root.open(subkey).ok()?.get_string("Path").ok())
+    .flat_map(|path| {
+        let expanded = expand_windows_path(&path);
+        std::env::split_paths(&expanded).collect::<Vec<_>>()
     })
+}
+
+/// Registry PATH can contain expandable entries such as %SystemRoot%\System32.
+#[cfg(windows)]
+fn expand_windows_path(path: &str) -> std::ffi::OsString {
+    let mut parts = path.split('%');
+    let mut expanded = std::ffi::OsString::from(parts.next().unwrap_or_default());
+    while let Some(name) = parts.next() {
+        let after = parts.next();
+        if let Some(value) = after.and_then(|_| std::env::var_os(name)) {
+            expanded.push(value);
+        } else {
+            expanded.push("%");
+            expanded.push(name);
+            if after.is_some() {
+                expanded.push("%");
+            }
+        }
+        expanded.push(after.unwrap_or_default());
+    }
+    expanded
 }
 
 fn find_in(name: &str, dirs: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
