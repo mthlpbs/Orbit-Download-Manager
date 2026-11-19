@@ -311,7 +311,9 @@ fn preferences(tokens: &[String]) -> Vec<String> {
 }
 
 fn normalized_value(name: &str, value: &str) -> String {
-    if name == "--js-runtimes" && Path::new(value).is_absolute() {
+    let windows_absolute = value.starts_with(r"\\")
+        || matches!(value.as_bytes(), [drive, b':', b'/' | b'\\', ..] if drive.is_ascii_alphabetic());
+    if name == "--js-runtimes" && (Path::new(value).is_absolute() || windows_absolute) {
         format!("deno:{value}")
     } else {
         value.to_owned()

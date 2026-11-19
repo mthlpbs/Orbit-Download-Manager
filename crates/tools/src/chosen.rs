@@ -19,6 +19,7 @@ pub enum Helper {
     Ffmpeg,
     /// Image galleries (#58).
     GalleryDl,
+    Deno,
 }
 
 impl Helper {
@@ -27,6 +28,7 @@ impl Helper {
             Helper::YtDlp => "yt-dlp",
             Helper::Ffmpeg => "ffmpeg",
             Helper::GalleryDl => "gallery-dl",
+            Helper::Deno => "deno",
         }
     }
 }
@@ -45,6 +47,8 @@ struct Programs {
         skip_serializing_if = "Option::is_none"
     )]
     gallery_dl: Option<Installed>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    deno: Option<Installed>,
 }
 
 const FILE: &str = "programs.json";
@@ -76,9 +80,7 @@ fn read(dir: &Path) -> Programs {
 fn write(dir: &Path, p: &Programs) -> Result<(), Error> {
     std::fs::create_dir_all(dir)?;
     let text = serde_json::to_vec_pretty(p).map_err(|e| Error::BadRelease(e.to_string()))?;
-    let tmp = dir.join(format!("{FILE}.tmp"));
-    std::fs::write(&tmp, text)?;
-    std::fs::rename(&tmp, dir.join(FILE))?;
+    craft_atomic::atomic_write(&dir.join(FILE), &text)?;
     Ok(())
 }
 
@@ -87,6 +89,7 @@ fn slot(p: &mut Programs, h: Helper) -> &mut Option<Installed> {
         Helper::YtDlp => &mut p.ytdlp,
         Helper::Ffmpeg => &mut p.ffmpeg,
         Helper::GalleryDl => &mut p.gallery_dl,
+        Helper::Deno => &mut p.deno,
     }
 }
 
@@ -133,7 +136,7 @@ pub fn ask(h: Helper, exe: &Path) -> Result<Installed, Error> {
 fn version_of(h: Helper, exe: &Path) -> Result<String, Error> {
     let mut cmd = Command::new(exe);
     cmd.arg(match h {
-        Helper::YtDlp | Helper::GalleryDl => "--version",
+        Helper::YtDlp | Helper::GalleryDl | Helper::Deno => "--version",
         Helper::Ffmpeg => "-version",
     });
     let out = crate::proc::output(cmd, h.name(), Duration::from_secs(20))
@@ -147,6 +150,7 @@ fn parse_version(h: Helper, out: &str) -> Option<String> {
     let first = out.lines().map(str::trim).find(|l| !l.is_empty())?;
     let v = match h {
         Helper::YtDlp | Helper::GalleryDl => first,
+        Helper::Deno => first.strip_prefix("deno ")?.split_whitespace().next()?,
         Helper::Ffmpeg => first
             .strip_prefix("ffmpeg version ")?
             .split_whitespace()
@@ -217,6 +221,7 @@ mod tests {
                 ytdlp: Some(mine.clone()),
                 ffmpeg: Some(mine.clone()),
                 gallery_dl: Some(mine.clone()),
+                deno: None,
             },
         )
         .unwrap();
@@ -277,6 +282,7 @@ mod tests {
                 exe: exe.clone(),
             }),
             gallery_dl: None,
+            deno: None,
         };
         write(dir.path(), &p).unwrap();
         assert_eq!(

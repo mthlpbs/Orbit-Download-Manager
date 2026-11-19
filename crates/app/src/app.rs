@@ -460,6 +460,8 @@ fn menu_answer(step: DupStep, start_now: bool) -> &'static str {
 enum Cmd {
     AddUrl,
     ToggleCategories,
+    ToggleToolbarItem(usize),
+    ResetToolbar,
     PathConfiguration,
     /// Help → a page of the website (`""` = home).
     HelpPage(&'static str),
@@ -1082,6 +1084,7 @@ impl Cmd {
 enum Popup {
     /// List header right-click: the column chooser.
     Columns,
+    Toolbar,
     /// List right-click on a row, or on blank space (None).
     Item(Option<u64>),
     /// The Start Queue (true) / Stop Queue drop-down arrows.
@@ -1182,13 +1185,28 @@ enum Pane {
     List,
 }
 
+const TOOLBAR_LABELS: [&str; 11] = [
+    "Add URL",
+    "Add Torrent",
+    "Resume",
+    "Stop",
+    "Stop All",
+    "Delete",
+    "Delete Completed",
+    "Settings",
+    "Scheduler",
+    "Start Queue",
+    "Stop Queue",
+];
+
 /// Where Tab (Shift+Tab: `back`) takes the keys from `from` (`None`: nothing had them, after a
 /// click on the toolbar or the strip), round; the tree left out while it is hidden.
-fn tab_to(from: Option<Pane>, tree_shown: bool, back: bool) -> Pane {
-    let order: &[Pane] = if tree_shown {
-        &[Pane::Toolbar, Pane::Tree, Pane::List]
-    } else {
-        &[Pane::Toolbar, Pane::List]
+fn tab_to(from: Option<Pane>, tree_shown: bool, toolbar_shown: bool, back: bool) -> Pane {
+    let order = match (tree_shown, toolbar_shown) {
+        (true, true) => &[Pane::Toolbar, Pane::Tree, Pane::List][..],
+        (true, false) => &[Pane::Tree, Pane::List],
+        (false, true) => &[Pane::Toolbar, Pane::List],
+        (false, false) => &[Pane::List],
     };
     let n = order.len();
     let at = from.and_then(|p| order.iter().position(|q| *q == p));
@@ -5551,6 +5569,7 @@ impl App {
         page: String,
         context: ipc::Command,
         profile: mdm_tools::config::Profile,
+        start_now: bool,
         ctx: &egui::Context,
     ) {
         let slot: std::sync::Arc<
@@ -5627,7 +5646,7 @@ impl App {
                         Category::Video
                     },
                     size: None,
-                    start_now: true,
+                    start_now,
                     context,
                     subs: Default::default(),
                     remember: None,
@@ -5643,7 +5662,6 @@ impl App {
     }
 
     fn video_dialog(&self, page: Option<(&str, mdm_ipc::Command)>) -> crate::videodlg::VideoDialog {
-        crate::videodlg::refresh_ytdlp(&self.rt);
         let dir = self.settings.category_dir(Category::Video, &self.downloads);
         let music = (!Category::Music.deleted())
             .then(|| self.settings.category_dir(Category::Music, &self.downloads));
@@ -8152,6 +8170,16 @@ impl App {
                 }
                 self.dirty = true;
             }
+            Cmd::ToggleToolbarItem(i) => {
+                self.settings.hidden_toolbar_items ^= 1 << i;
+                self.toolbar_at = 0;
+                self.dirty = true;
+            }
+            Cmd::ResetToolbar => {
+                self.settings.hidden_toolbar_items = 0;
+                self.toolbar_at = 0;
+                self.dirty = true;
+            }
             Cmd::PathConfiguration => {
                 self.path_config = Some(crate::helpers::Programs::paths());
             }
@@ -8746,7 +8774,7 @@ impl App {
                 ),
                 self.arrange_menu(),
                 // i18n: noun: the toolbar (submenu of View with its settings)
-                Sub("Toolbar", false, vec![]),
+                Sub("Toolbar", true, self.toolbar_entries()),
                 Sub("&Tray icon", false, vec![]),
                 off("C&ustomize URL List..."),
                 I(
@@ -9180,9 +9208,34 @@ impl App {
         })
     }
 
+    fn toolbar_entries(&self) -> Vec<MenuEntry<Cmd>> {
+        let mut entries: Vec<_> = TOOLBAR_LABELS
+            .iter()
+            .enumerate()
+            .map(|(i, label)| {
+                let translated = crate::i18n::tc("toolbar", label);
+                MenuEntry::Item(
+                    crate::chrome::label(&translated.replace('&', "&&")),
+                    Cmd::ToggleToolbarItem(i),
+                    true,
+                    self.settings.hidden_toolbar_items & (1 << i) == 0,
+                )
+            })
+            .collect();
+        entries.push(MenuEntry::Sep);
+        entries.push(MenuEntry::Item(
+            "Reset toolbar",
+            Cmd::ResetToolbar,
+            self.settings.hidden_toolbar_items != 0,
+            false,
+        ));
+        entries
+    }
+
     /// The entries of the popup menu `kind`, and the download it acts on.
     fn popup_entries(&self, kind: Popup) -> (Vec<MenuEntry<Cmd>>, Option<u64>) {
         match kind {
+            Popup::Toolbar => (self.toolbar_entries(), None),
             // Column chooser (IDM: right-click on the header). File Name always stays.
             Popup::Columns => {
                 let mut e: Vec<MenuEntry<Cmd>> = list::TITLES
@@ -9872,6 +9925,17 @@ impl App {
             }
         }
 
+        let visible_toolbar_bits = (1 << TOOLBAR_LABELS.len()) - 1;
+        let toolbar_shown =
+            self.settings.hidden_toolbar_items & visible_toolbar_bits != visible_toolbar_bits;
+        let pane_top = if toolbar_shown {
+            chrome::pane_top()
+        } else {
+            2.0
+        };
+        if !toolbar_shown {
+            self.toolbar_keys = false;
+        }
         // The keys go round the toolbar, the Categories tree and the download list with Tab and
         // Shift+Tab (`tab_to`), while no menu is open and no text box has them (#1190: the
         // toolbar couldn't be reached at all). A press anywhere takes them from the toolbar (the
@@ -9898,7 +9962,7 @@ impl App {
                 } else {
                     None
                 };
-                self.give_keys(tab_to(from, self.show_categories, back));
+                self.give_keys(tab_to(from, self.show_categories, toolbar_shown, back));
                 crate::chrome::show_cues(&ctx);
             }
         }
@@ -9910,56 +9974,76 @@ impl App {
         let deletable = picked.iter().any(|i| i.live.is_none());
         let can_stop_all = self.can_stop_all();
         let any_complete = self.items.iter().any(|i| i.status == Status::Complete);
-        let buttons = [
-            (Icon::AddUrl, "Add URL", true, Cmd::AddUrl),
-            (Icon::AddTorrent, "Add Torrent", true, Cmd::OpenTorrentFile),
+        let actions = [
+            (Icon::AddUrl, true, Cmd::AddUrl),
+            (Icon::AddTorrent, true, Cmd::OpenTorrentFile),
             // i18n: verb: continue the selected downloads
-            (Icon::Resume, "Resume", resumable, Cmd::Resume),
+            (Icon::Resume, resumable, Cmd::Resume),
             // i18n: verb: stop the selected downloads
-            (Icon::Stop, "Stop", running, Cmd::Stop),
-            (Icon::StopAll, "Stop All", can_stop_all, Cmd::StopAll),
+            (Icon::Stop, running, Cmd::Stop),
+            (Icon::StopAll, can_stop_all, Cmd::StopAll),
             // i18n: verb: delete the selected downloads
-            (Icon::Delete, "Delete", deletable, Cmd::Remove),
-            (
-                Icon::DeleteCompleted,
-                "Delete Completed",
-                any_complete,
-                Cmd::DeleteCompleted,
-            ),
+            (Icon::Delete, deletable, Cmd::Remove),
+            (Icon::DeleteCompleted, any_complete, Cmd::DeleteCompleted),
             // i18n: plural noun: opens the Options window (settings)
-            (Icon::Options, "Settings", true, Cmd::Options),
+            (Icon::Options, true, Cmd::Options),
             // i18n: noun: the tool that starts and stops queues on time
-            (Icon::Scheduler, "Scheduler", true, Cmd::Scheduler),
+            (Icon::Scheduler, true, Cmd::Scheduler),
             (
                 Icon::StartQueue,
-                "Start Queue",
                 // The button acts on the main queue (the others: its arrow, the menus).
                 self.queues.first().is_some_and(|q| !q.running),
                 Cmd::StartQueue(0),
             ),
             (
                 Icon::StopQueue,
-                "Stop Queue",
                 self.queues.first().is_some_and(|q| q.running),
                 Cmd::StopQueue(0),
             ),
         ];
-        let tb: Vec<(Icon, &str, bool)> = buttons.iter().map(|(i, l, e, _)| (*i, *l, *e)).collect();
-        let tb_keys = (self.toolbar_keys && free).then_some(self.toolbar_at);
-        match chrome::toolbar(ui, o, w, &tb, tb_keys) {
-            Some(ToolbarEvent::Click(k)) => chosen = Some((buttons[k].3, None)),
-            Some(ToolbarEvent::Drop(k, at)) => {
-                let kind = match buttons[k].0 {
-                    Icon::AddTorrent => Popup::TorrentDrop,
-                    icon => Popup::QueueDrop(matches!(icon, Icon::StartQueue)),
-                };
-                self.open_popup_asked(kind, at, &ctx);
+        let buttons: Vec<_> = actions
+            .into_iter()
+            .zip(TOOLBAR_LABELS)
+            .enumerate()
+            .filter(|(i, _)| self.settings.hidden_toolbar_items & (1 << i) == 0)
+            .map(|(_, ((icon, enabled, cmd), label))| (icon, label, enabled, cmd))
+            .collect();
+        let tb: Vec<_> = buttons.iter().map(|(i, l, e, _)| (*i, *l, *e)).collect();
+        let tb_keys = (self.toolbar_keys && free && toolbar_shown)
+            .then_some(self.toolbar_at.min(buttons.len().saturating_sub(1)));
+        let band = egui::Rect::from_min_size(
+            o + egui::vec2(0.0, chrome::MENU_H),
+            egui::vec2(w, chrome::pane_top()),
+        );
+        if toolbar_shown
+            && self.popup.is_none()
+            && self.open_menu.is_none()
+            && let Some(at) = ctx
+                .input(|i| {
+                    i.pointer
+                        .interact_pos()
+                        .filter(|_| i.pointer.button_released(egui::PointerButton::Secondary))
+                })
+                .filter(|at| band.contains(*at))
+        {
+            self.open_popup_asked(Popup::Toolbar, at, &ctx);
+        }
+        if toolbar_shown {
+            match chrome::toolbar(ui, o, w, &tb, tb_keys) {
+                Some(ToolbarEvent::Click(k)) => chosen = Some((buttons[k].3, None)),
+                Some(ToolbarEvent::Drop(k, at)) => {
+                    let kind = match buttons[k].0 {
+                        Icon::AddTorrent => Popup::TorrentDrop,
+                        icon => Popup::QueueDrop(matches!(icon, Icon::StartQueue)),
+                    };
+                    self.open_popup_asked(kind, at, &ctx);
+                }
+                Some(ToolbarEvent::Keys(k)) => {
+                    self.give_keys(Pane::Toolbar);
+                    self.toolbar_at = k;
+                }
+                None => {}
             }
-            Some(ToolbarEvent::Keys(k)) => {
-                self.give_keys(Pane::Toolbar);
-                self.toolbar_at = k;
-            }
-            None => {}
         }
 
         // Categories pane.
@@ -9971,7 +10055,7 @@ impl App {
             let cat_w = (self.settings.categories_width as f32).clamp(100.0, max_w);
             let right = o.x + 6.0 + cat_w;
             let split = winui::rect(egui::Rect::from_min_max(
-                pos2(right, o.y + chrome::MENU_H + chrome::pane_top()),
+                pos2(right, o.y + chrome::MENU_H + pane_top),
                 pos2(right + 4.0, o.y + h - STRIP_H - 5.0),
             ));
             let sr = ui.interact(
@@ -10036,7 +10120,7 @@ impl App {
             if let Some(ev) = chrome::categories(
                 ui,
                 &mut self.icons,
-                o,
+                o + egui::vec2(0.0, pane_top - chrome::pane_top()),
                 o.y + h - STRIP_H,
                 right,
                 &tree,
@@ -10082,7 +10166,7 @@ impl App {
         self.selection.retain(&ids);
         let (selected, focus) = self.selection.rows(&ids);
         let outer = egui::Rect::from_min_max(
-            pos2(o.x + list_left, o.y + chrome::MENU_H + chrome::pane_top()),
+            pos2(o.x + list_left, o.y + chrome::MENU_H + pane_top),
             pos2(o.x + w - 7.0, o.y + h - STRIP_H - 4.0),
         );
         self.list.menu_open = self.popup.is_some() || self.open_menu.is_some();
@@ -11460,13 +11544,22 @@ impl App {
         }
     }
 
+    fn save_video_cookies(&mut self, cookies: (String, String)) {
+        (
+            self.settings.video_cookies,
+            self.settings.video_cookies_profile,
+        ) = cookies;
+        crate::settings::share_video_settings(&self.settings);
+        self.dirty = true;
+    }
+
     fn dialogs(&mut self, ctx: &egui::Context) {
         let mut pending = Vec::new();
         for slot in std::mem::take(&mut self.configured_videos) {
             let answer = slot.lock().unwrap().take();
             match answer {
                 Some(Ok(add)) => {
-                    self.add_video_checked(add, true);
+                    self.add_video_checked(add, false);
                 }
                 Some(Err(error)) => self.notice = Some(("Video download", error)),
                 None => pending.push(slot),
@@ -11474,8 +11567,13 @@ impl App {
         }
         self.configured_videos = pending;
         if let Some(d) = &mut self.path_config {
-            if !matches!(d.show(ctx, &self.rt), Outcome::Open) {
+            let out = d.show(ctx, &self.rt);
+            let cookies = d.take_saved_cookies();
+            if !matches!(out, Outcome::Open) {
                 self.path_config = None;
+            }
+            if let Some(cookies) = cookies {
+                self.save_video_cookies(cookies);
             }
         }
         self.help_dialogs(ctx);
@@ -12028,7 +12126,9 @@ impl App {
             }
         }
         if let Some(v) = &mut self.video_dlg {
-            match v.show(ctx, &self.rt) {
+            let outcome = v.show(ctx, &self.rt);
+            let cookies = v.take_saved_cookies();
+            match outcome {
                 Outcome::Open => {}
                 Outcome::Closed => self.video_dlg = None,
                 Outcome::Done(out) => {
@@ -12061,9 +12161,13 @@ impl App {
                             page,
                             context,
                             profile,
-                        } => self.start_configured_video(page, context, profile, ctx),
+                            start_now,
+                        } => self.start_configured_video(page, context, profile, start_now, ctx),
                     }
                 }
+            }
+            if let Some(cookies) = cookies {
+                self.save_video_cookies(cookies);
             }
         }
         if let Some(got) = self.batch_clip.as_mut().and_then(|p| p.answer()) {
@@ -14904,7 +15008,7 @@ mod pane_tests {
             let mut at = from;
             let mut seen = Vec::new();
             for _ in 0..4 {
-                let to = tab_to(at, shown, back);
+                let to = tab_to(at, shown, true, back);
                 seen.push(to);
                 at = Some(to);
             }
@@ -14920,9 +15024,9 @@ mod pane_tests {
             [Toolbar, List, Toolbar, List]
         );
         // The tree had the keys as it was hidden: on to the toolbar.
-        assert_eq!(tab_to(Some(Tree), false, false), Toolbar);
-        assert_eq!(tab_to(None, true, false), Toolbar);
-        assert_eq!(tab_to(None, true, true), List);
+        assert_eq!(tab_to(Some(Tree), false, true, false), Toolbar);
+        assert_eq!(tab_to(None, true, true, false), Toolbar);
+        assert_eq!(tab_to(None, true, true, true), List);
     }
 }
 

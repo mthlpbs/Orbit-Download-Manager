@@ -109,6 +109,7 @@ pub struct Settings {
     /// The Categories pane shown, its branches open (All, Unfinished, Finished, Queues),
     /// and the node last shown.
     pub show_categories: bool,
+    pub hidden_toolbar_items: u16,
     pub branches: [bool; 4],
     pub view: Option<crate::app::View>,
     /// View → Dark Mode support (IDM 6.37): follow Windows' dark app mode; off = always light.
@@ -435,6 +436,7 @@ impl Default for Settings {
             window: None,
             window_maximized: false,
             show_categories: false,
+            hidden_toolbar_items: 0,
             branches: [true, false, false, false],
             view: None,
             dark_mode_support: true,

@@ -78,6 +78,12 @@ pub(crate) fn extra_dirs() -> Vec<PathBuf> {
         if let Some(scoop_global) = std::env::var_os("SCOOP_GLOBAL") {
             dirs.push(Path::new(&scoop_global).join("shims"));
         }
+        if let Some(scoop) = std::env::var_os("SCOOP") {
+            dirs.push(Path::new(&scoop).join("shims"));
+        }
+        if let Some(deno) = std::env::var_os("DENO_INSTALL") {
+            dirs.push(Path::new(&deno).join("bin"));
+        }
 
         // Python Scripts (pip install --user yt-dlp, gallery-dl)
         if let Some(lad) = &local_app_data {
@@ -116,9 +122,51 @@ pub(crate) fn extra_dirs() -> Vec<PathBuf> {
 /// the UI thread.
 pub(crate) fn installed(name: &str) -> Option<Installed> {
     let path = std::env::var_os("PATH").unwrap_or_default();
-    find_in(name, std::env::split_paths(&path).chain(extra_dirs())).map(|exe| Installed {
+    let dirs = std::env::split_paths(&path).chain(extra_dirs());
+    #[cfg(windows)]
+    let dirs = dirs.chain(windows_paths());
+    find_in(name, dirs).map(|exe| Installed {
         version: crate::SYSTEM.into(),
         exe,
+    })
+}
+
+/// Package installers can update PATH after Explorer or Orbit was started.
+#[cfg(windows)]
+fn windows_paths() -> impl Iterator<Item = PathBuf> {
+    use std::os::windows::ffi::OsStringExt;
+    use windows_sys::Win32::System::Registry::{
+        HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RRF_RT_REG_EXPAND_SZ, RRF_RT_REG_SZ, RegGetValueW,
+    };
+
+    [
+        (HKEY_CURRENT_USER, windows_sys::w!("Environment")),
+        (
+            HKEY_LOCAL_MACHINE,
+            windows_sys::w!(r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"),
+        ),
+    ]
+    .into_iter()
+    .flat_map(|(key, subkey)| {
+        let mut path = vec![0u16; 32_768];
+        let mut bytes = (path.len() * size_of::<u16>()) as u32;
+        // SAFETY: the subkey and value name are terminated, and bytes is the buffer size.
+        let result = unsafe {
+            RegGetValueW(
+                key,
+                subkey,
+                windows_sys::w!("Path"),
+                RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ,
+                std::ptr::null_mut(),
+                path.as_mut_ptr().cast(),
+                &mut bytes,
+            )
+        };
+        if result != 0 {
+            return Vec::new();
+        }
+        let len = path.iter().position(|&ch| ch == 0).unwrap_or(path.len());
+        std::env::split_paths(&std::ffi::OsString::from_wide(&path[..len])).collect()
     })
 }
 

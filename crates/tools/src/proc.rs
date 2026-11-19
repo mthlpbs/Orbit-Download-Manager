@@ -236,7 +236,11 @@ pub fn look_up(
         }),
         Err(first)
             if with_cookies(ours, browser_cookies().as_ref())
-                && refused_with_cookies(url, &first.to_string()) =>
+                && (refused_with_cookies(url, &first.to_string())
+                    || browser_cookies().is_some_and(|browser| {
+                        !browser_cookie_args(ours, Some(&browser)).is_empty()
+                            && cookie_trouble(&first.to_string())
+                    })) =>
         {
             match run(&without_cookies(ours)) {
                 Ok((json, warnings)) => {
@@ -1065,6 +1069,15 @@ fn with_usable_path(cmd: &mut Command) {
 /// be run, cached for the session). Kept once found; while there is none it is looked for again
 /// at each run, so one installed meanwhile counts at the next look-up (#852).
 fn js_runtime_found(exe: &Path) -> Option<Vec<String>> {
+    if let Some(deno) = crate::tools_dir()
+        .as_deref()
+        .and_then(crate::deno::installed)
+    {
+        return Some(vec![
+            "--js-runtimes".into(),
+            format!("deno:{}", deno.exe.display()),
+        ]);
+    }
     static FOUND: Mutex<Option<Vec<String>>> = Mutex::new(None);
     let mut found = FOUND
         .lock()
