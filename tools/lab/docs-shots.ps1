@@ -124,6 +124,9 @@ function Shot([int]$procId, [string]$title, [string]$name, [switch]$All) {
   for ($try = 0; $try -lt 20; $try++) {
     Start-Sleep -Milliseconds 500
     & "$PSScriptRoot\cap-own.ps1" -ProcessId $procId @by -Out $file | Out-Null
+    if ($name -like "video-*") {
+      & "$PSScriptRoot\screen-rect.ps1" -Title $title -Out (Join-Path $out "$name.screen.png") | Out-Null
+    }
     if (-not (Blank $file)) { break }
   }
   if ($Ui) {
