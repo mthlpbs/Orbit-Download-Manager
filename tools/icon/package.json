@@ -1,0 +1,12 @@
+{
+  "name": "orbit-icon-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build_icon.mjs"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "2.6.2",
+    "png-to-ico": "3.0.2"
+  }
+}

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit Download Manager</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<div class="popup" id="popup">
+  <section id="main-view" class="view">
+    <header class="main-header">
+      <img class="logo" src="icons/icon-128.png" width="30" height="30" alt="">
+      <div class="brand">
+        <h1>Orbit</h1>
+        <p id="status" class="status" role="status"><span class="dot" aria-hidden="true"></span><span id="status-text">Connecting…</span></p>
+      </div>
+      <label class="switch-control capture-control" title="Capture downloads">
+        <span class="sr-only">Capture downloads</span>
+        <input id="take" type="checkbox" role="switch" disabled>
+      </label>
+      <button id="open" class="icon-button" type="button" aria-label="Open Orbit app" title="Open Orbit app" disabled><span class="icon icon-external" aria-hidden="true"></span></button>
+      <button id="settings" class="icon-button" type="button" aria-label="Settings" title="Settings" aria-controls="settings-view"><span class="icon icon-settings" aria-hidden="true"></span></button>
+    </header>
+    <main class="popup-body">
+      <section id="connection-alert" class="connection-alert" hidden>
+        <div class="alert-content"><span class="icon icon-alert" aria-hidden="true"></span><div><h2 id="alert-title">Orbit can’t receive downloads</h2><p id="alert-description">Install the Orbit app or finish browser setup. Until then, downloads stay in the browser.</p></div></div>
+        <div class="alert-actions"><a id="fix" class="small-button primary" target="_blank" rel="noopener noreferrer"><span id="fix-label">Set up Orbit</span><span class="icon icon-external" aria-hidden="true"></span></a><button id="retry" class="small-button" type="button">Try again<span class="icon icon-refresh" aria-hidden="true"></span></button></div>
+      </section>
+      <p id="declined" class="notice" hidden><span id="declined-what"></span><span id="declined-why"></span></p>
+      <section id="site" class="site-section" hidden>
+        <h2 class="section-heading site-heading"><span class="icon icon-globe" aria-hidden="true"></span><span id="site-host"></span></h2>
+        <div class="card site-card">
+          <label class="setting-row" for="site-show-buttons"><span id="site-buttons-label">Show download button only on this site</span><input id="site-show-buttons" type="checkbox" role="switch" aria-labelledby="site-buttons-label" aria-describedby="site-note" disabled></label>
+          <label class="setting-row" for="site-capture"><span id="site-capture-label">Capture downloads from this site</span><input id="site-capture" type="checkbox" role="switch" aria-labelledby="site-capture-label" aria-describedby="site-note" disabled></label>
+        </div>
+        <p id="site-note" class="notice" hidden></p>
+      </section>
+      <section id="media" class="media-section">
+        <div class="section-heading media-heading"><h2>On this page</h2><span id="media-count" class="count" hidden>0</span><button id="download-all" class="text-button" type="button" hidden><span class="icon icon-download" aria-hidden="true"></span><span id="download-all-label">Download all</span></button></div>
+        <ul id="media-list" class="media-list" aria-label="Media on this page" hidden></ul>
+        <div id="media-none" class="empty-state"><span class="empty-icon"><span class="icon icon-video" aria-hidden="true"></span></span><div><h3>No media found yet</h3><p id="media-empty-description">Play the video or audio on this page, then reopen Orbit.</p></div></div>
+        <p class="keyboard-tip"><kbd id="skip-hint">Alt</kbd><span>+ click a link to download with the browser instead</span></p>
+      </section>
+    </main>
+  </section>
+  <section id="settings-view" class="view" hidden>
+    <header class="settings-header"><button id="back" class="icon-button" type="button" aria-label="Back to media" title="Back to media"><span class="icon icon-chevron-left" aria-hidden="true"></span></button><h1 id="settings-title" tabindex="-1">Settings</h1></header>
+    <div class="settings-body">
+      <section>
+        <h2 class="settings-section-heading">Downloads</h2>
+        <div class="card settings-card">
+          <label id="proxy-row" class="setting-row" for="proxy"><span class="setting-text"><span id="proxy-label">Use browser proxy or VPN</span><span id="proxy-description" class="description">Send downloads through this browser’s proxy or VPN extension</span></span><input id="proxy" type="checkbox" role="switch" aria-labelledby="proxy-label" aria-describedby="proxy-description"></label>
+          <label class="setting-row" for="media-title-name"><span class="setting-text"><span id="title-name-label">Add page title to file names</span><span id="title-name-description" class="description">e.g. “GitHub – walkthrough.mp4”</span></span><input id="media-title-name" type="checkbox" role="switch" aria-labelledby="title-name-label" aria-describedby="title-name-description"></label>
+          <label class="setting-row button-visibility" for="show-download-button"><span id="show-button-label">Show download button</span><input id="show-download-button" type="checkbox" role="switch" aria-labelledby="show-button-label" checked disabled></label>
+          <label class="setting-row" for="video-hide-fullscreen"><span class="setting-text"><span id="fullscreen-label">Hide download button in full screen</span><span id="fullscreen-description" class="description">Keeps videos clean while you watch</span></span><input id="video-hide-fullscreen" type="checkbox" role="switch" aria-labelledby="fullscreen-label" aria-describedby="fullscreen-description"></label>
+          <label class="setting-row" for="skip-key"><span class="setting-text"><span id="skip-label">Skip Orbit for one download</span><span id="skip-description" class="description">Hold this key while clicking a link</span></span><select id="skip-key" aria-labelledby="skip-label" aria-describedby="skip-description"><option value="Alt">Alt</option><option value="Ctrl">Ctrl</option><option value="Shift">Shift</option></select></label>
+        </div>
+      </section>
+      <section>
+        <h2 class="settings-section-heading">About</h2>
+        <div class="card about-card">
+          <a id="help" class="link-row" target="_blank" rel="noopener noreferrer"><span class="icon icon-help" aria-hidden="true"></span><span>Help &amp; guides</span><span class="icon icon-external trailing" aria-hidden="true"></span></a>
+          <a id="support" class="link-row" target="_blank" rel="noopener noreferrer"><span class="icon icon-heart" aria-hidden="true"></span><span>Support Orbit</span><span class="icon icon-external trailing" aria-hidden="true"></span></a>
+          <div class="link-row version-row"><span class="icon icon-info" aria-hidden="true"></span><span>Version</span><span id="version" class="version trailing"></span></div>
+        </div>
+      </section>
+      <button id="options" class="more-options" type="button">More options in the Orbit app<span class="icon icon-external" aria-hidden="true"></span></button>
+    </div>
+  </section>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden><span class="icon icon-check" aria-hidden="true"></span><span id="toast-text"></span></div>
+</div>
+<script src="popup.js"></script>
+</body>
+</html>

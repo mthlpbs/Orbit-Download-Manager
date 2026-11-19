@@ -1,0 +1,65 @@
+{
+    "manifest_version": 3,
+    "default_locale": "en",
+    "name": "__MSG_name__",
+    "version": "26.11.19",
+    "description": "__MSG_description__",
+    "homepage_url": "https://github.com/mthlpbs/Orbit-Download-Manager/",
+    "minimum_chrome_version": "116",
+    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArEUYuNVhL1WpgBmM0wd2a+WAKhHIIhgsZGMo7ZmfS14jAw54AUdhu5SiKLNZ3TBoAK8mxwg75TSIdNmztUTX8zL9zBNRlZGnEN6XMitBLtk9MlnkEOCrShfPG3im/m13++G8jOohgxMQiOwAbjAlxbFMyQKKwIeoL/bcpmXETCslHhdV3STC7P8PomBfYQaUPuDXiHKsmDHPurQKSk90jXy6OtFpXsoXp92GKzhmMriOmKv5yRLsD7AzqDNbXD37UujclroTALEpK9OHRz/Jhy/RNl7wNTtuW4zw6j1IchVPpcN0/JpICyehm4+CVseqZjlq1klvmsH2uy9v6axTeQIDAQAB",
+    "permissions": [
+        "downloads",
+        "contextMenus",
+        "nativeMessaging",
+        "cookies",
+        "storage",
+        "webRequest",
+        "scripting",
+        "declarativeNetRequestWithHostAccess",
+        "proxy",
+        "clipboardWrite"
+    ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "action": {
+        "default_popup": "popup.html",
+        "default_title": "__MSG_name__",
+        "default_icon": {
+            "16": "icons/icon-16.png",
+            "32": "icons/icon-32.png"
+        }
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "video.js"
+            ],
+            "all_frames": true,
+            "run_at": "document_idle"
+        },
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "page.js"
+            ],
+            "all_frames": true,
+            "run_at": "document_start"
+        }
+    ],
+    "icons": {
+        "16": "icons/icon-16.png",
+        "32": "icons/icon-32.png",
+        "48": "icons/icon-48.png",
+        "128": "icons/icon-128.png"
+    },
+    "author": "Mithila Prabashwara"
+}
