@@ -141,7 +141,11 @@ pub struct VideoDialog {
 }
 
 const WIDTH: f32 = 680.0;
-const HEIGHT: f32 = 821.0;
+const HEIGHT: f32 = 675.0;
+const CARD_GAP: f32 = 8.0;
+const FORMAT_CARD_H: f32 = 86.0;
+const SAVE_CARD_H: f32 = 86.0;
+const EMBED_CARD_H: f32 = 76.0;
 const LEFT: f32 = 37.0;
 const FIELD_X: f32 = 189.0;
 const RIGHT: f32 = WIDTH - LEFT;
@@ -841,13 +845,13 @@ impl VideoDialog {
         let busy = self.lookup.is_some() || self.install.is_some();
         let mut matched =
             (self.video.is_some() || self.list.is_some()) && self.page.trim() == self.looked_up;
-        video_card(&p, o, 12.0, 77.0, None, true);
-        video_label(ui, o, 39.0, "Page address", true);
+        video_card(&p, o, 10.0, 65.0, None, true);
+        video_label(ui, o, 35.0, "Page address", true);
         let (look_x, look_w) =
             winui::buttons_to_right(&p, RIGHT, 10.0, &[("Look up", 84.0)], 145.0)[0];
         let edit = winui::edit(
             ui,
-            r(o, FIELD_X, 22.0, look_x - FIELD_X - 10.0, 27.0),
+            r(o, FIELD_X, 19.0, look_x - FIELD_X - 10.0, 25.0),
             &mut self.page,
             !busy,
             false,
@@ -863,12 +867,11 @@ impl VideoDialog {
         }
         let was_config = self.use_config;
         let config_label = crate::i18n::mark("Use yt-dlp configuration file");
-        let path_x = winui::checkbox_caption_end(&p, o.x + FIELD_X, config_label)
-            .min(o.x + RIGHT - 110.0)
-            + 8.0;
+        let path_x = (winui::checkbox_caption_end(&p, o.x + FIELD_X, config_label) + 15.0)
+            .min(o.x + RIGHT - 110.0);
         winui::checkbox_until(
             ui,
-            pos2(o.x + FIELD_X, o.y + 61.0),
+            pos2(o.x + FIELD_X, o.y + 51.0),
             &mut self.use_config,
             config_label,
             !busy,
@@ -886,7 +889,7 @@ impl VideoDialog {
             ui,
             &p,
             path_x,
-            o.y + 72.0,
+            o.y + 62.0,
             &config_status,
             winui::MUTED(),
             o.x + RIGHT,
@@ -898,7 +901,7 @@ impl VideoDialog {
         let can_look = page_ok && !busy && !self.use_config && ytdlp.is_some();
         let look = winui::button(
             ui,
-            r(o, look_x, 22.0, look_w, 27.0),
+            r(o, look_x, 19.0, look_w, 25.0),
             "Look up",
             if !can_look {
                 ButtonKind::Disabled
@@ -1034,7 +1037,7 @@ impl VideoDialog {
         } else {
             (None, false)
         };
-        let mut top = 99.0;
+        let mut top = 75.0 + CARD_GAP;
         if let Some(status) = status {
             let install = offer.filter(|_| !busy).map(|(tool, label)| {
                 let w = winui::button_fit_width(&p, label, 105.0, 155.0);
@@ -1043,7 +1046,7 @@ impl VideoDialog {
             let left = LEFT + 12.0;
             let right = RIGHT - install.map_or(0.0, |(_, _, w)| w + 12.0);
             let lines = winui::wrap_lines(&p, status, right - left);
-            let height = (18.0 + 15.0 * lines.len().min(3) as f32).max(39.0);
+            let height = (15.0 + 14.0 * lines.len().min(3) as f32).max(35.0);
             video_card(&p, o, top, height, None, true);
             let color = if error {
                 winui::ERROR()
@@ -1055,7 +1058,7 @@ impl VideoDialog {
                 text(
                     &p,
                     o.x + left,
-                    o.y + top + 19.0 + i as f32 * 15.0,
+                    o.y + top + 18.0 + i as f32 * 14.0,
                     line,
                     if error { color } else { winui::TEXT() },
                 );
@@ -1079,31 +1082,35 @@ impl VideoDialog {
             {
                 self.install(tool, dir, rt, ui.ctx());
             }
-            top += height + 10.0;
+            top += height + CARD_GAP;
         }
 
         self.format_card(ui, o + egui::vec2(0.0, top), options);
-        top += 113.0;
-        top += self.quality_card(ui, o + egui::vec2(0.0, top), options) + 10.0;
+        top += FORMAT_CARD_H + CARD_GAP;
+        // Give the format list the room left above the footer. A longer status message reduces
+        // the number of visible rows so the Save and Embedding controls still fit.
+        let quality_height = HEIGHT - 58.0 - top - SAVE_CARD_H - EMBED_CARD_H - 2.0 * CARD_GAP;
+        self.quality_card(ui, o + egui::vec2(0.0, top), options, quality_height);
+        top += quality_height + CARD_GAP;
         self.save_card(ui, o + egui::vec2(0.0, top), options, ffmpeg.is_some());
-        top += 108.0;
+        top += SAVE_CARD_H + CARD_GAP;
         let embedding = o + egui::vec2(0.0, top);
         video_card(
             &p,
             embedding,
             0.0,
-            93.0,
+            EMBED_CARD_H,
             Some(crate::i18n::mark("Embedding")),
             options,
         );
-        let controls = embedding + egui::vec2(0.0, 31.0);
+        let controls = embedding + egui::vec2(0.0, 23.0);
         let subtitles =
             self.list.is_none() && self.subtitles_row(ui, controls, options, ffmpeg.is_some());
         video_label(ui, controls, 21.0, "Subtitle languages", subtitles);
         self.chapters_row(ui, controls, options, ffmpeg.is_some());
         winui::checkbox_until(
             ui,
-            pos2(o.x + FIELD_X + 158.0, controls.y + 43.0),
+            pos2(o.x + FIELD_X + 158.0, controls.y + 36.0),
             &mut self.thumbnail,
             "Embed thumbnail when available",
             options && ffmpeg.is_some() && self.preferences.container != "webm",
@@ -1131,12 +1138,12 @@ impl VideoDialog {
             &p,
             o,
             0.0,
-            103.0,
+            FORMAT_CARD_H,
             Some(crate::i18n::mark("Format")),
             enabled,
         );
-        video_label(ui, o, 47.0, "Output container", enabled);
-        video_label(ui, o, 82.0, "Preferred codec", enabled && !self.advanced);
+        video_label(ui, o, 43.0, "Output container", enabled);
+        video_label(ui, o, 71.0, "Preferred codec", enabled && !self.advanced);
         let containers = ["Matroska (MKV)", "MPEG-4 (MP4)", "WebM"];
         let ci = mdm_tools::preferences::CONTAINERS
             .iter()
@@ -1145,7 +1152,7 @@ impl VideoDialog {
         let mut changed = false;
         if let Some(i) = winui::combo_light(
             ui,
-            r(o, FIELD_X, 30.0, 230.0, 26.0),
+            r(o, FIELD_X, 27.0, 230.0, 24.0),
             &containers,
             ci,
             enabled,
@@ -1170,7 +1177,7 @@ impl VideoDialog {
             .unwrap_or(0);
         if let Some(i) = winui::combo_light(
             ui,
-            r(o, FIELD_X, 65.0, 230.0, 26.0),
+            r(o, FIELD_X, 55.0, 230.0, 24.0),
             &codecs,
             selected,
             enabled && !self.advanced,
@@ -1183,7 +1190,7 @@ impl VideoDialog {
             text(
                 &p,
                 o.x + FIELD_X + 242.0,
-                o.y + 82.0,
+                o.y + 71.0,
                 crate::i18n::t("Set by the format IDs"),
                 winui::MUTED(),
             );
@@ -1199,28 +1206,8 @@ impl VideoDialog {
         }
     }
 
-    fn quality_card(&mut self, ui: &mut Ui, o: Pos2, enabled: bool) -> f32 {
+    fn quality_card(&mut self, ui: &mut Ui, o: Pos2, enabled: bool, height: f32) {
         let p = ui.painter().clone();
-        if let Some(list) = &mut self.list {
-            video_card(
-                &p,
-                o,
-                0.0,
-                236.0,
-                Some(crate::i18n::mark("Quality")),
-                enabled,
-            );
-            ui.add_enabled_ui(enabled, |ui| {
-                list.middle(ui, o + egui::vec2(LEFT - 11.0, -35.0), Some(489.0));
-            });
-            return 236.0;
-        }
-
-        let height = if self.format_code.is_some() {
-            282.0
-        } else {
-            236.0
-        };
         video_card(
             &p,
             o,
@@ -1229,6 +1216,18 @@ impl VideoDialog {
             Some(crate::i18n::mark("Quality")),
             enabled,
         );
+        if let Some(list) = &mut self.list {
+            ui.add_enabled_ui(enabled, |ui| {
+                list.middle(
+                    ui,
+                    o + egui::vec2(LEFT - 11.0, 0.0),
+                    RIGHT - LEFT + 22.0,
+                    height,
+                );
+            });
+            return;
+        }
+
         let shown = crate::i18n::mark("Show all formats");
         let x = (RIGHT - winui::text_width(&p, crate::i18n::t(shown)) - 23.0).max(FIELD_X);
         let before = self.advanced;
@@ -1258,23 +1257,18 @@ impl VideoDialog {
         }
         if let Some(mut code) = self.format_code.take() {
             let previous = code.clone();
-            self.format_table(ui, o, enabled, &mut code);
+            self.format_table(ui, o, enabled, height, &mut code);
             let changed = code != previous;
             self.format_code = Some(code);
             if changed {
                 self.name_from_choice();
             }
         } else {
-            self.quality_list(ui, o, enabled);
-        }
-        if self.format_code.is_some() {
-            282.0
-        } else {
-            236.0
+            self.quality_list(ui, o, enabled, height);
         }
     }
 
-    fn quality_list(&mut self, ui: &mut Ui, o: Pos2, enabled: bool) {
+    fn quality_list(&mut self, ui: &mut Ui, o: Pos2, enabled: bool, height: f32) {
         let defaults = self.preset_choices(None);
         let choices = if enabled {
             self.video
@@ -1287,7 +1281,7 @@ impl VideoDialog {
             .then_some(self.chosen)
             .filter(|i| *i < choices.len());
         self.rows.name = crate::i18n::t("Quality");
-        let rect = r(o, LEFT, 30.0, RIGHT - LEFT, 193.0);
+        let rect = r(o, LEFT, 30.0, RIGHT - LEFT, height - 43.0);
         let picked = ui
             .add_enabled_ui(enabled, |ui| {
                 let ev = winui::row_list(
@@ -1341,12 +1335,19 @@ impl VideoDialog {
         }
     }
 
-    fn format_table(&mut self, ui: &mut Ui, o: Pos2, enabled: bool, code: &mut String) {
+    fn format_table(
+        &mut self,
+        ui: &mut Ui,
+        o: Pos2,
+        enabled: bool,
+        height: f32,
+        code: &mut String,
+    ) {
         let Some((video, choices)) = &self.video else {
             return;
         };
         let p = ui.painter().clone();
-        let area = r(o, LEFT, 29.0, RIGHT - LEFT, 170.0);
+        let code_y = height - 61.0;
         let header = [
             "ID",
             "EXT",
@@ -1358,14 +1359,14 @@ impl VideoDialog {
             "ACODEC",
             "MORE INFO",
         ];
-        format_columns(&p, o.x + LEFT, area.top() + 12.0, header, winui::MUTED());
+        format_columns(&p, o.x + LEFT, o.y + 40.0, header, winui::MUTED());
         self.rows.name = crate::i18n::t("Available formats");
         let picked = ui
             .add_enabled_ui(enabled, |ui| {
                 winui::row_list(
                     ui,
                     "video-formats",
-                    r(o, LEFT, 47.0, RIGHT - LEFT, 150.0),
+                    r(o, LEFT, 47.0, RIGHT - LEFT, code_y - 56.0),
                     video.formats.len(),
                     19.0,
                     &mut self.rows,
@@ -1392,10 +1393,10 @@ impl VideoDialog {
         if enabled && let Some(i) = picked {
             pick_format(video, code, i);
         }
-        video_label(ui, o, 227.0, "Format code", enabled);
+        video_label(ui, o, code_y + 16.0, "Format code", enabled);
         winui::edit(
             ui,
-            r(o, FIELD_X, 210.0, RIGHT - FIELD_X - 215.0, 26.0),
+            r(o, FIELD_X, code_y, RIGHT - FIELD_X - 215.0, 24.0),
             code,
             enabled,
             false,
@@ -1410,7 +1411,7 @@ impl VideoDialog {
         let selected = presets.iter().position(|c| c.selector == code.trim());
         if let Some(i) = winui::combo_light(
             ui,
-            r(o, RIGHT - 205.0, 210.0, 205.0, 26.0),
+            r(o, RIGHT - 205.0, code_y, 205.0, 24.0),
             &names,
             selected.map_or(0, |i| i + 1),
             enabled && !presets.is_empty(),
@@ -1441,7 +1442,7 @@ impl VideoDialog {
         winui::paragraph(
             &p,
             o.x + FIELD_X,
-            o.y + 254.0,
+            o.y + code_y + 40.0,
             hint,
             color,
             o.x + RIGHT,
@@ -1451,18 +1452,25 @@ impl VideoDialog {
 
     fn save_card(&mut self, ui: &mut Ui, o: Pos2, enabled: bool, ffmpeg: bool) {
         let p = ui.painter().clone();
-        video_card(&p, o, 0.0, 98.0, Some(crate::i18n::mark("Save")), enabled);
-        video_label(ui, o, 47.0, "Save to", enabled);
+        video_card(
+            &p,
+            o,
+            0.0,
+            SAVE_CARD_H,
+            Some(crate::i18n::mark("Save")),
+            enabled,
+        );
+        video_label(ui, o, 43.0, "Save to", enabled);
         winui::edit(
             ui,
-            r(o, FIELD_X, 30.0, RIGHT - FIELD_X - 48.0, 26.0),
+            r(o, FIELD_X, 27.0, RIGHT - FIELD_X - 48.0, 24.0),
             &mut self.folder,
             enabled,
             false,
         );
         if winui::button(
             ui,
-            r(o, RIGHT - 38.0, 30.0, 38.0, 26.0),
+            r(o, RIGHT - 38.0, 27.0, 38.0, 24.0),
             "...",
             if enabled {
                 ButtonKind::Normal
@@ -1482,19 +1490,19 @@ impl VideoDialog {
         if let Some(folder) = winui::picked(ui.ctx(), "video-folder") {
             self.folder = folder.display().to_string();
         }
-        let field = r(o, FIELD_X, 64.0, RIGHT - FIELD_X, 26.0);
+        let field = r(o, FIELD_X, 55.0, RIGHT - FIELD_X, 24.0);
         if let Some(list) = &mut self.list {
-            video_label(ui, o, 81.0, "Quality", enabled);
+            video_label(ui, o, 71.0, "Quality", enabled);
             ui.add_enabled_ui(enabled, |ui| list.quality_row(ui, field, ffmpeg));
         } else {
-            video_label(ui, o, 81.0, "File name", enabled);
+            video_label(ui, o, 71.0, "File name", enabled);
             let edit = winui::edit(ui, field, &mut self.name, enabled, false);
             self.name_edited |= edit.changed();
             if self.name.is_empty() && !edit.has_focus() {
                 text(
                     &p,
                     o.x + FIELD_X + 5.0,
-                    o.y + 81.0,
+                    o.y + 71.0,
                     crate::i18n::t("Uses the video title if left empty"),
                     winui::MUTED(),
                 );
@@ -1584,7 +1592,7 @@ impl VideoDialog {
         let mut on = self.chapters;
         let resp = winui::checkbox_until(
             ui,
-            pos2(o.x + FIELD_X, o.y + 43.0),
+            pos2(o.x + FIELD_X, o.y + 36.0),
             &mut on,
             // i18n: checkbox in Download video: the chapters a video's page lists (YouTube's, for one) go into the video file, where players show them and skip between them
             "Embed chapters",
