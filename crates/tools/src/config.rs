@@ -51,7 +51,12 @@ pub fn managed() -> bool {
 }
 pub fn profile() -> io::Result<Profile> {
     CURRENT.with(|c| c.borrow().clone()).map_or_else(
-        || crate::preferences::Preferences::read().profile(false),
+        || {
+            Ok(Profile {
+                args: crate::preferences::Preferences::read().runtime_args(),
+                ..Default::default()
+            })
+        },
         Profile::resolved,
     )
 }

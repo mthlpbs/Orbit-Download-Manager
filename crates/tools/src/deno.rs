@@ -40,13 +40,14 @@ pub fn available() -> bool {
 }
 
 pub fn explicit(dir: &Path) -> Option<Installed> {
-    chosen::chosen(dir, chosen::Helper::Deno).or_else(|| {
-        let preferences = crate::preferences::Preferences::read_from(dir);
-        let exe = PathBuf::from(preferences.deno_path.trim());
-        (exe.is_absolute() && exe.is_file()).then(|| Installed {
-            exe,
-            version: String::new(),
-        })
+    if let Some(configured) = chosen::configured(dir, chosen::Helper::Deno) {
+        return configured.exe.is_file().then_some(configured);
+    }
+    let preferences = crate::preferences::Preferences::read_from(dir);
+    let exe = PathBuf::from(preferences.deno_path.trim());
+    (exe.is_absolute() && exe.is_file()).then(|| Installed {
+        exe,
+        version: String::new(),
     })
 }
 

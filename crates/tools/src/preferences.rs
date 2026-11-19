@@ -141,11 +141,16 @@ impl Preferences {
             }
         )
     }
-    pub fn profile(&self, use_file: bool) -> io::Result<crate::config::Profile> {
-        let mut args = Vec::new();
+    pub(crate) fn runtime_args(&self) -> Vec<String> {
         if self.remote_ejs {
-            args.extend(["--remote-components".into(), "ejs:github".into()]);
+            vec!["--remote-components".into(), "ejs:github".into()]
+        } else {
+            Vec::new()
         }
+    }
+
+    pub fn profile(&self, use_file: bool) -> io::Result<crate::config::Profile> {
+        let mut args = self.runtime_args();
         args.extend([
             "--merge-output-format".into(),
             self.container.clone(),

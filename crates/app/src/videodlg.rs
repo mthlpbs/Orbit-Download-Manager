@@ -1221,9 +1221,13 @@ impl VideoDialog {
             self.rows = Default::default();
         }
         if let Some(mut code) = self.format_code.take() {
+            let previous = code.clone();
             self.format_table(ui, o, enabled, &mut code);
+            let changed = code != previous;
             self.format_code = Some(code);
-            self.name_from_choice();
+            if changed {
+                self.name_from_choice();
+            }
         } else {
             self.quality_list(ui, o, enabled);
         }

@@ -52,6 +52,7 @@ struct Programs {
 }
 
 const FILE: &str = "programs.json";
+static PROGRAMS_WRITE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 pub fn config_file(dir: &Path) -> Option<std::path::PathBuf> {
     read(dir).ytdlp_config.filter(|p| p.is_file())
@@ -61,6 +62,9 @@ pub fn set_config_file(dir: &Path, file: Option<&Path>) -> Result<(), Error> {
     if let Some(file) = file {
         crate::config::load(file)?;
     }
+    let _guard = PROGRAMS_WRITE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut programs = read(dir);
     programs.ytdlp_config = file.map(Path::to_owned);
     write(dir, &programs)
@@ -95,7 +99,11 @@ fn slot(p: &mut Programs, h: Helper) -> &mut Option<Installed> {
 
 /// The program the person chose for `h`, if any and still there.
 pub fn chosen(dir: &Path, h: Helper) -> Option<Installed> {
-    slot(&mut read(dir), h).take().filter(|i| i.exe.is_file())
+    configured(dir, h).filter(|i| i.exe.is_file())
+}
+
+pub(crate) fn configured(dir: &Path, h: Helper) -> Option<Installed> {
+    slot(&mut read(dir), h).take()
 }
 
 /// Use `exe` for `h` from now on, once it has answered as that program (`--version`) in a
@@ -109,6 +117,9 @@ pub fn choose(dir: &Path, h: Helper, exe: &Path) -> Result<Installed, Error> {
             oldest: crate::gallery::OLDEST,
         });
     }
+    let _guard = PROGRAMS_WRITE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut p = read(dir);
     *slot(&mut p, h) = Some(installed.clone());
     write(dir, &p)?;
@@ -117,6 +128,9 @@ pub fn choose(dir: &Path, h: Helper, exe: &Path) -> Result<Installed, Error> {
 
 /// Back to MDM's own copy of `h`.
 pub fn forget(dir: &Path, h: Helper) -> Result<(), Error> {
+    let _guard = PROGRAMS_WRITE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut p = read(dir);
     if slot(&mut p, h).take().is_some() {
         write(dir, &p)?;

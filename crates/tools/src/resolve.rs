@@ -497,6 +497,7 @@ pub fn look_up_kept(
 ) -> Result<(Looked, proc::LookedUp), ProcError> {
     let mut args: Vec<String> = [
         "-J",
+        "--simulate",
         "--no-playlist",
         "--flat-playlist",
         "--playlist-items",
