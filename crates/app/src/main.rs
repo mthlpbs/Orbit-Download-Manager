@@ -94,12 +94,23 @@ pub fn window_builder() -> egui::ViewportBuilder {
 /// The main window's title (dialogs find their owner by it).
 pub const MAIN_TITLE: &str = concat!("Orbit Download Manager ", env!("CARGO_PKG_VERSION"));
 
-/// The supplied Orbit logo, rasterized by tools/icon/build_icon.mjs for Windows.
+/// The Windows window icon matches the executable's icon used by the taskbar.
+#[cfg(windows)]
+pub fn app_icon() -> std::sync::Arc<egui::IconData> {
+    static ICON: std::sync::OnceLock<std::sync::Arc<egui::IconData>> = std::sync::OnceLock::new();
+    ICON.get_or_init(|| {
+        let png = include_bytes!("../assets/icons/app/odm-window.png");
+        std::sync::Arc::new(eframe::icon_data::from_png_bytes(png).unwrap_or_default())
+    })
+    .clone()
+}
+
+#[cfg(not(windows))]
 pub fn app_icon() -> std::sync::Arc<egui::IconData> {
     app_picture()
 }
 
-/// The 256 px Orbit icon used by app windows and the remote control.
+/// The original Orbit logo for use inside the app.
 pub fn app_picture() -> std::sync::Arc<egui::IconData> {
     static ICON: std::sync::OnceLock<std::sync::Arc<egui::IconData>> = std::sync::OnceLock::new();
     ICON.get_or_init(|| {
