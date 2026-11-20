@@ -40,7 +40,7 @@ h2, h3 { font-size: 13px; line-height: 18px; font-weight: 600; }
 .icon-settings { --icon: url("assets/settings.png"); } .icon-external { --icon: url("assets/external.png"); }
 .icon-download { --icon: url("assets/download.png"); } .icon-help { --icon: url("assets/help.png"); }
 .icon-heart { --icon: url("assets/heart.png"); } .icon-alert { --icon: url("assets/alert.png"); }
-.icon-refresh { --icon: url("assets/refresh.png"); } .icon-video { --icon: url("assets/video.png"); }
+.icon-refresh { --icon: url("assets/refresh.png"); }
 .icon-music { --icon: url("assets/music.png"); } .icon-globe { --icon: url("assets/globe.png"); }
 .icon-lock { --icon: url("assets/lock.png"); } .icon-link { --icon: url("assets/link.png"); }
 .icon-check { --icon: url("assets/check.png"); } .icon-info { --icon: url("assets/info.png"); }
@@ -98,9 +98,6 @@ input[role="switch"]:disabled { opacity: .45; }
 .media-actions .download { color: var(--link); background: var(--tint); border-color: transparent; }
 .media-actions .download:disabled { color: var(--muted); opacity: .5; }
 .media-actions .download:hover:not(:disabled) { background: var(--tint); filter: brightness(1.12); }
-.empty-state { display: flex; align-items: center; gap: 12px; min-height: 80px; padding: 12px; border: 1px solid var(--edge); border-radius: 12px; background: var(--card); }
-.empty-icon { display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: none; border-radius: 10px; color: var(--secondary); background: var(--raised); }
-.empty-state p { margin-top: 2px; color: var(--secondary); font-size: 12px; line-height: 17px; }
 .keyboard-tip { display: flex; align-items: center; gap: 6px; min-height: 22px; margin-top: 8px; padding: 2px 4px 0; color: var(--muted); font-size: 12px; line-height: 17px; }
 kbd { flex: none; padding: 1px 6px; border: 1px solid var(--edge); border-radius: 5px; background: var(--raised); color: var(--secondary); font: 500 11px/16px Inter, sans-serif; }
 .keyboard-tip span { white-space: nowrap; }

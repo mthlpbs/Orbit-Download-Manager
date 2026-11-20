@@ -92,6 +92,7 @@
     }
   };
   const host = location.hostname;
+  const onYouTube = /(^|\.)youtube\.com$/.test(host);
   // The address the app looks the video up by — the video's, not the page's. Most pages that play
   // a video are not the video's page: YouTube's home, a search, a channel or a playlist carries a
   // list in its address ("recommended", the results, the channel's videos), and yt-dlp reads such
@@ -894,6 +895,7 @@
   let lastMove = 0;
   let pointer = { x: -1, y: -1 };
   let menuOpen = false;
+  let menuAbove = null;
   let dragging = null;
   let busy = false;
   let raf = 0;
@@ -1037,8 +1039,10 @@ button:focus-visible { outline: none; }
   position: absolute; width: 318px; max-width: calc(100vw - 16px); padding: 4px; border-radius: 6px;
   background: var(--bg); color: var(--tx); border: 1px solid var(--bd); box-shadow: var(--sh);
   font: 400 12px/1.2 var(--font); display: none; white-space: nowrap;
+  overflow-y: auto; overscroll-behavior: contain;
 }
 .menu.open { display: block; }
+.menu.above { transform: translateY(calc(-100% - 6px)); }
 .menu:focus { outline: none; }
 .mh { display: flex; gap: 8px; align-items: center; padding: 6px 8px 7px; }
 .mh img { width: 18px; height: 18px; flex: none; }
@@ -1521,10 +1525,16 @@ button:focus-visible { outline: none; }
   // `place` is where it sits in the room the video leaves around it: x and y from 0 to 1, one of
   // them 0 or 1 (on an edge).
   function rects() {
-    const r = held ? held.r : (lastRect = video.getBoundingClientRect());
+    let r = held ? held.r : (lastRect = video.getBoundingClientRect());
     const w = pill.offsetWidth || 150;
     const h = pill.offsetHeight || 30;
-    return { r, w, h, roomX: Math.max(0, r.width - w - 2 * INSET), roomY: Math.max(0, r.height - h - 2 * INSET) };
+    const miniplayer = held ? held.miniplayer : onYouTube && Boolean(video.closest("ytd-miniplayer, .ytp-player-minimized"));
+    // Leave space for the miniplayer's top row of controls even when those controls are hidden.
+    if (miniplayer) {
+      const controlsHeight = 48;
+      r = new DOMRect(r.left, r.top + controlsHeight, r.width, r.height - controlsHeight);
+    }
+    return { r, w, h, miniplayer, roomX: Math.max(0, r.width - w - 2 * INSET), roomY: Math.max(0, r.height - h - 2 * INSET) };
   }
 
   // Is a control of the page under this spot (a viewport rectangle)? What counts is something
@@ -1588,26 +1598,25 @@ button:focus-visible { outline: none; }
     // A small video, one its words wouldn't fit, or Compact chosen in Options: the round button
     // and its menu only.
     const vr = held ? held.r : video.getBoundingClientRect();
-    pill.classList.toggle("compact", compactFor(compactAlways, vr.width, fullWidth, INSET));
-    const { r, w, roomX, roomY } = rects();
+    if (!menuOpen) pill.classList.toggle("compact", compactFor(compactAlways, vr.width, fullWidth, INSET));
+    const { r, w, h, miniplayer, roomX, roomY } = rects();
     // The pointer on it (or its menu open): it stays where it is, whatever the video does
     // meanwhile. A preview that grows while the pointer is over it and shrinks back when the
     // pointer goes (#560) would otherwise take the button from under the pointer. Grown or
     // shrunk itself meanwhile (its grip shown, its words changed), it keeps its end at the
     // video's edge it was put against.
-    if (!dragging && pinned && pinned.v === video && (menuOpen || root.matches(":hover"))) {
+    if (!dragging && pinned && pinned.v === video && pinned.miniplayer === miniplayer && (menuOpen || root.matches(":hover"))) {
       if (w !== pinned.w && pinned.end) {
         pinned.left -= w - pinned.w;
         root.style.setProperty("transform", `translate(${Math.round(pinned.left)}px, ${Math.round(pinned.top)}px)`, "important");
       }
       pinned.w = w;
-      if (menuOpen) placeMenu(pinned.top, pinned.left, w);
+      if (menuOpen) placeMenu(pinned, h);
       placeTip(pinned.left, w);
       return;
     }
     // Held for a video gone (#503): where it was, not a corner found anew over what the page
     // shows there now.
-    const h = pill.offsetHeight || 30;
     const at = dragging ? dragging.at : held && !chosen ? held.at : spot(r, w, h, roomX, roomY);
     const left = r.left + INSET + at.x * roomX;
     // In the part of the video on screen: one scrolled half out keeps its button in view.
@@ -1615,24 +1624,31 @@ button:focus-visible { outline: none; }
     const visBottom = Math.min(r.bottom, innerHeight) - INSET - h;
     const top = Math.min(Math.max(r.top + INSET + at.y * roomY, visTop), Math.max(visTop, visBottom));
     root.style.setProperty("transform", `translate(${Math.round(left)}px, ${Math.round(top)}px)`, "important");
-    pinned = { v: video, left, top, w, end: at.x > 0.5 };
-    if (menuOpen) placeMenu(top, left, w);
+    pinned = { v: video, left, top, w, end: at.x > 0.5, miniplayer };
+    if (menuOpen) placeMenu(pinned, h);
     placeTip(left, w);
     if (dragging && dragging.moved) drawGuide(r, w, h, roomX, roomY, left, top);
   }
 
-  // Which of its sides is nearer the video's middle: its menu and its tip line up with that one.
+  // Which of its sides is nearer the video's middle: line up the tip with that side.
   function towardEnd(left, w) {
     const { r } = rects();
     return left + w / 2 > r.left + r.width / 2;
   }
 
-  // The open menu opens below the button, or above it near the bottom of the window.
-  function placeMenu(top, left, w) {
-    const h = menu.offsetHeight;
-    const below = top + 36 + h < innerHeight;
-    menu.style.top = below ? "36px" : `${-h - 6}px`;
-    menu.style.left = towardEnd(left, w) ? `${w - menu.offsetWidth}px` : "0";
+  // Anchor the menu to the pinned button even if a hover preview moves or the results arrive.
+  function placeMenu({ top, left, w, end }, buttonHeight) {
+    const gap = 6;
+    const above = top - gap - INSET;
+    const below = innerHeight - top - buttonHeight - gap - INSET;
+    if (menuAbove === null) menuAbove = above > below;
+    menu.classList.toggle("above", menuAbove);
+    menu.style.top = menuAbove ? "0" : `${buttonHeight + gap}px`;
+    menu.style.maxHeight = `${Math.max(0, menuAbove ? above : below)}px`;
+    const width = menu.offsetWidth;
+    const preferred = end ? left + w - width : left;
+    const x = Math.max(INSET, Math.min(preferred, innerWidth - INSET - width));
+    menu.style.left = `${x - left}px`;
   }
 
   function placeTip(left, w) {
@@ -1764,7 +1780,7 @@ button:focus-visible { outline: none; }
   function hold() {
     const now = Date.now();
     const d = entered && entered.v === video && now - entered.t < 1000 ? entered.d : describe(video, lastRect);
-    return { r: lastRect, at: chosen ? place : (auto.v === video && auto.at) || place, d, since: now };
+    return { r: lastRect, at: chosen ? place : (auto.v === video && auto.at) || place, miniplayer: pinned?.miniplayer, d, since: now };
   }
 
   // While shown: follow the video (scrolling, layout) and fade when the pointer rests (IDLE_MS)
@@ -2185,6 +2201,7 @@ button:focus-visible { outline: none; }
     if (!menuOpen) return;
     const back = menu.contains(shadow.activeElement);
     menuOpen = false;
+    menuAbove = null;
     menu.classList.remove("open");
     more.setAttribute("aria-expanded", "false");
     // The keyboard's focus back on its button, not lost with the menu.

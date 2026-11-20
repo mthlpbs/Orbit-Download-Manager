@@ -219,9 +219,8 @@ async function showMedia(tab, available) {
   list.replaceChildren(); rowButtons.clear();
   $("media-count").textContent = listedMedia.length;
   $("media-count").hidden = !listedMedia.length;
+  $("media-heading").hidden = !listedMedia.length;
   list.hidden = !listedMedia.length;
-  $("media-none").hidden = listedMedia.length > 0;
-  $("media-empty-description").textContent = reply.keptOff ? t("popup_media_store") : reply.streamed ? t("popup_media_streamed") : "Play the video or audio on this page, then reopen Orbit.";
   for (const media of listedMedia) {
     const row = document.createElement("li");
     row.dataset.kind = media.kind; row.dataset.format = tagOf(media);

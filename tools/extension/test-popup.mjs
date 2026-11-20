@@ -145,7 +145,13 @@ await page.locator('#popup').screenshot({path:'target/extension-previews/disconn
 assert.ok(await page.locator('#popup').evaluate(x=>x.scrollHeight===x.clientHeight && x.clientHeight<=600));
 await page.evaluate(async()=>{Object.assign(window.__popup,{connected:true,media:[]});await show();});
 await page.locator('#popup').screenshot({path:'target/extension-previews/empty.png'});
-assert.equal(await page.locator('#media-none').isVisible(),true);
+assert.equal(await page.locator('#media-heading').isHidden(),true);
+assert.equal(await page.locator('#media-list').isHidden(),true);
+assert.equal(await page.locator('#skip-hint').isVisible(),true);
+assert.equal(await page.getByText('No media found yet').count(),0);
+await page.evaluate(async items=>{window.__popup.media=items;await show();},media);
+assert.equal(await page.locator('#media-heading').isVisible(),true);
+assert.equal(await page.locator('#media-list li').count(),media.length);
 await page.evaluate(async()=>{window.__popup.host='chrome://newtab/';await show();});
 assert.equal(await page.locator('#site').isHidden(),true);
 // Firefox's optional proxy permission stays off after denial, then can be granted and revoked.
