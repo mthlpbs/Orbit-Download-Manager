@@ -1652,7 +1652,7 @@ async function mediaDownload(tabId, url) {
       src: it.url,
       title: tabTitle(tab),
       referrer: tab.url && tab.url !== page ? tab.url : "",
-      ...(await streamContext(tabId, it.url, ctx)),
+      ...(await videoContext(tabId, page, it.url, ctx)),
       ...(ctx.incognito ? { private: true } : {}),
     });
   }
@@ -1686,6 +1686,11 @@ async function cookieHeader(url, ctx) {
   return header(await cookiesFor(url, ctx));
 }
 
+async function siteCookiesEnabled() {
+  const { useSiteCookies } = await ext.storage.local.get({ useSiteCookies: true });
+  return useSiteCookies !== false;
+}
+
 // For yt-dlp, which may ask another host of the site than the page's (a YouTube Music page is
 // looked up on www.youtube.com): each cookie with the domain, path and flags the browser keeps,
 // so the app files `.youtube.com`'s sign-in for every host of it and a host's own cookie for
@@ -1709,8 +1714,8 @@ async function videoCookies(url, ctx) {
 // its playlists and pieces), and the cookies that went with it that no store lists (a frame's
 // own, kept for its page only), added for its host. Nothing more for an address the tab didn't
 // load (a page's).
-async function streamContext(tabId, url, ctx) {
-  const c = await videoCookies(url, ctx);
+async function streamContext(tabId, url, ctx, useSiteCookies = true) {
+  const c = useSiteCookies ? await videoCookies(url, ctx) : { cookies: "", cookieJar: [] };
   const tab = media.get(tabId);
   const it = tab && [...tab.items, ...(tab.ranged || []), ...(tab.maybe || [])].find((x) => x.url === url);
   const sent = (it && it.sent) || {};
@@ -1719,7 +1724,7 @@ async function streamContext(tabId, url, ctx) {
     ...(web(sent.referer) ? { referer: sent.referer } : {}),
     ...(web(sent.origin) ? { origin: sent.origin } : {}),
   };
-  if (typeof sent.cookie === "string" && sent.cookie) {
+  if (useSiteCookies && typeof sent.cookie === "string" && sent.cookie) {
     let host = "";
     let secure = false;
     try {
@@ -1741,6 +1746,21 @@ async function streamContext(tabId, url, ctx) {
     c.cookies = sent.cookie;
   }
   return Object.keys(fetchedWith).length ? { ...c, fetchedWith } : c;
+}
+
+async function videoContext(tabId, page, src, ctx, useSiteCookies) {
+  const enabled = typeof useSiteCookies === "boolean" ? useSiteCookies : await siteCookiesEnabled();
+  const stream = await streamContext(tabId, src || page, ctx, enabled);
+  if (!enabled) return { ...stream, useSiteCookies: false };
+  if (!src || src === page) return stream;
+  // The stream keeps its request header. yt-dlp also needs cookies for the page and
+  // its extractor; the jar retains the browser's domain and path for each cookie.
+  const site = await videoCookies(page, ctx);
+  const byScope = new Map();
+  for (const cookie of [...site.cookieJar, ...stream.cookieJar]) {
+    byScope.set(JSON.stringify([cookie.domain, cookie.path, cookie.name]), cookie);
+  }
+  return { ...stream, cookieJar: [...byScope.values()] };
 }
 
 // Has the user left this extension the site? With access limited ("On click", some sites), its
@@ -2027,7 +2047,7 @@ async function handOff(d) {
     finalUrl: d.finalUrl && d.finalUrl !== d.url ? d.finalUrl : "",
     referrer: d.referrer || "",
     ...(d.page && /^https?:\/\//i.test(d.page) && d.page.length <= URL_MAX ? { pageUrl: d.page } : {}),
-    cookies: await cookieHeader(d.url, d),
+    cookies: (await siteCookiesEnabled()) ? await cookieHeader(d.url, d) : "",
     filename: d.filename || "",
     // The browser's name is only its address's guess (#948, `addressNamed`): the host checks
     // Options' file types by it, and MDM names the file from the server's own answer.
@@ -2751,10 +2771,10 @@ async function menuClicked(info, tab) {
     const title = tabTitle(tab);
     // A player's own stream (blob:, a MediaSource) or a stream's manifest: the Download video
     // window, which reads streams (a manifest downloaded as a file is only a short list).
-    // The manifest's own cookies (its server may not be the page's), as the media list sends.
+    // The stream and the page can use different cookie domains.
     if (url && MANIFEST.test(url)) {
       await mediaBack;
-      const reply = await native({ video: true, explicit: true, url: info.pageUrl, src: url, title, ...(await streamContext(tab && tab.id, url, { incognito, storeId })), private: incognito });
+      const reply = await native({ video: true, explicit: true, url: info.pageUrl, src: url, title, ...(await videoContext(tab && tab.id, info.pageUrl, url, { incognito, storeId })), private: incognito });
       if (!reply.ok && reply.why !== "options") explain(reply.why);
       return;
     }
@@ -2774,7 +2794,7 @@ async function menuClicked(info, tab) {
         ...(src ? { src } : {}),
         ...(title ? { title } : {}),
         referrer: info.pageUrl && info.pageUrl !== page ? info.pageUrl : "",
-        ...(await streamContext(tab && tab.id, src || page, { incognito, storeId })),
+        ...(await videoContext(tab && tab.id, page, src, { incognito, storeId })),
         private: incognito,
       });
       if (!reply.ok && reply.why !== "options") explain(reply.why);
@@ -2799,7 +2819,8 @@ async function menuClicked(info, tab) {
       // A page extensions may not read (the browser's own, a store).
     }
     if (!links.length) return;
-    const reply = await sendLinks({ links, referrer: info.pageUrl, cookies: await cookieHeader(info.pageUrl, { incognito, storeId }), private: incognito });
+    const cookies = (await siteCookiesEnabled()) ? await cookieHeader(info.pageUrl, { incognito, storeId }) : "";
+    const reply = await sendLinks({ links, referrer: info.pageUrl, cookies, private: incognito });
     // Sent, but a link longer than a whole message was left out: the help page says so.
     if (!reply.ok || reply.left) explain(reply.ok ? "too-large" : reply.why);
   }
@@ -3012,7 +3033,9 @@ async function videoTarget(m, page, sender) {
   // (`video-played`): goes as its `src`, a feed's or a post's too, with the page's title (the
   // only one there is for it).
   const played = playedItem(tab.id, m.played, sender.frameId || 0);
-  const src = file || (played ? played.url : "") || (post || feed ? "" : await streamFor(sender));
+  // A named YouTube video has its own extractor and subtitles. Fall back to a played stream
+  // only if the page lookup fails or the player cannot name the video.
+  const src = file || (played ? played.url : "") || (post || feed || (youtube && named) ? "" : await streamFor(sender));
   if (!named && !src) return null;
   const own = named || page;
   return {
@@ -3027,7 +3050,7 @@ async function videoTarget(m, page, sender) {
     // The cookies of what yt-dlp is given (the app files them under its host): the stream's
     // own server may not be the page's, and the page's cookies are not for it. With a stream's,
     // what the browser sent with it (#900).
-    ...(await streamContext(tab.id, src || own, { incognito: tab.incognito, storeId: tab.cookieStoreId })),
+    ...(await videoContext(tab.id, m.direct && src ? src : own, src, { incognito: tab.incognito, storeId: tab.cookieStoreId }, m.useSiteCookies)),
   };
 }
 
@@ -3064,6 +3087,7 @@ async function videoLookup(m, page, sender) {
     },
     cookies: v.cookies,
     cookieJar: v.cookieJar,
+    ...(v.useSiteCookies === false ? { useSiteCookies: false } : {}),
     ...(v.fetchedWith ? { fetchedWith: v.fetchedWith } : {}),
     private: Boolean(tab.incognito),
   });
@@ -3154,6 +3178,7 @@ async function pageMessage(m, sender) {
       referrer: v.referrer,
       cookies: v.cookies,
       cookieJar: v.cookieJar,
+      ...(v.useSiteCookies === false ? { useSiteCookies: false } : {}),
       ...(v.fetchedWith ? { fetchedWith: v.fetchedWith } : {}),
       ...(tab.incognito ? { private: true } : {}),
     });

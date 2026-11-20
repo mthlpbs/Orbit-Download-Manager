@@ -296,6 +296,7 @@ async function storedSwitch(id, key, after, defaultValue = false) {
   });
 }
 storedSwitch("media-title-name", "mediaTitleName", () => showMedia(current, connected));
+storedSwitch("site-cookies", "useSiteCookies", null, true);
 storedSwitch("show-download-button", "showDownloadButton", async () => {
   let host = "";
   try { const url = new URL(current && current.url); if (/^https?:$/.test(url.protocol)) host = url.hostname; } catch {}

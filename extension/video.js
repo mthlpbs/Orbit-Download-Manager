@@ -55,7 +55,6 @@
     video_open_post_button: "Open post",
     video_drag_dots: "Drag the dots to move it along the edge",
     video_tip: "Download $1",
-    video_tip_best: "Download the best quality",
     video_sending: "Sending to MDM...",
     video_added: "Added to MDM",
     video_show: "Show",
@@ -63,10 +62,10 @@
     video_get_mdm: "Get MDM",
     video_retry: "Retry",
     video_turn_on: "Turn on",
-    video_best: "best",
     video_original: "original",
     video_compatible: "Most compatible",
-    video_download_best: "Download best",
+    video_default_quality: "Default",
+    video_use_site_cookies: "Use site cookies",
     video_all_qualities: "All qualities and subtitles...",
     video_looking: "Looking up the qualities…",
     video_no_choices: "No video to download here",
@@ -742,7 +741,25 @@
     if (!look || typeof look !== "object") return null;
     if (look.file) return look;
     if (look.state !== "ready" || !Array.isArray(look.choices) || !look.choices.length) return null;
-    return look.choices.find((c) => c && c.audio !== true) || look.choices[0];
+    return look.choices[look.default_choice] || look.choices.find((c) => c && c.audio !== true) || look.choices[0];
+  }
+
+  // Older apps sent the configured selector as a duplicate row at the start of the list.
+  function menuDefault(look) {
+    const index = look.choices.indexOf(bestOf(look));
+    if (look.default_action_only) return { marked: -1, hidden: index, pick: index };
+    const primary = look.choices[index];
+    if (primary && look.default_choice === index) {
+      const matching = look.choices.findIndex((choice, i) => i !== index && choice &&
+        (primary.height || primary.audio) && choice.height === primary.height &&
+        choice.audio === primary.audio && choice.ext === primary.ext &&
+        choice.codec === primary.codec && choice.kbps === primary.kbps);
+      if (matching >= 0) return { marked: matching, hidden: index, pick: index };
+      if (primary.label === "Default quality" && !primary.height && !primary.audio) {
+        return { marked: -1, hidden: index, pick: index };
+      }
+    }
+    return { marked: index, hidden: -1, pick: index };
   }
 
   // The chip: what one click gets ({text, hd}), a skeleton while the look-up runs, or nothing.
@@ -756,7 +773,7 @@
   // The hover tip's first line: exactly what one click downloads ("Download 1080p MP4 · 412 MB").
   function tipFor(look, t, lang) {
     const c = bestOf(look);
-    if (!c) return look && look.state === "pending" ? t("video_tip_best") : t("video_download");
+    if (!c) return t("video_download");
     const name = qualityName(c, t);
     const what = c.height || c.file ? [name, String(c.ext || "").toUpperCase()].filter(Boolean).join(" ") : name;
     const size = choiceSize(c, lang);
@@ -824,13 +841,16 @@
   let compactAlways = false;
   // Hidden while the page is fullscreen, when chosen in the popup (off: it shows, as now).
   let hideFullscreen = false;
+  let useSiteCookies = null;
   // The background resolves global defaults, site exceptions and embedded-player rules together.
   try {
-    ext.storage.local.get({ hideVideoFullscreen: false }).then((v) => {
+    ext.storage.local.get({ hideVideoFullscreen: false, useSiteCookies: true }).then((v) => {
       hideFullscreen = Boolean(v.hideVideoFullscreen);
+      if (useSiteCookies === null) setCookieMode(v.useSiteCookies !== false);
     }).catch(() => {});
     ext.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
+      if (changes.useSiteCookies) setCookieMode(changes.useSiteCookies.newValue !== false);
       if (changes.showDownloadButton || changes.downloadButtonSites) {
         const pending = asking;
         const refresh = () => {
@@ -1037,14 +1057,13 @@ button:focus-visible { outline: none; }
 .menu button:hover { background: var(--hov); }
 .menu button.sel { background: var(--hov); }
 .menu button.sel::before { content: ""; position: absolute; inset-inline-start: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--go); }
-.menu .n { width: 14px; color: var(--tx2); font-size: 11px; text-align: end; flex: none; }
-.menu .q { width: 46px; font-weight: 600; flex: none; }
+.menu .q { flex: 1; text-align: start; font-weight: 600; }
 .menu .f { color: var(--tx2); flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .menu .z { color: var(--tx2); font-variant-numeric: tabular-nums; }
+.menu .default-tag { flex: none; padding: 1px 4px; color: var(--accent); border: 1px solid var(--bd); border-radius: 4px; font-size: 10px; }
 .menu .k { margin-inline-start: auto; padding-inline-start: 12px; color: var(--tx2); font-size: 11px; }
 .menu .top .lead { color: var(--accent); font-weight: 600; }
 .menu .top .f { color: var(--tx); }
-.menu .best { font: 700 10px/13px var(--font); color: var(--accent); border: 1.5px solid var(--accent); border-radius: 3px; padding: 0 3px; margin-inline-start: 4px; }
 .menu .mi { width: 16px; display: flex; justify-content: center; color: var(--tx2); flex: none; }
 .menu .mi svg { width: 13px; height: 13px; }
 .menu .top .mi { color: var(--go); }
@@ -1105,6 +1124,7 @@ button:focus-visible { outline: none; }
   <div class="rows" role="group"></div>
   <div class="hr"></div>
   <button role="menuitem" data-act="window"><span class="mi"><svg viewBox="0 0 16 16" ${ICON} stroke-width="1.4"><path d="M2.5 4h11M2.5 8h11M2.5 12h7"/></svg></span><span></span></button>
+  <button role="menuitemcheckbox" aria-checked="true" data-act="cookies"><span class="mi" aria-hidden="true">✓</span><span></span></button>
   <div class="hr"></div>
   <button role="menuitem" data-act="hide"><span class="mi"><svg viewBox="0 0 16 16" ${ICON} stroke-width="1.4"><circle cx="8" cy="8" r="5.5"/><path d="M4.2 11.8l7.6-7.6"/></svg></span><span></span><span class="k">Esc</span></button>
   <button role="menuitem" data-act="never"><span class="mi"><svg viewBox="0 0 16 16" ${ICON} stroke-width="1.4"><circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c2 2 2 9 0 11M8 2.5c-2 2-2 9 0 11"/></svg></span><span></span></button>
@@ -1136,6 +1156,7 @@ button:focus-visible { outline: none; }
   closeX.setAttribute("aria-label", t("video_hide_here"));
   menu.setAttribute("aria-label", idleLabel);
   item("window").lastElementChild.textContent = t("video_all_qualities");
+  item("cookies").lastElementChild.textContent = t("video_use_site_cookies");
   item("hide").children[1].textContent = t("video_hide_here");
   item("never").lastElementChild.textContent = ext.i18n.getMessage("video_never_site", [host]) || `Never on ${host}`;
   item("settings").lastElementChild.textContent = t("video_settings");
@@ -1147,6 +1168,18 @@ button:focus-visible { outline: none; }
   // video that plays a plain file needs none: the browser says its picture's size, and it goes
   // to MDM as a file.
   const looks = new Map();
+  function setCookieMode(enabled) {
+    if (useSiteCookies === enabled) return;
+    useSiteCookies = enabled;
+    const button = item("cookies");
+    button.setAttribute("aria-checked", String(enabled));
+    button.firstElementChild.textContent = enabled ? "✓" : "";
+    looks.clear();
+    if (menuOpen && video) {
+      startLook(describeNow(video), true);
+      fillMenu();
+    }
+  }
   // Shown this long over the same video first: previews the pointer only crosses aren't looked up.
   const LOOK_DELAY_MS = 600;
   // The pointer resting this long on the button itself (#1053): the click is coming, so the
@@ -1215,7 +1248,7 @@ button:focus-visible { outline: none; }
     const kept = looks.get(c.key);
     if (usable(kept) && !(byUser && kept.state === "busy")) return kept;
     const og = location.href === landedAt ? document.querySelector('meta[property="og:title"]')?.content : "";
-    const asked = { src: c.d.src, title: (og || document.title || "").trim(), url: c.d.url, at: c.d.at };
+    const asked = { src: c.d.src, title: (og || document.title || "").trim(), url: c.d.url, at: c.d.at, useSiteCookies };
     const l = { state: "pending", at: Date.now(), href: location.href, asked };
     looks.set(c.key, l);
     const alive = () => looks.get(c.key) === l && location.href === l.href;
@@ -1884,7 +1917,7 @@ button:focus-visible { outline: none; }
       if (d.drm) return render();
       const og = location.href === landedAt ? document.querySelector('meta[property="og:title"]')?.content : "";
       const title = (og || document.title || "").trim();
-      const j = { video, src: video.currentSrc || "", href: location.href, asked: { src: d.src, title, url: d.url, at: d.at }, row, toWindow };
+      const j = { video, src: video.currentSrc || "", href: location.href, asked: { src: d.src, title, url: d.url, at: d.at, useSiteCookies }, row, toWindow };
       const c = { v: video, d, key: lookKey(d) };
       let l = lookOf(c);
       setStatus({ state: "sending", text: t("video_sending") });
@@ -1994,8 +2027,8 @@ button:focus-visible { outline: none; }
   });
 
   // ---- the menu -------------------------------------------------------------------------------
-  // The video's qualities as its look-up found them: "Download best" first, then one numbered
-  // line per quality (video, then sound); MDM's whole window; hiding and settings. Filled as it
+  // The video's qualities as its look-up found them, with the configured row marked.
+  // MDM's whole window, hiding and settings follow the list. Filled as it
   // opens and again when the look-up ends.
   function fillMenu() {
     const c = video ? describeNow(video) : null;
@@ -2009,11 +2042,9 @@ button:focus-visible { outline: none; }
     note.replaceChildren();
     const best = bestOf(look);
     if (look && look.file) {
-      rows.append(topRow(best, { file: true }));
+      rows.append(fileRow(best));
     } else if (look && look.state === "pending") {
-      // Looking: the best already takes a click; its lines come when it ends.
       say(t("video_looking"));
-      rows.append(topRow(null, {}));
       for (let i = 0; i < 3; i += 1) {
         const s = document.createElement("div");
         s.className = "skrow";
@@ -2022,16 +2053,19 @@ button:focus-visible { outline: none; }
       }
     } else if (look && look.state === "ready" && Array.isArray(look.choices) && look.choices.length) {
       const groups = groupChoices(look.choices, 100);
-      rows.append(topRow(best, { choice: look.choices.indexOf(best) }));
-      let n = 0;
+      const primary = menuDefault(look);
       for (const [kind, words] of [["video", "video_tab_video"], ["audio", "video_tab_audio"]]) {
-        if (!groups[kind].length) continue;
+        const choices = groups[kind].filter((i) => i !== primary.hidden);
+        if (!choices.length) continue;
         const cap = document.createElement("div");
         cap.className = "cap";
         cap.dataset.kind = kind;
         cap.textContent = t(words);
         rows.append(cap);
-        for (const i of groups[kind]) rows.append(row(look.choices[i], i, (n += 1), look.choices[i] === best));
+        for (const i of choices) {
+          const isDefault = i === primary.marked;
+          rows.append(row(look.choices[i], isDefault ? primary.pick : i, isDefault));
+        }
       }
       tell(noticeOf(look));
     } else if (look) {
@@ -2096,36 +2130,30 @@ button:focus-visible { outline: none; }
     return { q: qualityName(c, t), f: qualityMeta(c, t) };
   }
 
-  // The first line: what one click downloads ("Download best · 1080p MP4 · 60 fps · 412 MB"),
-  // chosen as the list opens.
-  function topRow(c, { choice, file }) {
+  // A plain file has no quality list.
+  function fileRow(c) {
     const b = document.createElement("button");
     b.type = "button";
     b.setAttribute("role", "menuitem");
     b.className = "top sel";
-    if (Number.isInteger(choice) && choice >= 0) b.dataset.choice = String(choice);
-    else b.dataset.row = file ? "file" : "best";
+    b.dataset.row = "file";
     const mi = span("mi", "");
     mi.append(arrowIcon.cloneNode(true));
-    const name = c ? [qualityName(c, t), c.height || c.file ? String(c.ext || "").toUpperCase() : ""].filter(Boolean).join(" ") : "";
-    const what = [name, c && c.fps ? `${Math.round(c.fps)} fps` : ""].filter(Boolean).join(" · ");
-    b.append(mi, span("lead", t("video_download_best")), span("f", what), span("z", c ? choiceSize(c, lang) : ""));
+    b.append(mi, span("lead", t("video_download")), span("f", qualityName(c, t)), span("z", choiceSize(c, lang)));
     return b;
   }
   const arrowIcon = $(".tpl svg");
 
-  // A quality's line: its number, its name, its type and frame rate (the best marked), its size;
-  // all as text.
-  function row(c, choice, n, best) {
+  function row(c, choice, isDefault) {
     const b = document.createElement("button");
     b.type = "button";
     b.setAttribute("role", "menuitem");
     b.dataset.choice = String(choice);
     const { q, f } = lineWords(c, t);
-    const fs = span("f", f);
-    if (best) fs.append(span("best", t("video_best")));
     if (c && c.compatible === true) b.title = String(c.label ?? "").slice(0, 200);
-    b.append(span("n", String(n)), span("q", q), fs, span("z", rowText(c, lang).size));
+    b.append(span("q", c.audio && f ? `${q} · ${f}` : q));
+    if (isDefault) b.append(span("default-tag", t("video_default_quality")));
+    b.append(span("z", choiceSize(c, lang)));
     return b;
   }
 
@@ -2150,8 +2178,7 @@ button:focus-visible { outline: none; }
     more.setAttribute("aria-expanded", "true");
     lastMove = Date.now();
     position();
-    // On the chosen line ("Download best"), else the first item.
-    focusItem(rows.querySelector("button.sel") || menuItems()[0]);
+    focusItem(menuItems()[0]);
   }
 
   function closeMenu() {
@@ -2179,6 +2206,11 @@ button:focus-visible { outline: none; }
 
   async function run(act) {
     if (act === "window") return download(null, true);
+    if (act === "cookies") {
+      setCookieMode(useSiteCookies === false);
+      item("cookies").focus();
+      return;
+    }
     closeMenu();
     if (act === "hide") return hideHere();
     if (act === "never") {

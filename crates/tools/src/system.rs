@@ -118,17 +118,76 @@ pub(crate) fn extra_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-/// PATH first, then [`extra_dirs`]. Discovery only reads metadata, never starts a helper on
-/// the UI thread.
+/// PowerShell's application resolution on Windows, then PATH and package-manager folders.
 pub(crate) fn installed(name: &str) -> Option<Installed> {
     let path = std::env::var_os("PATH").unwrap_or_default();
     let dirs = std::env::split_paths(&path).chain(extra_dirs());
     #[cfg(windows)]
     let dirs = dirs.chain(windows_paths());
-    find_in(name, dirs).map(|exe| Installed {
+    #[cfg(windows)]
+    let exe = powershell_source(name).or_else(|| find_in(name, dirs));
+    #[cfg(not(windows))]
+    let exe = find_in(name, dirs);
+    exe.map(|exe| Installed {
         version: crate::SYSTEM.into(),
         exe,
     })
+}
+
+#[cfg(windows)]
+fn powershell_source(name: &str) -> Option<PathBuf> {
+    use std::os::windows::process::CommandExt;
+    use std::time::{Duration, Instant};
+
+    const NAMES: [&str; 3] = ["yt-dlp", "ffmpeg", "deno"];
+    type Discovery = (std::ffi::OsString, Instant, [Option<PathBuf>; 3]);
+    static CACHE: std::sync::Mutex<Option<Discovery>> = std::sync::Mutex::new(None);
+    let index = NAMES.iter().position(|n| *n == name)?;
+    let inherited = std::env::var_os("PATH").unwrap_or_default();
+    let path =
+        std::env::join_paths(std::env::split_paths(&inherited).chain(windows_paths())).ok()?;
+    let mut cache = CACHE.lock().ok()?;
+    if let Some((before, checked, sources)) = cache.as_ref()
+        && *before == path
+        && checked.elapsed() < Duration::from_secs(30)
+    {
+        return sources[index].clone().filter(|p| runnable(p));
+    }
+    let shell = PathBuf::from(std::env::var_os("SystemRoot")?)
+        .join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
+    let script = "[Console]::OutputEncoding = [Text.UTF8Encoding]::new(); \
+        & { foreach ($name in $args) { \
+        $found = Get-Command $name -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1 Source; \
+        if ($found) { $found.Source } else { '-' } } } yt-dlp ffmpeg deno";
+    let output = std::process::Command::new(shell)
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            script,
+        ])
+        .creation_flags(0x08000000)
+        .env("PATH", &path)
+        .output()
+        .ok()?;
+    let mut lines = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(str::trim)
+        .map(PathBuf::from)
+        .collect::<Vec<_>>()
+        .into_iter();
+    let sources = std::array::from_fn(|_| {
+        lines.next().filter(|p| {
+            p.is_absolute()
+                && p.extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"))
+                && runnable(p)
+        })
+    });
+    let result = sources[index].clone();
+    *cache = Some((path, Instant::now(), sources));
+    result
 }
 
 /// Package installers can update PATH after Explorer or Orbit was started.

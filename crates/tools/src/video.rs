@@ -62,8 +62,6 @@ pub struct SubProblem {
     pub code: String,
     pub name: String,
     pub reason: SubReason,
-    /// They came on the second try, but beside the video, not in it (they were to be embedded).
-    pub beside: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -128,7 +126,6 @@ fn sub_name(info: &serde_json::Value, code: &str) -> String {
 #[derive(Clone, Debug)]
 struct SubsRetry {
     automatic: bool,
-    embed: bool,
     ffmpeg: bool,
     base: Vec<String>,
 }
@@ -1584,29 +1581,19 @@ fn attempt(
         }
     }
     let mut problems = Vec::new();
-    for (code, why) in &refused {
+    for (code, _) in &refused {
         let gone = still.iter().find(|(c, _)| c == code);
         match gone {
             Some((_, why)) => problems.push(SubProblem {
                 code: code.clone(),
                 name: sub_name(&info, code),
                 reason: why.clone(),
-                beside: false,
             }),
             None => {
                 note(
                     progress,
                     format!("Subtitles in {code} came on the second try"),
                 );
-                // Asked into the video, they're beside it now.
-                if retry.is_some_and(|r| r.embed) {
-                    problems.push(SubProblem {
-                        code: code.clone(),
-                        name: sub_name(&info, code),
-                        reason: why.clone(),
-                        beside: true,
-                    });
-                }
             }
         }
     }
@@ -2063,9 +2050,33 @@ impl VideoJob {
             ours.push("--hls-prefer-native".into());
             choose.push("--hls-prefer-native".into());
         }
-        let retry = with_subs.then(|| SubsRetry {
+        let profile = crate::config::profile()
+            .map_err(|e| ProcError::Start("yt-dlp configuration".into(), e))?;
+        let flag = |on, off| {
+            profile
+                .args
+                .iter()
+                .chain(&ours)
+                .rev()
+                .find_map(|arg| {
+                    if arg == on {
+                        Some(true)
+                    } else if arg == off {
+                        Some(false)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(false)
+        };
+        let embed_subtitles = flag("--embed-subs", "--no-embed-subs");
+        if embed_subtitles && flag("--write-subs", "--no-write-subs") {
+            // yt-dlp otherwise keeps subtitles explicitly requested for download after embedding.
+            ours.extend(["--compat-options".into(), "no-keep-subs".into()]);
+        }
+        // The subtitle-only retry writes a sidecar. Embedded jobs report refused tracks instead.
+        let retry = (with_subs && !embed_subtitles).then(|| SubsRetry {
             automatic: subs.automatic,
-            embed: subs.embed && ffmpeg.is_some(),
             ffmpeg: ffmpeg.is_some(),
             base: retry_base,
         });
@@ -2084,13 +2095,15 @@ impl VideoJob {
         // Whose cookies yt-dlp has, for the log (#229): the browser's name only, never a
         // cookie or the profile (a folder may name the person).
         let events = match proc::browser_cookies() {
-            Some(b) if !browser.private && cookies.is_none() => vec![(
-                std::time::SystemTime::now(),
-                format!(
-                    "Cookies read from {} on this computer (Options → Sites Logins)",
-                    b.browser
-                ),
-            )],
+            Some(b) if !browser.private && browser.cookie_policy.is_none() && cookies.is_none() => {
+                vec![(
+                    std::time::SystemTime::now(),
+                    format!(
+                        "Cookies read from {} on this computer (Options → Sites Logins)",
+                        b.browser
+                    ),
+                )]
+            }
             _ => Vec::new(),
         };
         let progress = Arc::new(Mutex::new(Progress {
@@ -2119,8 +2132,6 @@ impl VideoJob {
         {
             let (progress, child) = (progress.clone(), child.clone());
             let (exe, url) = (exe.to_owned(), url.to_owned());
-            let profile = crate::config::profile()
-                .map_err(|e| ProcError::Start("yt-dlp configuration".into(), e))?;
             std::thread::spawn(move || {
                 crate::config::with_profile(profile, || {
                     // The cookie file lives as long as the run.
@@ -2938,7 +2949,6 @@ mod tests {
         // The retry fetches only those, beside the video, never into it.
         let r = SubsRetry {
             automatic: true,
-            embed: true,
             ffmpeg: true,
             base: vec!["-o".into(), "x.%(ext)s".into()],
         };

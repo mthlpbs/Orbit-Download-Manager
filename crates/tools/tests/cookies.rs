@@ -14,10 +14,73 @@
 
 use std::time::{Duration, Instant};
 
-use mdm_ipc::BrowserCookie;
+use mdm_ipc::{BrowserCookie, VideoCookies};
 use mdm_labserver::{Config, LabServer};
 use mdm_tools::proc::{BrowserCookies, FromBrowser, set_browser_cookies};
 use mdm_tools::video::{State, Subs, VideoJob};
+
+#[test]
+fn site_cookie_source_replaces_config_cookies_for_lookup_and_postprocessing() {
+    use mdm_tools::config::{Profile, with_profile};
+    use mdm_tools::proc::{ytdlp, ytdlp_info};
+    use std::path::{Path, PathBuf};
+
+    let config = Profile {
+        args: [
+            "--cookies-from-browser",
+            "firefox:other",
+            "--cookies",
+            "other.txt",
+            "--embed-subs",
+        ]
+        .map(str::to_owned)
+        .to_vec(),
+        ..Default::default()
+    };
+    let page = "https://example.test/video";
+    let exe = Path::new("yt-dlp");
+    let info = Path::new("video.info.json");
+    for header in [None, Some("fixture=value".into())] {
+        let browser = FromBrowser {
+            cookie_policy: Some(VideoCookies::Site),
+            cookies: header.clone(),
+            ..Default::default()
+        };
+        let (ours, file) = browser.args(page).unwrap();
+        let mut jar = None;
+        with_profile(config.clone(), || {
+            for cmd in [
+                ytdlp(exe, &[], &ours, page),
+                ytdlp_info(exe, &[], &ours, info),
+            ] {
+                let cmd = cmd.unwrap();
+                let args: Vec<_> = cmd.get_args().map(|a| a.to_string_lossy()).collect();
+                assert!(args.iter().any(|a| a == "--embed-subs"));
+                assert!(args.iter().any(|a| a == "--no-cookies-from-browser"));
+                assert!(
+                    !args
+                        .iter()
+                        .any(|a| a == "--cookies-from-browser" || a == "other.txt")
+                );
+                let found = args
+                    .windows(2)
+                    .find(|a| a[0] == "--cookies")
+                    .map(|a| PathBuf::from(a[1].as_ref()));
+                assert_eq!(found.is_some(), header.is_some());
+                if let Some(path) = &found {
+                    assert!(
+                        std::fs::read_to_string(path)
+                            .unwrap()
+                            .contains("fixture\tvalue")
+                    );
+                }
+                jar = found;
+            }
+        });
+        drop(file);
+        assert!(jar.is_none_or(|p| !p.exists()));
+    }
+}
 
 /// The cookies the lab saw on each request for `path` since `from` (the log's index).
 fn cookies_seen(lab: &LabServer, path: &str, from: usize) -> Vec<String> {

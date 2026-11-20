@@ -85,6 +85,7 @@ struct Message {
     /// The same cookies with their domains and flags (`mdm_ipc::Command::cookie_jar`); an older
     /// extension sends none.
     cookie_jar: Vec<mdm_ipc::BrowserCookie>,
+    use_site_cookies: Option<bool>,
     user_agent: Option<String>,
     /// `navigator.userAgentData` brands: Brave and Opera name themselves there, not in the
     /// User-Agent; Firefox's forks add the name `runtime.getBrowserInfo` gives ("Zen").
@@ -621,6 +622,8 @@ fn video_command(
         // The type the plain file's server said when the tab loaded it (#800).
         mime: m.mime.clone().filter(|t| direct && !t.trim().is_empty()),
         video_page: Some(src.unwrap_or_else(|| m.url.clone())),
+        page_url: Some(m.url.clone()).filter(|p| p.len() <= PAGE_MAX),
+        video_cookies: Some(video_cookies(m)),
         video_title: m.title.clone().filter(|t| !t.trim().is_empty()),
         referer,
         origin,
@@ -712,6 +715,7 @@ fn menu_command(
                 origin,
                 cookies: m.cookies.clone().filter(|c| !c.is_empty()),
                 cookie_jar: m.cookie_jar.clone(),
+                video_cookies: Some(video_cookies(m)),
                 user_agent: m.user_agent.clone(),
                 private: m.private,
                 ..Default::default()
@@ -741,6 +745,14 @@ fn menu_command(
         startup: true,
         ..cmd
     })
+}
+
+fn video_cookies(m: &Message) -> mdm_ipc::VideoCookies {
+    if m.use_site_cookies == Some(false) {
+        mdm_ipc::VideoCookies::None
+    } else {
+        mdm_ipc::VideoCookies::Site
+    }
 }
 
 /// One of the quality menu's messages, asked of the running app (never started for it: a menu

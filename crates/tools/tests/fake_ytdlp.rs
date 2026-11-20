@@ -1204,9 +1204,8 @@ fn checks(me: &Path) {
             problem.code.as_str(),
             problem.name.as_str(),
             &problem.reason,
-            problem.beside
         ),
-        ("en", "English", &SubReason::TooManyRequests, false)
+        ("en", "English", &SubReason::TooManyRequests)
     );
     let log: Vec<&str> = p.events.iter().map(|(_, t)| t.as_str()).collect();
     assert!(

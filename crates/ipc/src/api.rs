@@ -275,6 +275,13 @@ pub struct VideoLookupAnswer {
     /// place in this list.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub choices: Vec<VideoChoice>,
+    /// The row used by the extension's primary download button.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_choice: Option<usize>,
+    /// The primary button still uses the configured selector when it cannot be matched to
+    /// a quality on the page. That action is kept out of the extension's quality list.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub default_action_only: bool,
     /// `failed`: [`lookup::NO_YTDLP`], [`lookup::NO_CHOICES`] or [`lookup::ERROR`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,

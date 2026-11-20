@@ -24,6 +24,10 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     WS_THICKFRAME,
 };
 
+#[path = "win32/file_menu.rs"]
+mod file_menu;
+pub use file_menu::show_file_menu;
+
 /// 32-bit Windows: `SetWindowLongPtrW` is `SetWindowLongW` there, whose value is 32 bits (all a
 /// pointer is on it); taking a pointer-sized value as the 64-bit one does, the calls below are the
 /// same on both.
@@ -6064,16 +6068,29 @@ fn drawn_within(rgba: &[u8], side: u32, within: u32) -> bool {
     })
 }
 
-/// COM for this thread (apartment-threaded, as the shell's icon handlers expect), once.
-fn com_on_this_thread() {
-    use windows_sys::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx};
-    thread_local!(static DONE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) });
-    DONE.with(|done| {
-        if !done.replace(true) {
-            // SAFETY: no reserved pointer; the thread keeps COM for its lifetime.
-            unsafe { CoInitializeEx(std::ptr::null(), COINIT_APARTMENTTHREADED as u32) };
+struct ShellApartment(bool);
+
+impl ShellApartment {
+    fn enter() -> Self {
+        use windows_sys::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx};
+        // SAFETY: COM initializes for the calling thread, with no reserved data.
+        Self(unsafe { CoInitializeEx(std::ptr::null(), COINIT_APARTMENTTHREADED as u32) } >= 0)
+    }
+}
+
+impl Drop for ShellApartment {
+    fn drop(&mut self) {
+        if self.0 {
+            // SAFETY: balances this guard's successful initialization on the same thread.
+            unsafe { windows_sys::Win32::System::Com::CoUninitialize() }
         }
-    });
+    }
+}
+
+/// Keep COM alive on the reusable icon worker, then release the apartment with that worker.
+fn com_on_this_thread() {
+    thread_local!(static SHELL: ShellApartment = ShellApartment::enter());
+    SHELL.with(|_| {});
 }
 
 /// The start of the shell's `IImageList` vtable (commoncontrols.h), as far as `GetIcon`. The list
@@ -8361,7 +8378,7 @@ fn open_with_file(path: &std::path::Path) -> Vec<u16> {
 pub fn open_with_dialog(path: &std::path::Path) -> Result<(), i32> {
     use windows_sys::Win32::Foundation::ERROR_CANCELLED;
     use windows_sys::Win32::UI::Shell::{OPENASINFO, SHOpenWithDialog};
-    com_on_this_thread();
+    let _shell = ShellApartment::enter();
     let file = open_with_file(path);
     let info = OPENASINFO {
         pcszFile: file.as_ptr(),
@@ -8419,7 +8436,7 @@ pub fn open_file_shell(path: &std::path::Path) -> Result<(), std::io::Error> {
     use windows_sys::Win32::UI::Shell::ShellExecuteW;
     use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
-    com_on_this_thread();
+    let _shell = ShellApartment::enter();
     let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
     let folder: Option<Vec<u16>> = std::path::absolute(path).ok().and_then(|p| {
         p.parent()

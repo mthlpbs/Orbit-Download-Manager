@@ -1212,7 +1212,10 @@ const ok = (what) => {
     assert.deepEqual(m.videoLookup, { page: "https://news.test/story", src: "https://cdn.test/v/clip.mp4", title: "A story's film", storeId: "firefox-container-2" });
     assert.deepEqual([m.cookies, m.private, m.userAgent, m.v], ["sid=1", false, "UA", "0.2.5"]);
     assert.equal(m.cookieJar.length, 1, "each cookie with its domain");
-    assert.deepEqual(calls.filter((c) => c[0] === "cookies").at(-1)[1], { url: "https://cdn.test/v/clip.mp4", storeId: "firefox-container-2" }, "the file's cookies, from the tab's container");
+    assert.deepEqual(calls.filter((c) => c[0] === "cookies").slice(-2).map(([, q]) => q), [
+      { url: "https://cdn.test/v/clip.mp4", storeId: "firefox-container-2" },
+      { url: "https://news.test/story", storeId: "firefox-container-2" },
+    ], "stream and site cookies come from the same tab's container");
     // A player's page in a frame, in a private window: that page's cookies, from the private
     // store, and the tab as its referrer.
     const framed = { id: "ours", url: "https://player.test/embed/1", frameId: 3, tab: { id: 6, url: "https://blog.test/post", incognito: true } };
@@ -1221,6 +1224,9 @@ const ok = (what) => {
     assert.deepEqual([p.videoLookup, p.private], [{ page: "https://player.test/embed/1", referrer: "https://blog.test/post" }, true]);
     assert.deepEqual(calls.filter((c) => c[0] === "cookies").at(-1)[1], { url: "https://player.test/embed/1", storeId: "1" }, "the page's cookies, from the private store");
     assert.ok(!natives(calls).some((x) => x.video), "never the window's message");
+    await ask(listeners, { type: "video", useSiteCookies: false }, sender);
+    const window = natives(calls).find((x) => x.video);
+    assert.deepEqual([window.useSiteCookies, window.cookies, window.cookieJar], [false, "", []]);
   }
   // An app whose rules say nothing of it (an older one): the click as it was, no lookup sent.
   {
@@ -1568,7 +1574,10 @@ const MPD = (protect) => `<?xml version="1.0"?>
   assert.equal(sent.ok, true);
   const v = natives(calls).find((m) => m.video);
   assert.deepEqual([v.explicit, v.src, v.url, v.title, v.cookies, v.referrer], [true, "https://cdn.test/v/master.m3u8", "https://watch.test/v/1", "A film", "sid=1", ""]);
-  assert.deepEqual(calls.filter((c) => c[0] === "cookies").pop()[1], { url: "https://cdn.test/v/master.m3u8" });
+  assert.deepEqual(calls.filter((c) => c[0] === "cookies").slice(-2).map(([, q]) => q), [
+    { url: "https://cdn.test/v/master.m3u8" },
+    { url: "https://watch.test/v/1" },
+  ]);
   assert.deepEqual(v.cookieJar.map((c) => c.domain), [".tube.test"], "each cookie with its domain");
   await popupAsk(listeners, { type: "media-download", tab: 9, url: "https://files.test/movie.mp4" });
   const f = natives(calls).find((m) => m.url === "https://files.test/movie.mp4");
@@ -2640,6 +2649,13 @@ function videoButton({ stored = {} } = {}) {
     throw new Error(`${name}: no end`);
   };
   const make = (names, value) => new Function(`${names.map(fn).join("\n")}\nreturn ${value};`)();
+  const bestOf = make(["bestOf"], "bestOf");
+  const choices = [{ height: 2160 }, { height: 720 }];
+  assert.equal(bestOf({ state: "ready", choices, default_choice: 1 }), choices[1]);
+  const menuDefault = make(["bestOf", "menuDefault"], "menuDefault");
+  assert.deepEqual(menuDefault({ state: "ready", choices, default_choice: 1 }), { marked: 1, hidden: -1, pick: 1 });
+  assert.deepEqual(menuDefault({ state: "ready", choices: [choices[1], ...choices], default_choice: 0 }), { marked: 2, hidden: 0, pick: 0 });
+  assert.deepEqual(menuDefault({ state: "ready", choices, default_choice: 0, default_action_only: true }), { marked: -1, hidden: 0, pick: 0 });
   // 100 ms before the first question, then the old backoff's target (1 s x 1.25^n, 2 s at most)
   // less what the last answer took (50 ms at least): an older app (60 ms) is asked as seldom as
   // before, a newer one (holding the answer ~1.5 s) is asked again almost at once early on.
@@ -2895,6 +2911,7 @@ function videoButton({ stored = {} } = {}) {
       `const LOOKUP_MS = 60000;
       ${constant("LOOK_RETRY_MS")}${constant("STREAM")}${constant("REST_MS")}${constant("usable")}
       const looks = new Map();
+      const useSiteCookies = true;
       const location = { href: "https://videos.test/watch?v=1" };
       const landedAt = location.href;
       const document = { title: "A talk", querySelector: () => null };
@@ -2995,8 +3012,8 @@ function videoButton({ stored = {} } = {}) {
   // Its texts: English's, kept as the fallback too.
   const english = JSON.parse(readText("../../extension/_locales/en/messages.json"));
   for (const key of ["video_looking", "video_all_qualities", "video_no_choices", "video_playlist", "video_no_ytdlp", "video_too_long", "video_busy", "video_queued", "video_failed_lookup",
-    "video_off", "video_drm", "video_cant_save", "video_open_post", "video_open_post_button", "video_drag_dots", "video_tip_best", "video_sending", "video_added", "video_show",
-    "video_no_answer", "video_get_mdm", "video_retry", "video_turn_on", "video_download_best", "video_best", "video_original", "video_compatible"]) {
+    "video_off", "video_drm", "video_cant_save", "video_open_post", "video_open_post_button", "video_drag_dots", "video_sending", "video_added", "video_show",
+    "video_no_answer", "video_get_mdm", "video_retry", "video_turn_on", "video_default_quality", "video_use_site_cookies", "video_original", "video_compatible"]) {
     assert.ok(english[key], key);
     assert.ok(source.includes(`${key}: ${JSON.stringify(english[key].message)}`), `video.js FALLBACK: ${key}`);
     assert.ok(source.includes(`t("${key}")`), `video.js uses ${key}`);
@@ -3055,7 +3072,7 @@ function videoButton({ stored = {} } = {}) {
     assert.equal(w.chipFor({ state: "failed" }, tt), null);
     assert.equal(w.tipFor(ready, tt, "en"), "video_tip(1080p MP4 · 392.9 MB)");
     assert.equal(w.tipFor({ state: "ready", choices: [{ ...hd, approx: true }] }, tt, "en"), "video_tip(1080p MP4 · ~392.9 MB)");
-    assert.equal(w.tipFor({ state: "pending" }, tt, "en"), "video_tip_best");
+    assert.equal(w.tipFor({ state: "pending" }, tt, "en"), "video_download");
     assert.equal(w.tipFor(null, tt, "en"), "video_download");
     assert.deepEqual([596, 3723, 0, null, "x"].map(w.durationText), ["9:56", "1:02:03", "", "", ""]);
     assert.equal(w.headerLine("Big Buck Bunny", 596, "youtube.com"), "Big Buck Bunny · 9:56 · youtube.com");

@@ -2327,20 +2327,38 @@ impl Complete {
                 // drag built yet (no drag source in their window library), so the handle isn't
                 // shown there and nothing is moved: Open folder is the way to the file.
                 #[cfg(windows)]
-                {
+                let grip_uses_enter = {
                     let handle = r(o, 414.0, 187.0, 27.0, 20.0);
                     let grip = ui
                         .interact(
                             handle,
                             egui::Id::unique(("drag-out", self.id)),
-                            winui::pointer_drag(),
+                            egui::Sense::click_and_drag(),
                         )
-                        // i18n: tooltip of the handle in Download complete: drag it to drop the downloaded file somewhere
-                        .on_hover_text(crate::i18n::t("Drag the file into a folder or an app"));
+                        .on_hover_text(crate::i18n::t(
+                            "Drag the file into a folder or an app. Right-click for the File Explorer menu.",
+                        ));
                     if grip.hovered() {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
                     }
-                    if grip.drag_started() {
+                    winui::focus_on_press(&grip);
+                    winui::expose(
+                        &grip,
+                        egui::Role::Button,
+                        crate::i18n::t("File Explorer menu"),
+                        true,
+                        None,
+                    );
+                    if grip.secondary_clicked() || grip.clicked() {
+                        show_file_menu(
+                            ui.ctx(),
+                            crate::i18n::t("Download complete"),
+                            &self.path,
+                            self.moved_away,
+                            Some(grip.interact_pointer_pos().unwrap_or(handle.left_bottom())),
+                        );
+                    }
+                    if grip.drag_started_by(egui::PointerButton::Primary) {
                         drag_downloads_out(
                             ui.ctx(),
                             crate::i18n::t("Download complete"),
@@ -2359,11 +2377,15 @@ impl Complete {
                         ui,
                         egui::Rect::from_center_size(handle.center(), vec2(16.0, 16.0)),
                     );
-                }
+                    winui::show_focus(ui, &grip, handle);
+                    grip.has_focus()
+                };
 
                 // Enter: Open, the default button (as in the other dialogs).
                 // The keys of a drag out of the grip are the drag's (Escape cancels it), not
                 // this window's (#561: the drag runs beside the window, which sees them too).
+                #[cfg(not(windows))]
+                let grip_uses_enter = false;
                 #[cfg(windows)]
                 let dragging = crate::win32::dragging_out();
                 #[cfg(not(windows))]
@@ -2374,7 +2396,7 @@ impl Complete {
                 if opened.is_some() {
                     self.opening = None;
                 }
-                if (open.clicked() || (!dragging && winui::enter_pressed(ui)))
+                if (open.clicked() || (!dragging && !grip_uses_enter && winui::enter_pressed(ui)))
                     && self.opening.is_none()
                 {
                     let opening = crate::launch::Asked::default();
@@ -2911,6 +2933,12 @@ pub fn message(ctx: &egui::Context, id: &str, title: &str, text: &str) -> Outcom
                 13.0,
             );
             grow_to(ui.ctx(), id, lines, 1);
+            let label = ui.interact(
+                r(o, 16.0, 10.0, width - 32.0, 22.0 + extra),
+                ui.scope_id().with("message-text"),
+                egui::Sense::hover(),
+            );
+            winui::expose(&label, egui::Role::Label, text, true, None);
             let ok = winui::button_light(
                 ui,
                 r(o, (width - 73.0) / 2.0, 47.0 + extra, 73.0, 21.0),
@@ -3515,6 +3543,73 @@ fn moved_away_text(path: &Path) -> String {
     )
 }
 
+fn missing_file_text(path: &Path, moved_away: bool) -> String {
+    if moved_away {
+        return moved_away_text(path);
+    }
+    let name = crate::i18n::isolate(&path.file_name().unwrap_or_default().to_string_lossy());
+    crate::i18n::fmt(
+        crate::i18n::t(
+            "The downloaded file is no longer available at its saved location. It may have been moved or deleted.\n\n{file}",
+        ),
+        &[("file", &name)],
+    )
+}
+
+/// Look once before using the file and again only if the action failed. Explorer can move it
+/// between those operations, and an I/O error on an existing path is different from a missing file.
+fn use_download(
+    path: &Path,
+    moved_away: bool,
+    action: impl FnOnce(&Path) -> Result<(), String>,
+    describe_error: impl FnOnce(&str) -> String,
+) -> Result<(), String> {
+    match path.try_exists() {
+        Ok(false) => Err(missing_file_text(path, moved_away)),
+        Err(error) => Err(describe_error(&error.to_string())),
+        Ok(true) => action(path).map_err(|error| match path.try_exists() {
+            Ok(false) => missing_file_text(path, moved_away),
+            _ => describe_error(&error),
+        }),
+    }
+}
+
+#[cfg(windows)]
+pub fn show_file_menu(
+    ctx: &egui::Context,
+    title: &str,
+    path: &Path,
+    moved_away: bool,
+    at: Option<egui::Pos2>,
+) {
+    if let Err(error) =
+        crate::win32::show_file_menu(title, path.to_owned(), moved_away, at, ctx.clone())
+    {
+        tracing::warn!("file context menu: {error}");
+        tell(
+            crate::i18n::mark("File Explorer menu"),
+            crate::i18n::t("The File Explorer menu could not be shown.").into(),
+        );
+        ctx.request_repaint();
+    }
+}
+
+#[cfg(windows)]
+pub(crate) fn file_menu_now(
+    path: &Path,
+    moved_away: bool,
+    action: impl FnOnce(&Path) -> Result<(), String>,
+) {
+    if let Err(error) = use_download(path, moved_away, action, |error| {
+        crate::i18n::fmt(
+            crate::i18n::t("The File Explorer action could not be completed: {error}"),
+            &[("error", error)],
+        )
+    }) {
+        tell(crate::i18n::mark("File Explorer menu"), error);
+    }
+}
+
 /// Hand the downloaded file `path` to `hand` (which opens it, or shows a chooser for it), or say
 /// why not: moved or deleted since (`moved_away`: dragged out to a place MDM couldn't learn,
 /// #869), or `hand`'s error. True when it was handed over. Waits for `hand`, so it runs on a
@@ -3525,21 +3620,13 @@ fn hand_over(
     hand: impl FnOnce(&Path) -> Result<(), String>,
 ) -> bool {
     let name = crate::i18n::isolate(&path.file_name().unwrap_or_default().to_string_lossy());
-    let failed = if !path.exists() && moved_away {
-        moved_away_text(path)
-    } else if !path.exists() {
-        crate::i18n::fmt(
-            crate::i18n::t(
-                "{file} is no longer where it was saved (moved or deleted). Redownload, in its right-click menu, gets it again.",
-            ),
-            &[("file", &name)],
-        )
-    } else if let Err(e) = hand(path) {
+    let failed = use_download(path, moved_away, hand, |error| {
         crate::i18n::fmt(
             crate::i18n::t("{file} could not be opened: {error}"),
-            &[("file", &name), ("error", &e)],
+            &[("file", &name), ("error", error)],
         )
-    } else {
+    });
+    let Err(failed) = failed else {
         return true;
     };
     // i18n: title of the message when a downloaded file can't be opened

@@ -56,6 +56,9 @@ pub struct Command {
     /// there too. An older extension sends `cookies` only.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub cookie_jar: Vec<BrowserCookie>,
+    /// Cookie source selected for a video session. Cookie values remain in request memory.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub video_cookies: Option<VideoCookies>,
     pub user_agent: Option<String>,
     /// From the browser: where its redirects from `url` ended (`url` stays the address asked
     /// for, so an expired signed link can be renewed from it).
@@ -167,6 +170,14 @@ pub struct Command {
     /// sites again (a pattern of the user's own that covers it stays).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_site: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum VideoCookies {
+    Site,
+    None,
+    Browser { browser: String, profile: String },
 }
 
 /// The most parts a page's links come in ([`LinksPart`]): 256 messages of up to 1 MB each.

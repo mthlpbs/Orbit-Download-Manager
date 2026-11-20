@@ -325,10 +325,6 @@
       }
     }
   },
-  "video_tip_best": {
-    "message": "Download the best quality",
-    "description": "first line of the tooltip of the download button over a video while the app is still finding its qualities"
-  },
   "video_sending": {
     "message": "Sending to MDM...",
     "description": "on the download button over a video right after it was clicked, while the download goes to the app; MDM is Orbit Download Manager's short name, keep it as it is; short"
@@ -357,9 +353,8 @@
     "message": "Turn on",
     "description": "button on the download button over a video when it is off on this web site: turns it on again here; verb; very short"
   },
-  "video_best": {
-    "message": "best",
-    "description": "after the best quality in the menu of the download button over a video, after a star (★ best); lower case; one word"
+  "video_use_site_cookies": {
+    "message": "Use site cookies"
   },
   "video_all_qualities": {
     "message": "All qualities and subtitles...",
@@ -369,9 +364,9 @@
     "message": "Orbit Download Manager isn't installed or didn't start",
     "description": "shown briefly on the download button when the app could not be reached; keep the name Orbit Download Manager as it is"
   },
-  "video_download_best": {
-    "message": "Download best",
-    "description": "first line of the list under the download button over a video: downloads the best quality at once; the quality, its file type and size follow on the same line; short"
+  "video_default_quality": {
+    "message": "Default",
+    "description": "tag on the video quality used by the main download button"
   },
   "video_original": {
     "message": "original",

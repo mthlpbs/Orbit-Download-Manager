@@ -510,6 +510,7 @@ mod tests {
                 let mut i = Item::new(id, url, dest, crate::model::Category::Video);
                 i.note("Added from a playlist (yt-dlp)");
                 i.video = Some(crate::model::VideoSpec {
+                    cookie_policy: None,
                     ytdlp: None,
                     selector: "bv*[height<=1080]+ba/b[height<=1080]".into(),
                     subs: Default::default(),

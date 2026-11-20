@@ -4490,7 +4490,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-app"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "arboard",
  "base64 0.23.1",
@@ -4544,7 +4544,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-cli"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "anyhow",
  "clap",
@@ -4563,7 +4563,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-cnl"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "aes",
  "axum",
@@ -4576,7 +4576,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-crash"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "breakpad-symbols",
  "chrono",
@@ -4601,7 +4601,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-debrid"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "bytes",
  "chrono",
@@ -4621,7 +4621,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-engine"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "aes",
  "base64 0.23.1",
@@ -4672,7 +4672,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-extract"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "flate2",
  "lzma-rust2",
@@ -4685,7 +4685,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-geo"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "lzma-rust2",
  "png 0.18.1",
@@ -4694,7 +4694,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-ipc"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "craft-atomic",
  "dirs 7.0.0",
@@ -4706,7 +4706,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-labserver"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "anyhow",
  "aws-lc-rs",
@@ -4735,7 +4735,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-mcp"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "mdm-ipc",
  "rmcp",
@@ -4749,7 +4749,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-nmhost"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "chrono",
  "mdm-ipc",
@@ -4760,7 +4760,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-remote"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -4781,7 +4781,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-tools"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "aws-lc-rs",
  "base64 0.23.1",
@@ -4811,7 +4811,7 @@ dependencies = [
 
 [[package]]
 name = "mdm-torrent"
-version = "26.11.19"
+version = "26.11.20"
 dependencies = [
  "anyhow",
  "flate2",

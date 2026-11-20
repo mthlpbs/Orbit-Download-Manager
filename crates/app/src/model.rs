@@ -872,15 +872,6 @@ impl Job {
 pub fn sub_notice(p: &mdm_tools::video::SubProblem, site: &str) -> String {
     use mdm_tools::video::SubReason;
     let language = p.name.as_str();
-    if p.beside {
-        return crate::i18n::fmt(
-            // i18n: after a video download: {language} = a language's name; its subtitles were to go inside the video, but came on a second try, so they're a separate file beside it
-            crate::i18n::t(
-                "Subtitles in {language} came on a second try: they're beside the video, not in it.",
-            ),
-            &[("language", language)],
-        );
-    }
     match &p.reason {
         SubReason::TooManyRequests => crate::i18n::fmt(
             // i18n: after a video download: {language} = a language's name, {site} = a web site's name (youtube.com); the site refused because it was asked too often
@@ -901,6 +892,8 @@ pub fn sub_notice(p: &mdm_tools::video::SubProblem, site: &str) -> String {
 /// format selector.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VideoSpec {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cookie_policy: Option<mdm_ipc::VideoCookies>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ytdlp: Option<mdm_tools::config::Profile>,
     pub selector: String,
@@ -1404,6 +1397,10 @@ impl Item {
                             .collect();
                     }
                     self.side_files = done.side_files;
+                    if self.context.video_cookies == Some(mdm_ipc::VideoCookies::Site) {
+                        self.context.cookies = None;
+                        self.context.cookie_jar.clear();
+                    }
                 }
                 // A gallery's files (#58), already marked by its job as the video's are.
                 if status == Status::Complete
@@ -2011,6 +2008,7 @@ mod file_address_tests {
             Category::Video,
         );
         i.video = Some(VideoSpec {
+            cookie_policy: None,
             ytdlp: None,
             selector: "best".into(),
             subs: Default::default(),
@@ -2230,6 +2228,7 @@ mod tests {
         it.downloaded = downloaded;
         it.status = status;
         it.video = Some(VideoSpec {
+            cookie_policy: None,
             ytdlp: None,
             selector: "18".into(),
             subs: Default::default(),

@@ -93,6 +93,24 @@ pub fn validate_text(text: &str) -> io::Result<()> {
 }
 
 impl Profile {
+    /// List the site's formats even when the configured selector is unavailable on this page.
+    pub fn for_quality_lookup(mut self) -> Self {
+        let mut args = Vec::new();
+        let mut source = self.args.into_iter();
+        while let Some(arg) = source.next() {
+            match arg.as_str() {
+                "-f" | "--format" | "--audio-format" | "--audio-quality" => {
+                    source.next();
+                }
+                "-x" | "--extract-audio" => {}
+                _ => args.push(arg),
+            }
+        }
+        self.args = args.clone();
+        self.base_args = args;
+        self.file = None;
+        self
+    }
     pub fn resolved(mut self) -> io::Result<Self> {
         if self.args.is_empty() {
             self.args = self.base_args.clone();

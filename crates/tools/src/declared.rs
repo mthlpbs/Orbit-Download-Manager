@@ -37,6 +37,7 @@ impl Declared {
     /// not the page's own Cookie header nor a stream's Origin, which are the page's site's.
     pub fn browser(&self, from: &FromBrowser) -> FromBrowser {
         FromBrowser {
+            cookie_policy: from.cookie_policy.clone(),
             private: from.private,
             referer: Some(self.page.clone()),
             origin: None,
@@ -421,6 +422,7 @@ mod tests {
         assert_eq!(d.page, page.as_str());
         assert_eq!(d.name.as_deref(), Some("Before The - Short Film"));
         let browser = FromBrowser {
+            cookie_policy: None,
             private: true,
             referer: Some("https://search.example/".into()),
             origin: Some("https://www.shortverse.com".into()),

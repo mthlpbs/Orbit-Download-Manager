@@ -25,6 +25,7 @@ use std::time::{Duration, Instant};
 use mdm_ipc::api::{VideoChoice, VideoLookupAnswer, VideoNotice, lookup};
 use mdm_tools::resolve::{Choice, Looked, Video};
 use mdm_tools::video::{InfoSlot, LOOKUP_WAIT, Preloaded, Subs};
+use mdm_tools::{config::Profile, preferences::Preferences};
 
 use crate::videodlg::VideoAdd;
 
@@ -91,6 +92,136 @@ struct Search {
     info: InfoSlot,
     /// Its choices are merged qualities (ffmpeg was there).
     merge: bool,
+    settings: Option<MenuSettings>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct MenuSettings {
+    preferences: Preferences,
+    profile: Profile,
+}
+
+impl MenuSettings {
+    fn read(context: &mdm_ipc::Command) -> Option<Self> {
+        context.video_cookies.as_ref()?;
+        let preferences = Preferences::read();
+        let profile = preferences.profile(preferences.use_config).ok()?;
+        Some(Self {
+            preferences,
+            profile,
+        })
+    }
+
+    fn choices(
+        &self,
+        video: &Video,
+        fallback: &[Choice],
+        merge: bool,
+    ) -> (Vec<Choice>, Option<usize>) {
+        let prefs = &self.preferences;
+        // Rank the configured codec first at each resolution. Keep other codecs available
+        // where the site has no matching stream at that resolution.
+        let mut preferred = video.clone();
+        preferred.formats.retain(|f| {
+            let codec = f.vcodec.as_deref().unwrap_or_default();
+            let wanted = match prefs.codec {
+                1 => codec.starts_with("avc1"),
+                2 => codec.starts_with("vp9") || codec.starts_with("vp09"),
+                3 => codec.starts_with("av01"),
+                _ => true,
+            };
+            (!f.video || wanted) && (prefs.container != "webm" || f.ext == "webm")
+        });
+        let preferred = mdm_tools::resolve::choices(&preferred, merge);
+        let mut heights = std::collections::HashSet::new();
+        let mut rows: Vec<Choice> = fallback
+            .iter()
+            .filter(|c| !mdm_tools::resolve::is_audio(c))
+            .filter(|c| c.height.is_none_or(|h| heights.insert(h)))
+            .map(|c| {
+                let mut row = preferred
+                    .iter()
+                    .find(|p| p.height.is_some() && p.height == c.height)
+                    .unwrap_or(c)
+                    .clone();
+                row.ext = self.container().to_owned();
+                row
+            })
+            .collect();
+        rows.sort_by_key(|c| std::cmp::Reverse(c.height));
+        let has_video = !rows.is_empty();
+        rows.extend(
+            fallback
+                .iter()
+                .filter(|c| mdm_tools::resolve::is_audio(c))
+                .cloned(),
+        );
+        if !prefs.use_config && !has_video {
+            return (rows, None);
+        }
+
+        let (selector, index) = if prefs.use_config {
+            let selector = self.profile.selector();
+            let index = rows
+                .iter()
+                .position(|c| c.selector == selector)
+                .or_else(|| {
+                    let selected = video.selected_format.as_deref()?;
+                    let matches_ids = |c: &Choice| c.selector.split('/').next() == Some(selected);
+                    rows.iter().position(matches_ids).or_else(|| {
+                        let picked = fallback.iter().find(|c| matches_ids(c))?;
+                        let index = rows.iter().position(|c| {
+                            c.height == picked.height && !mdm_tools::resolve::is_audio(c)
+                        })?;
+                        rows[index] = picked.clone();
+                        rows[index].ext = self.container().to_owned();
+                        Some(index)
+                    })
+                });
+            (selector, index)
+        } else {
+            let height = mdm_tools::preferences::HEIGHTS
+                .get(prefs.quality)
+                .copied()
+                .flatten();
+            let index = rows.iter().position(|c| {
+                !mdm_tools::resolve::is_audio(c)
+                    && height.is_none_or(|h| c.height.is_some_and(|got| got <= h))
+            });
+            (prefs.selector(prefs.quality), index)
+        };
+        if let Some(i) = index {
+            rows[i].selector = selector;
+            return (rows, Some(i));
+        }
+
+        // A custom selector may be valid without matching any of the grouped rows.
+        let ext = mdm_tools::resolve::audio_conversion(&selector)
+            .map(|a| a.format)
+            .unwrap_or(if selector == "ba/b" {
+                "m4a"
+            } else {
+                self.container()
+            })
+            .to_owned();
+        rows.insert(
+            0,
+            Choice {
+                label: crate::i18n::t("Default quality").into(),
+                selector,
+                ext,
+                ..Default::default()
+            },
+        );
+        (rows, Some(0))
+    }
+
+    fn container(&self) -> &str {
+        self.profile
+            .value("--recode-video")
+            .or_else(|| self.profile.value("--remux-video"))
+            .unwrap_or(&self.preferences.container)
+    }
 }
 
 /// What makes two clicks one look-up ([`Lookups::share`]): the address looked up and everything
@@ -103,10 +234,12 @@ struct Key {
     store_id: Option<String>,
     cookies: Option<String>,
     jar: Vec<mdm_ipc::BrowserCookie>,
+    cookie_policy: Option<mdm_ipc::VideoCookies>,
     referer: Option<String>,
     origin: Option<String>,
     user_agent: Option<String>,
     merge: bool,
+    settings: Option<MenuSettings>,
 }
 
 impl Key {
@@ -117,10 +250,12 @@ impl Key {
             store_id: store_id.clone(),
             cookies: context.cookies.clone(),
             jar: context.cookie_jar.clone(),
+            cookie_policy: context.video_cookies.clone(),
             referer: context.referer.clone(),
             origin: context.origin.clone(),
             user_agent: context.user_agent.clone(),
             merge,
+            settings: MenuSettings::read(context),
         }
     }
 }
@@ -155,6 +290,7 @@ pub struct Job {
     /// The qualities that need merging are offered (ffmpeg is there).
     pub merge: bool,
     pub running: Running,
+    profile: Option<Profile>,
 }
 
 /// A choice made in the browser that fits its look-up.
@@ -167,6 +303,7 @@ pub struct Picked {
     /// yt-dlp's look-up, for the download (its `Debug` shows nothing of it).
     pub info: InfoSlot,
     pub merge: bool,
+    settings: Option<MenuSettings>,
 }
 
 /// The look-ups the browser's quality menu asked for (`App::lookups`).
@@ -190,6 +327,12 @@ impl Lookups {
         rt: tokio::runtime::Handle,
         now: Instant,
     ) -> VideoLookupAnswer {
+        let preferences = Preferences::read();
+        if preferences.use_config
+            && let Err(error) = preferences.profile(true)
+        {
+            return VideoLookupAnswer::failed(lookup::ERROR, Some(error.to_string()));
+        }
         // The qualities that need merging, when ffmpeg is there (as the window offers them).
         let merge = mdm_tools::tools_dir()
             .as_deref()
@@ -253,6 +396,7 @@ impl Lookups {
                 found,
                 info,
                 merge,
+                settings: key.settings,
             },
         );
         Some(token)
@@ -282,6 +426,8 @@ impl Lookups {
         let store_id = store(&ask.store_id);
         let found = Shared::default();
         let info = InfoSlot::new(now);
+        let key = Key::of(&context, &store_id, merge);
+        let settings = key.settings.clone();
         let job = Job {
             token: token.clone(),
             address: address.clone(),
@@ -290,9 +436,9 @@ impl Lookups {
             info: info.clone(),
             merge,
             running,
+            profile: settings.as_ref().map(|s| s.profile.clone()),
         };
         // The one a later click shares, in place of any earlier one of the same thing.
-        let key = Key::of(&context, &store_id, merge);
         self.recent.retain(|r| r.key != key);
         while self.recent.len() >= KEPT {
             self.recent.remove(0);
@@ -313,6 +459,7 @@ impl Lookups {
                 found,
                 info,
                 merge,
+                settings,
             },
         );
         Some(job)
@@ -360,7 +507,10 @@ impl Lookups {
             return None;
         }
         let (video, choice) = match &*lock(&s.found) {
-            Found::Video(v, choices) => (v.clone(), choices.get(pick.choice)?.clone()),
+            Found::Video(v, choices) => (
+                v.clone(),
+                choices_for(s, v, choices).0.get(pick.choice)?.clone(),
+            ),
             _ => return None,
         };
         let s = self.searches.remove(&pick.token)?;
@@ -371,6 +521,7 @@ impl Lookups {
             choice,
             info: s.info,
             merge: s.merge,
+            settings: s.settings,
         })
     }
 
@@ -417,6 +568,7 @@ pub fn context_of(ask: &mdm_ipc::VideoLookup, cmd: &mdm_ipc::Command) -> mdm_ipc
         origin: cmd.origin.clone(),
         cookies: cmd.cookies.clone(),
         cookie_jar: cmd.cookie_jar.clone(),
+        video_cookies: cmd.video_cookies.clone(),
         user_agent: cmd.user_agent.clone(),
         private: cmd.private,
         ..Default::default()
@@ -470,13 +622,20 @@ fn answer(token: &str, s: &Search) -> VideoLookupAnswer {
             notice: notice(v),
             ..VideoLookupAnswer::failed(lookup::NO_CHOICES, None)
         },
-        Found::Video(v, choices) => VideoLookupAnswer {
-            token: Some(token.to_owned()),
-            title: Some(cut(title_of(v, &s.address, &s.context), TITLE_MAX)),
-            choices: choices.iter().take(CHOICES).map(menu_choice).collect(),
-            notice: notice(v),
-            ..VideoLookupAnswer::of(lookup::READY)
-        },
+        Found::Video(v, choices) => {
+            let (choices, default_choice) = choices_for(s, v, choices);
+            let default_choice = default_choice.filter(|i| *i < CHOICES);
+            VideoLookupAnswer {
+                token: Some(token.to_owned()),
+                title: Some(cut(title_of(v, &s.address, &s.context), TITLE_MAX)),
+                choices: choices.iter().take(CHOICES).map(menu_choice).collect(),
+                default_choice,
+                default_action_only: default_choice
+                    .is_some_and(|i| choices[i].label == crate::i18n::t("Default quality")),
+                notice: notice(v),
+                ..VideoLookupAnswer::of(lookup::READY)
+            }
+        }
         Found::List => VideoLookupAnswer::of(lookup::LIST),
         Found::Failed(e) => {
             let message =
@@ -484,6 +643,19 @@ fn answer(token: &str, s: &Search) -> VideoLookupAnswer {
             VideoLookupAnswer::failed(lookup::ERROR, Some(cut(&message, MESSAGE_MAX)))
         }
     }
+}
+
+fn choices_for<'a>(
+    s: &Search,
+    video: &Video,
+    choices: &'a [Choice],
+) -> (std::borrow::Cow<'a, [Choice]>, Option<usize>) {
+    s.settings
+        .as_ref()
+        .map_or((std::borrow::Cow::Borrowed(choices), None), |settings| {
+            let (rows, default) = settings.choices(video, choices, s.merge);
+            (std::borrow::Cow::Owned(rows), default)
+        })
 }
 
 /// The download choice `p` adds, into `folder` (the Video category's), or `music` (the Music
@@ -504,11 +676,18 @@ pub fn video_add(
         .ok()
         .filter(|u| matches!(u.scheme(), "http" | "https"))?;
     let preferences = mdm_tools::preferences::Preferences::read();
+    let profile = p
+        .settings
+        .as_ref()
+        .map(|s| s.profile.clone())
+        .or_else(|| preferences.profile(false).ok());
     let name = mdm_tools::preferences::filename(
-        &preferences.filename_template,
+        profile
+            .as_ref()
+            .map_or(&preferences.filename_template, |p| &p.name_template),
         title_of(&p.video, &p.address, &p.context),
         &p.video.naming,
-        if mdm_tools::resolve::is_audio(&p.choice) {
+        if p.settings.is_some() || mdm_tools::resolve::is_audio(&p.choice) {
             &p.choice.ext
         } else {
             &preferences.container
@@ -519,7 +698,7 @@ pub fn video_add(
         _ => (crate::model::Category::Video, folder),
     };
     Some(VideoAdd {
-        ytdlp: preferences.profile(false).ok(),
+        ytdlp: profile,
         page,
         selector: p.choice.selector.clone(),
         dest: folder.join(mdm_engine::naming::sanitize(name.trim())),
@@ -623,6 +802,7 @@ pub fn run(job: Job, exe: PathBuf, rt: tokio::runtime::Handle) -> std::io::Resul
                 info,
                 merge,
                 running,
+                profile,
                 ..
             } = job;
             let _ended = Ended {
@@ -634,12 +814,38 @@ pub fn run(job: Job, exe: PathBuf, rt: tokio::runtime::Handle) -> std::io::Resul
             let fast = {
                 let (address, browser) = (address.clone(), browser.clone());
                 let opts = crate::settings::own_net();
-                async move { mdm_tools::manifest::fetch(&address, &browser, &opts).await }
+                let uses_config = profile.as_ref().is_some_and(|p| p.file.is_some());
+                async move {
+                    if uses_config {
+                        None
+                    } else {
+                        mdm_tools::manifest::fetch(&address, &browser, &opts).await
+                    }
+                }
             };
             // yt-dlp's look-up all the same (the click asked for the video): kept for the
             // download, and the menu's answer when MDM can't read the stream.
             settle(&found, &info, merge, &rt, fast, || {
-                crate::videodlg::look_up_kept(&exe, &address, &browser, &rt)
+                let lookup = || crate::videodlg::look_up_kept(&exe, &address, &browser, &rt);
+                let Some(profile) = profile else {
+                    return lookup();
+                };
+                let result = mdm_tools::config::with_profile(profile.clone(), lookup);
+                if profile.file.is_some()
+                    && result
+                        .0
+                        .as_ref()
+                        .is_err_and(|error| mdm_tools::servers::format_unavailable(error))
+                {
+                    let mut result =
+                        mdm_tools::config::with_profile(profile.for_quality_lookup(), lookup);
+                    if let Ok(Looked::Video(video)) = &mut result.0 {
+                        video.selected_format = None;
+                    }
+                    result
+                } else {
+                    result
+                }
             });
             drop(running);
         })?;

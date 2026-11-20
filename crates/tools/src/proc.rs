@@ -173,11 +173,9 @@ pub fn without_cookies(ours: &[String]) -> Vec<String> {
 /// Does a run with arguments `ours` have cookies (its own, or the chosen browser's)? One told
 /// [`NO_COOKIES`] has none: the chosen browser's store isn't read for it.
 fn with_cookies(ours: &[String], chosen: Option<&BrowserCookies>) -> bool {
-    !ours.iter().any(|a| a == NO_COOKIES)
-        && (chosen.is_some()
-            || ours
-                .iter()
-                .any(|a| a == "--cookies" || a == "--cookies-from-browser"))
+    ours.iter()
+        .any(|a| a == "--cookies" || a == "--cookies-from-browser")
+        || (!ours.iter().any(|a| a == NO_COOKIES) && chosen.is_some())
 }
 
 /// Does a run of yt-dlp with arguments `ours` send cookies: the browser's extension's (a cookie
@@ -202,6 +200,9 @@ fn retry_cookie_lookup(
     url: &str,
     message: &str,
 ) -> bool {
+    if ours.iter().any(|a| a == NO_COOKIES) {
+        return false;
+    }
     let uses_config_cookies = configured
         .iter()
         .any(|a| a == "--cookies" || a == "--cookies-from-browser");
@@ -670,6 +671,7 @@ pub struct FromBrowser {
     /// A private window's request, including a kept row after restart: never read the normal
     /// browser's cookie store. Cookies explicitly passed with this request remain usable.
     pub private: bool,
+    pub cookie_policy: Option<mdm_ipc::VideoCookies>,
     pub referer: Option<String>,
     pub origin: Option<String>,
     pub user_agent: Option<String>,
@@ -717,6 +719,23 @@ impl FromBrowser {
             (Some(cookies), Some(host)) => Some(header_cookies(&host, cookies)),
             _ => None,
         };
+        use mdm_ipc::VideoCookies;
+        if self.private && text.is_none() || self.cookie_policy.is_some() {
+            args.push(NO_COOKIES.to_owned());
+        }
+        let text = match &self.cookie_policy {
+            Some(VideoCookies::Browser { browser, profile }) if !self.private => {
+                if let Some(cookies) = BrowserCookies::new(browser, profile) {
+                    args.extend([
+                        "--cookies-from-browser".into(),
+                        safe(&cookies.spec())?.to_owned(),
+                    ]);
+                }
+                None
+            }
+            Some(VideoCookies::None | VideoCookies::Browser { .. }) => None,
+            _ => text,
+        };
         let file = match text {
             Some(text) => {
                 let file = cookie_file(&text).map_err(|e| ProcError::Start("yt-dlp".into(), e))?;
@@ -726,12 +745,7 @@ impl FromBrowser {
                 ]);
                 Some(file)
             }
-            _ => {
-                if self.private {
-                    args.push(NO_COOKIES.to_owned());
-                }
-                None
-            }
+            _ => None,
         };
         Ok((args, file))
     }
@@ -750,7 +764,7 @@ fn field(s: &str) -> bool {
 /// The browser's cookies (`cookies.getAll`'s), each for its own domain, path and flags: yt-dlp
 /// sends a cookie of `.youtube.com` to www.youtube.com when the page was music.youtube.com, and
 /// one of the page's host alone to that host only.
-fn jar_cookies(jar: &[mdm_ipc::BrowserCookie]) -> String {
+pub fn jar_cookies(jar: &[mdm_ipc::BrowserCookie]) -> String {
     let flag = |b: bool| if b { "TRUE" } else { "FALSE" };
     let mut text = String::from(NETSCAPE);
     for c in jar {
@@ -883,6 +897,16 @@ fn layers_with(
     ours: &[String],
     chosen: Option<&BrowserCookies>,
 ) -> Result<(), ProcError> {
+    // A session-specific source replaces both cookie options from the config file.
+    let filtered;
+    let user = if ours.iter().any(|a| a == NO_COOKIES) {
+        filtered = without_cookies(user);
+        filtered
+            .strip_suffix(&[NO_COOKIES.to_owned()])
+            .unwrap_or(&filtered)
+    } else {
+        user
+    };
     let all: Vec<String> = user.iter().chain(ours).cloned().collect();
     let from_store = browser_cookie_args(&all, chosen);
     for a in &all {
@@ -1152,6 +1176,7 @@ pub fn ytdlp(
         .chain(user.iter().cloned())
         .collect();
     layers(&mut cmd, &configured, ours)?;
+    add_ffmpeg_location(&mut cmd, ours);
     cmd.args(["--ignore-config", "--no-exec", "--no-update"]);
     if !configured.iter().any(|a| a == "--js-runtimes") {
         let detected = js_runtime_args(exe);
@@ -1187,6 +1212,7 @@ pub fn ytdlp_info(
         .chain(user.iter().cloned())
         .collect();
     layers(&mut cmd, &configured, ours)?;
+    add_ffmpeg_location(&mut cmd, ours);
     cmd.args(["--ignore-config", "--no-exec", "--no-update"]);
     if !configured.iter().any(|a| a == "--js-runtimes") {
         let detected = js_runtime_args(exe);
@@ -1202,6 +1228,16 @@ pub fn ytdlp_info(
     cmd.arg("--load-info-json");
     cmd.arg(info);
     Ok(cmd)
+}
+
+fn add_ffmpeg_location(cmd: &mut Command, ours: &[String]) {
+    if !ours.iter().any(|arg| arg == "--ffmpeg-location")
+        && let Some(tool) = crate::tools_dir()
+            .as_deref()
+            .and_then(crate::ffmpeg::installed)
+    {
+        cmd.arg("--ffmpeg-location").arg(tool.exe);
+    }
 }
 
 /// A job of its own for one helper and every process it starts (#61): on Windows `yt-dlp.exe`

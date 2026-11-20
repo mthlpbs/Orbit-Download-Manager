@@ -85,7 +85,7 @@ raw-window-handle = "0.6"
 # (win32.rs `text_rasterizer`): its COM interfaces, which windows-sys doesn't have. The windows
 # 0.62 wgpu-hal already builds. DXGI: the graphics drivers' versions, read before Direct3D 12 starts
 # (win32.rs `graphics_drivers`, #1205; wgpu-hal builds it too).
-windows = { version = "0.62", default-features = false, features = ["Win32_Graphics_DirectWrite", "Win32_Graphics_Dxgi"] }
+windows = { version = "0.62", default-features = false, features = ["Win32_Graphics_DirectWrite", "Win32_Graphics_Dxgi", "Win32_System_Com", "Win32_UI_Shell_Common", "Win32_UI_WindowsAndMessaging"] }
 
 # Windows notification-area icon and system font fallback.
 [target.'cfg(windows)'.dependencies.tray-icon]

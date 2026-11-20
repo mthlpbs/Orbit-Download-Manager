@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "default_locale": "en",
     "name": "__MSG_name__",
-    "version": "26.11.19",
+    "version": "26.11.20",
     "description": "__MSG_description__",
     "homepage_url": "https://github.com/mthlpbs/Orbit-Download-Manager/",
     "browser_specific_settings": {

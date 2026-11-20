@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use egui::{Pos2, Ui, pos2};
+use mdm_ipc::{BrowserCookie, VideoCookies};
 use mdm_tools::declared::Declared;
 use mdm_tools::resolve::{Choice, Looked, SubChoice, Video};
 use mdm_tools::video::{ALL_UPLOADERS, Subs};
@@ -87,6 +88,13 @@ pub struct VideoDialog {
     /// The browser's request context for `page` as it came (VideoAdd::context).
     context: mdm_ipc::Command,
     from_browser: String,
+    cookie_source: Option<VideoCookies>,
+    auto_lookup: bool,
+    cookie_browser: String,
+    cookie_profile: String,
+    cookie_viewer: bool,
+    cookie_rows: winui::RowList,
+    reveal_cookies: bool,
     /// Save to.
     folder: String,
     /// The Video and Music categories' folders MDM puts in Save to (#611): Music's while a
@@ -117,6 +125,7 @@ pub struct VideoDialog {
     /// First choice shown (the list scrolls by whole rows).
     /// The choices list's scroll and selection.
     rows: winui::RowList,
+    audio_rows: winui::RowList,
     error: Option<String>,
     focused: bool,
     /// Download Now (true) or Later, once chosen.
@@ -141,9 +150,9 @@ pub struct VideoDialog {
 }
 
 const WIDTH: f32 = 680.0;
-const HEIGHT: f32 = 675.0;
-const CARD_GAP: f32 = 8.0;
-const FORMAT_CARD_H: f32 = 86.0;
+const HEIGHT: f32 = 1040.0;
+const CARD_GAP: f32 = 13.0;
+const FORMAT_CARD_H: f32 = 77.0;
 const SAVE_CARD_H: f32 = 86.0;
 const EMBED_CARD_H: f32 = 76.0;
 const LEFT: f32 = 37.0;
@@ -234,6 +243,7 @@ impl VideoDialog {
         let folder = folder.display().to_string();
         let preferences = mdm_tools::preferences::Preferences::read();
         let quality = preferences.quality.min(8);
+        let cookies = mdm_tools::proc::browser_cookies();
         VideoDialog {
             use_config: preferences.use_config,
             thumbnail: preferences.embed_thumbnail,
@@ -249,6 +259,15 @@ impl VideoDialog {
             page: String::new(),
             context: Default::default(),
             from_browser: String::new(),
+            cookie_source: None,
+            auto_lookup: false,
+            cookie_browser: cookies
+                .as_ref()
+                .map_or_else(String::new, |c| c.browser.clone()),
+            cookie_profile: cookies.and_then(|c| c.profile).unwrap_or_default(),
+            cookie_viewer: false,
+            cookie_rows: Default::default(),
+            reveal_cookies: false,
             video_dir: folder.clone(),
             music_dir: None,
             sound: false,
@@ -265,6 +284,7 @@ impl VideoDialog {
             video: None,
             chosen: quality,
             rows: Default::default(),
+            audio_rows: Default::default(),
             error: None,
             focused: false,
             start_now: None,
@@ -309,21 +329,97 @@ impl VideoDialog {
             context.referer = None;
         }
         let page = own;
+        let cookie_source = context.video_cookies.clone().or_else(|| {
+            (!context.cookie_jar.is_empty() || context.cookies.is_some())
+                .then_some(VideoCookies::Site)
+        });
         VideoDialog {
             page: page.clone(),
             from_browser: page,
             context,
+            auto_lookup: cookie_source == Some(VideoCookies::Site),
+            cookie_source,
             ..Self::blank(folder)
         }
     }
 
     /// The browser's context, while the address is still the one it came with.
     fn context(&self) -> mdm_ipc::Command {
-        if self.page.trim() == self.from_browser {
+        let mut context = if self.page.trim() == self.from_browser {
             self.context.clone()
         } else {
             mdm_ipc::Command::default()
+        };
+        if self.page.trim() == self.from_browser && self.cookie_source == Some(VideoCookies::Site) {
+            context.video_cookies = Some(VideoCookies::Site);
+        } else if !self.use_config
+            || matches!(
+                self.cookie_source,
+                Some(VideoCookies::None | VideoCookies::Browser { .. })
+            )
+        {
+            context.video_cookies = Some(
+                if self.cookie_browser.is_empty() || self.cookie_source == Some(VideoCookies::None)
+                {
+                    VideoCookies::None
+                } else {
+                    VideoCookies::Browser {
+                        browser: self.cookie_browser.clone(),
+                        profile: self.cookie_profile.trim().to_owned(),
+                    }
+                },
+            );
+            context.cookies = None;
+            context.cookie_jar.clear();
         }
+        context
+    }
+
+    fn site_context(&self) -> bool {
+        !self.from_browser.is_empty()
+            && self.page.trim() == self.from_browser
+            && (self.context.video_cookies == Some(VideoCookies::Site)
+                || self.context.cookies.is_some()
+                || !self.context.cookie_jar.is_empty())
+    }
+
+    fn site_name(&self) -> String {
+        self.context
+            .page_url
+            .as_deref()
+            .or(Some(&self.from_browser))
+            .and_then(|page| url::Url::parse(page).ok())
+            .and_then(|page| page.host_str().map(str::to_owned))
+            .map(|host| host.strip_prefix("www.").unwrap_or(&host).to_owned())
+            .unwrap_or_default()
+    }
+
+    fn site_cookies(&self) -> Vec<BrowserCookie> {
+        if !self.context.cookie_jar.is_empty() {
+            return self.context.cookie_jar.clone();
+        }
+        let domain = url::Url::parse(&self.from_browser)
+            .ok()
+            .and_then(|page| page.host_str().map(str::to_owned))
+            .unwrap_or_default();
+        self.context
+            .cookies
+            .as_deref()
+            .unwrap_or_default()
+            .split(';')
+            .filter_map(|pair| {
+                let (name, value) = pair.trim().split_once('=')?;
+                Some(BrowserCookie {
+                    domain: domain.clone(),
+                    name: name.to_owned(),
+                    value: value.to_owned(),
+                    path: "/".to_owned(),
+                    host_only: true,
+                    secure: self.from_browser.starts_with("https:"),
+                    ..Default::default()
+                })
+            })
+            .collect()
     }
 
     fn preset_choices(&self, video: Option<&Video>) -> Vec<Choice> {
@@ -589,21 +685,40 @@ impl VideoDialog {
             self.confirmed = Some(now);
             ctx.request_repaint();
         }
+        let viewport = ctx
+            .input(|i| i.viewport().monitor_size)
+            .map_or(HEIGHT, |s| (s.y - 100.0).clamp(470.0, HEIGHT));
         let out = window(
             ctx,
             "video-page",
             "Download video from a page",
-            [WIDTH, HEIGHT],
+            [WIDTH, viewport],
             false,
             winui::BG(),
-            |ui, o| self.body(ui, o, rt),
+            |ui, o| self.body(ui, o, rt, viewport),
         );
+        if self.cookie_viewer && self.site_context() {
+            let outcome = self.show_cookies(ctx);
+            if !matches!(outcome, Outcome::Open) {
+                self.cookie_viewer = false;
+                self.reveal_cookies = false;
+            }
+        } else if self.cookie_viewer {
+            self.cookie_viewer = false;
+            self.reveal_cookies = false;
+        }
         // A playlist's quality chosen, a list or a video looked up: Save to follows (#611).
         self.follow_sound();
         // Helpers... open: on Close, the helpers are read again (another program, or MDM's own).
         if let Some(h) = &mut self.helpers {
             let outcome = h.show(ctx, rt);
             self.saved_cookies = h.take_saved_cookies();
+            if let Some((browser, profile)) = &self.saved_cookies {
+                self.cookie_browser.clone_from(browser);
+                self.cookie_profile.clone_from(profile);
+                self.looked_up.clear();
+                self.kept = None;
+            }
             if !matches!(outcome, Outcome::Open) {
                 self.helpers = None;
                 self.tools = None;
@@ -839,7 +954,54 @@ impl VideoDialog {
         self.error = None;
     }
 
-    fn body(&mut self, ui: &mut Ui, o: Pos2, rt: &tokio::runtime::Handle) -> Outcome<()> {
+    fn body(
+        &mut self,
+        ui: &mut Ui,
+        o: Pos2,
+        rt: &tokio::runtime::Handle,
+        viewport: f32,
+    ) -> Outcome<()> {
+        let scroll = egui::ScrollArea::vertical()
+            .id_salt("video-dialog-scroll")
+            .max_height(viewport - 58.0)
+            .auto_shrink([false, true])
+            .scroll_source(egui::scroll_area::ScrollSource {
+                mouse_wheel: false,
+                ..Default::default()
+            })
+            .show_viewport(ui, |ui, visible| {
+                let o = ui.min_rect().min;
+                let (ready, listing, bottom) = self.cards(ui, o, rt, viewport);
+                ui.allocate_space(egui::vec2(WIDTH - 16.0, bottom));
+                // Native lists handle raw wheel events. Use those same events for the dialog
+                // so egui's smoothed wheel input cannot scroll it a second time.
+                if bottom > visible.height()
+                    && ui.rect_contains_pointer(ui.clip_rect())
+                    && !winui::wheel_taken(ui)
+                {
+                    let line = 16.0;
+                    let page = (visible.height() / line).floor().max(1.0);
+                    let travel = winui::wheel_rows(ui, line, page) * line;
+                    if travel != 0.0 {
+                        ui.scroll_with_delta_animation(
+                            egui::vec2(0.0, -travel),
+                            egui::style::ScrollAnimation::none(),
+                        );
+                    }
+                }
+                (ready, listing)
+            });
+        let (ready, listing) = scroll.inner;
+        self.footer(ui, o, ready && !self.cookie_viewer, listing, viewport)
+    }
+
+    fn cards(
+        &mut self,
+        ui: &mut Ui,
+        o: Pos2,
+        rt: &tokio::runtime::Handle,
+        viewport: f32,
+    ) -> (bool, bool, f32) {
         let p = ui.painter().clone();
         let (dir, ytdlp, ffmpeg) = self.tools.get_or_insert_with(tools).clone();
         let busy = self.lookup.is_some() || self.install.is_some();
@@ -899,6 +1061,7 @@ impl VideoDialog {
         let page_ok = url::Url::parse(self.page.trim())
             .is_ok_and(|url| matches!(url.scheme(), "http" | "https") && url.host().is_some());
         let can_look = page_ok && !busy && !self.use_config && ytdlp.is_some();
+        let auto_look = can_look && self.site_context() && self.auto_lookup;
         let look = winui::button(
             ui,
             r(o, look_x, 19.0, look_w, 25.0),
@@ -915,10 +1078,20 @@ impl VideoDialog {
         )
         .clicked()
             || (edit.has_focus() && can_look && winui::take_key(ui, egui::Key::Enter));
-        if look
+        let mut top = 75.0 + CARD_GAP;
+        let cookies_before = self.context().video_cookies;
+        top += self.cookies_card(ui, o + egui::vec2(0.0, top), !busy) + CARD_GAP;
+        if cookies_before != self.context().video_cookies {
+            matched = false;
+            self.looked_up.clear();
+            self.kept = None;
+            self.error = None;
+        }
+        if (look || auto_look)
             && can_look
             && let Some(tool) = &ytdlp
         {
+            self.auto_lookup = false;
             matched = false;
             // A typed or pasted address too (#359); the box shows what is looked up.
             self.page = mdm_tools::pages::video_address(self.page.trim());
@@ -938,7 +1111,7 @@ impl VideoDialog {
                 Ok(p) => p,
                 Err(e) => {
                     self.error = Some(e);
-                    return Outcome::Open;
+                    return (false, false, top);
                 }
             };
             std::thread::spawn(move || {
@@ -996,7 +1169,7 @@ impl VideoDialog {
             (
                 Some(if config_path.is_some() {
                     crate::i18n::t(
-                        "Format, quality, save and embedding settings come from your yt-dlp configuration file.",
+                        "Cookies, format, quality, embedding and save settings come from your yt-dlp configuration file.",
                     )
                 } else {
                     crate::i18n::t("Select a configuration file in yt-dlp settings.")
@@ -1030,14 +1203,13 @@ impl VideoDialog {
         } else if !options {
             (
                 Some(crate::i18n::t(
-                    "Click Look up to load the qualities for this page.",
+                    "Click Look up to load the qualities for this page. The options below unlock after that.",
                 )),
                 false,
             )
         } else {
             (None, false)
         };
-        let mut top = 75.0 + CARD_GAP;
         if let Some(status) = status {
             let install = offer.filter(|_| !busy).map(|(tool, label)| {
                 let w = winui::button_fit_width(&p, label, 105.0, 155.0);
@@ -1087,13 +1259,15 @@ impl VideoDialog {
 
         self.format_card(ui, o + egui::vec2(0.0, top), options);
         top += FORMAT_CARD_H + CARD_GAP;
-        // Give the format list the room left above the footer. A longer status message reduces
-        // the number of visible rows so the Save and Embedding controls still fit.
-        let quality_height = HEIGHT - 58.0 - top - SAVE_CARD_H - EMBED_CARD_H - 2.0 * CARD_GAP;
+        let (min_quality, ideal_quality) = if self.advanced {
+            (236.0, 350.0)
+        } else {
+            (107.0, 235.0)
+        };
+        let remaining = viewport - 58.0 - top - EMBED_CARD_H - SAVE_CARD_H - CARD_GAP * 3.0;
+        let quality_height = remaining.clamp(min_quality, ideal_quality);
         self.quality_card(ui, o + egui::vec2(0.0, top), options, quality_height);
         top += quality_height + CARD_GAP;
-        self.save_card(ui, o + egui::vec2(0.0, top), options, ffmpeg.is_some());
-        top += SAVE_CARD_H + CARD_GAP;
         let embedding = o + egui::vec2(0.0, top);
         video_card(
             &p,
@@ -1116,6 +1290,9 @@ impl VideoDialog {
             options && ffmpeg.is_some() && self.preferences.container != "webm",
             Some(o.x + RIGHT),
         );
+        top += EMBED_CARD_H + CARD_GAP;
+        self.save_card(ui, o + egui::vec2(0.0, top), options, ffmpeg.is_some());
+        top += SAVE_CARD_H + CARD_GAP;
 
         let listing = self.list.as_ref().is_some_and(|list| list.listing());
         let chosen = self.list.as_ref().map_or_else(
@@ -1129,7 +1306,293 @@ impl VideoDialog {
             } else {
                 options && chosen && ffmpeg.is_some()
             };
-        self.footer(ui, o, ready, listing)
+        (ready, listing, top)
+    }
+
+    fn cookies_card(&mut self, ui: &mut Ui, o: Pos2, enabled: bool) -> f32 {
+        let p = ui.painter().clone();
+        let site = self.site_context();
+        let using_site = site && self.cookie_source == Some(VideoCookies::Site);
+        let enabled = enabled && (!self.use_config || site);
+        let height = if using_site { 128.0 } else { 77.0 };
+        video_card(
+            &p,
+            o,
+            0.0,
+            height,
+            Some(crate::i18n::mark("Cookies")),
+            enabled,
+        );
+        let caption = if using_site {
+            "Sent by the Orbit extension"
+        } else if self.use_config {
+            "Set by yt-dlp configuration file"
+        } else {
+            "Prefilled from yt-dlp settings"
+        };
+        winui::text_right(
+            &p,
+            o.x + RIGHT,
+            o.y + 21.0,
+            crate::i18n::t(caption),
+            if using_site {
+                winui::accent()
+            } else {
+                winui::MUTED()
+            },
+        );
+        video_label(ui, o, 56.0, "Cookies from", enabled);
+        let browsers = if self.context.private && self.page.trim() == self.from_browser {
+            Vec::new()
+        } else {
+            mdm_tools::proc::cookie_browsers()
+        };
+        let site_label = format!("{} · {}", crate::i18n::t("Site"), self.site_name());
+        let labels: Vec<_> = site
+            .then_some(site_label.as_str())
+            .into_iter()
+            .chain(std::iter::once("None"))
+            .chain(browsers.iter().map(|b| browser_label(b)))
+            .collect();
+        let configured = (self.use_config && self.cookie_source.is_none())
+            .then(|| {
+                mdm_tools::config::path()
+                    .and_then(|file| mdm_tools::config::load(&file).ok())
+                    .and_then(|profile| profile.value("--cookies-from-browser").map(str::to_owned))
+            })
+            .flatten();
+        let (browser, profile) = configured.as_deref().map_or(
+            (self.cookie_browser.as_str(), self.cookie_profile.as_str()),
+            |spec| spec.split_once(':').unwrap_or((spec, "")),
+        );
+        let offset = usize::from(site);
+        let selected = if using_site {
+            0
+        } else if self.cookie_source == Some(VideoCookies::None) {
+            offset
+        } else {
+            offset
+                + browsers
+                    .iter()
+                    .position(|b| *b == browser)
+                    .map_or(0, |i| i + 1)
+        };
+        let mut inactive_profile = profile.to_owned();
+        if let Some(i) = winui::combo_light(
+            ui,
+            r(
+                o,
+                FIELD_X,
+                38.0,
+                if using_site { 207.0 } else { 185.0 },
+                28.0,
+            ),
+            &labels,
+            selected,
+            enabled,
+            "video-cookie-browser",
+        ) {
+            self.cookie_source = if i < offset {
+                Some(VideoCookies::Site)
+            } else if let Some(browser) = i.checked_sub(offset + 1).and_then(|i| browsers.get(i)) {
+                if self.cookie_browser != *browser {
+                    self.cookie_browser = (*browser).to_owned();
+                    self.cookie_profile.clear();
+                }
+                Some(VideoCookies::Browser {
+                    browser: self.cookie_browser.clone(),
+                    profile: self.cookie_profile.clone(),
+                })
+            } else {
+                Some(VideoCookies::None)
+            };
+        }
+        if using_site {
+            let count = cookie_count(self.site_cookies().len());
+            text(
+                &p,
+                o.x + FIELD_X + 220.0,
+                o.y + 56.0,
+                &count,
+                winui::MUTED(),
+            );
+            if winui::button(
+                ui,
+                r(o, RIGHT - 132.0, 38.0, 132.0, 28.0),
+                "View cookies...",
+                ButtonKind::Normal,
+                false,
+                None,
+            )
+            .clicked()
+            {
+                self.cookie_viewer = true;
+                self.cookie_rows = Default::default();
+            }
+            winui::paragraph(
+                &p,
+                o.x + FIELD_X,
+                o.y + 86.0,
+                crate::i18n::t(
+                    "Uses the cookies from the tab that opened this download. This overrides the browser and profile in yt-dlp settings.",
+                ),
+                winui::MUTED(),
+                o.x + RIGHT,
+                15.0,
+            );
+            return height;
+        }
+        text(
+            &p,
+            o.x + FIELD_X + 197.0,
+            o.y + 56.0,
+            crate::i18n::t("Profile"),
+            if enabled {
+                winui::TEXT()
+            } else {
+                winui::TEXT_DISABLED()
+            },
+        );
+        winui::edit(
+            ui,
+            r(o, FIELD_X + 256.0, 38.0, RIGHT - FIELD_X - 256.0, 28.0),
+            if enabled {
+                &mut self.cookie_profile
+            } else {
+                &mut inactive_profile
+            },
+            enabled && selected > offset,
+            false,
+        );
+        height
+    }
+
+    fn show_cookies(&mut self, ctx: &egui::Context) -> Outcome<()> {
+        let cookies = self.site_cookies();
+        let title = crate::i18n::fmt(
+            crate::i18n::t("Cookies for {site}"),
+            &[("site", &self.site_name())],
+        );
+        crate::dialogs::question(
+            ctx,
+            "video-site-cookies",
+            &title,
+            [560.0, 430.0],
+            false,
+            winui::BG(),
+            |ui, o| {
+                let p = ui.painter().clone();
+                winui::paragraph(
+                    &p,
+                    o.x + 25.0,
+                    o.y + 24.0,
+                    crate::i18n::t(
+                        "The Orbit extension sent these cookies. Orbit uses them for this download session.",
+                    ),
+                    winui::TEXT(),
+                    o.x + 535.0,
+                    17.0,
+                );
+                let columns = [38.0, 216.0, 345.0, 453.0];
+                for (x, title) in columns
+                    .into_iter()
+                    .zip(["Name", "Domain", "Expires", "Value"])
+                {
+                    text(
+                        &p,
+                        o.x + x,
+                        o.y + 76.0,
+                        crate::i18n::t(title),
+                        winui::MUTED(),
+                    );
+                }
+                self.cookie_rows.name = crate::i18n::t("Cookies");
+                winui::row_list(
+                    ui,
+                    "video-cookie-table",
+                    r(o, 25.0, 85.0, 510.0, 248.0),
+                    cookies.len(),
+                    25.0,
+                    &mut self.cookie_rows,
+                    |ui, clip, i, row, look| {
+                        let cookie = &cookies[i];
+                        let expiry = cookie
+                            .expires
+                            .filter(|e| e.is_finite() && *e > 0.0)
+                            .and_then(|e| chrono::DateTime::from_timestamp(e as i64, 0))
+                            .map_or_else(
+                                || crate::i18n::t("Session").to_owned(),
+                                |d| d.format("%d %b %Y").to_string(),
+                            );
+                        let value = if self.reveal_cookies {
+                            cookie.value.as_str()
+                        } else {
+                            "••••••"
+                        };
+                        for (j, cell) in
+                            [cookie.name.as_str(), cookie.domain.as_str(), &expiry, value]
+                                .into_iter()
+                                .enumerate()
+                        {
+                            let right = columns.get(j + 1).copied().unwrap_or(526.0) - 7.0;
+                            winui::fit(
+                                ui,
+                                clip,
+                                o.x + columns[j],
+                                row.top() + 16.0,
+                                cell,
+                                look.ink,
+                                o.x + right,
+                                ("cookie-cell", i, j),
+                            );
+                        }
+                        look.name =
+                            format!("{}, {}, {}, {}", cookie.name, cookie.domain, expiry, value);
+                    },
+                );
+                let count = cookie_count(cookies.len());
+                text(&p, o.x + 25.0, o.y + 357.0, &count, winui::MUTED());
+                winui::etched_h(&p, o.x + 25.0, o.y + 376.0, 510.0);
+                winui::checkbox(
+                    ui,
+                    pos2(o.x + 25.0, o.y + 392.0),
+                    &mut self.reveal_cookies,
+                    "Show values",
+                    true,
+                );
+                if winui::button(
+                    ui,
+                    r(o, 276.0, 386.0, 164.0, 29.0),
+                    "Copy as cookies.txt",
+                    if cookies.is_empty() {
+                        ButtonKind::Disabled
+                    } else {
+                        ButtonKind::Normal
+                    },
+                    false,
+                    None,
+                )
+                .clicked()
+                {
+                    ui.ctx().copy_text(mdm_tools::proc::jar_cookies(&cookies));
+                }
+                if winui::button(
+                    ui,
+                    r(o, 451.0, 386.0, 84.0, 29.0),
+                    "Close",
+                    ButtonKind::Normal,
+                    false,
+                    None,
+                )
+                .clicked()
+                    || winui::escape_pressed(ui)
+                {
+                    Outcome::Closed
+                } else {
+                    Outcome::Open
+                }
+            },
+        )
     }
 
     fn format_card(&mut self, ui: &mut Ui, o: Pos2, enabled: bool) {
@@ -1142,8 +1605,18 @@ impl VideoDialog {
             Some(crate::i18n::mark("Format")),
             enabled,
         );
-        video_label(ui, o, 43.0, "Output container", enabled);
-        video_label(ui, o, 71.0, "Preferred codec", enabled && !self.advanced);
+        video_label(ui, o, 56.0, "Output container", enabled);
+        text(
+            &p,
+            o.x + FIELD_X + 214.0,
+            o.y + 56.0,
+            crate::i18n::t("Codec"),
+            if enabled {
+                winui::TEXT()
+            } else {
+                winui::TEXT_DISABLED()
+            },
+        );
         let containers = ["Matroska (MKV)", "MPEG-4 (MP4)", "WebM"];
         let ci = mdm_tools::preferences::CONTAINERS
             .iter()
@@ -1152,7 +1625,7 @@ impl VideoDialog {
         let mut changed = false;
         if let Some(i) = winui::combo_light(
             ui,
-            r(o, FIELD_X, 27.0, 230.0, 24.0),
+            r(o, FIELD_X, 38.0, 202.0, 28.0),
             &containers,
             ci,
             enabled,
@@ -1167,17 +1640,21 @@ impl VideoDialog {
         let ids: Vec<_> = (0..mdm_tools::preferences::CODECS.len())
             .filter(|i| self.preferences.container != "webm" || *i != 1)
             .collect();
-        let codecs: Vec<_> = ids
+        let mut codecs: Vec<_> = ids
             .iter()
             .map(|i| mdm_tools::preferences::CODECS[*i])
             .collect();
-        let selected = ids
+        let mut selected = ids
             .iter()
             .position(|i| *i == self.preferences.codec)
             .unwrap_or(0);
+        if self.advanced {
+            codecs.push("Set by format IDs");
+            selected = codecs.len() - 1;
+        }
         if let Some(i) = winui::combo_light(
             ui,
-            r(o, FIELD_X, 55.0, 230.0, 24.0),
+            r(o, FIELD_X + 275.0, 38.0, RIGHT - FIELD_X - 275.0, 28.0),
             &codecs,
             selected,
             enabled && !self.advanced,
@@ -1185,15 +1662,6 @@ impl VideoDialog {
         ) {
             self.preferences.codec = ids[i];
             changed = true;
-        }
-        if self.format_code.is_some() {
-            text(
-                &p,
-                o.x + FIELD_X + 242.0,
-                o.y + 71.0,
-                crate::i18n::t("Set by the format IDs"),
-                winui::MUTED(),
-            );
         }
         if changed {
             if !self.advanced
@@ -1245,6 +1713,14 @@ impl VideoDialog {
                 if let Some((video, _)) = self.video.take() {
                     let merge = self.tools.as_ref().is_some_and(|t| t.2.is_some());
                     let choices = mdm_tools::resolve::choices(&video, merge);
+                    let wanted = mdm_tools::preferences::HEIGHTS[self.preferences.quality.min(8)];
+                    self.format_code = mdm_tools::resolve::pick(&choices, wanted)
+                        .and_then(|picked| picked.choice.selector.split('/').next())
+                        .filter(|code| {
+                            format_code_choice(&video, code, &self.preferences.container).is_some()
+                        })
+                        .map(str::to_owned)
+                        .or_else(|| Some(String::new()));
                     self.video = Some((video, choices));
                 }
             } else {
@@ -1347,107 +1823,185 @@ impl VideoDialog {
             return;
         };
         let p = ui.painter().clone();
-        let code_y = height - 61.0;
-        let header = [
-            "ID",
-            "EXT",
-            "RESOLUTION",
-            "FPS",
-            "FILESIZE",
-            "TBR",
-            "VCODEC",
-            "ACODEC",
-            "MORE INFO",
-        ];
-        format_columns(&p, o.x + LEFT, o.y + 40.0, header, winui::MUTED());
-        self.rows.name = crate::i18n::t("Available formats");
-        let picked = ui
-            .add_enabled_ui(enabled, |ui| {
-                winui::row_list(
-                    ui,
-                    "video-formats",
-                    r(o, LEFT, 47.0, RIGHT - LEFT, code_y - 56.0),
-                    video.formats.len(),
-                    19.0,
-                    &mut self.rows,
-                    |_, clip, i, row, look| {
-                        let f = &video.formats[i];
-                        let cells = format_cells(f);
-                        let selected = code.split('+').any(|id| id.trim() == f.id);
-                        if selected {
-                            clip.rect_filled(r(row.min, 1.0, 3.0, 3.0, 13.0), 1.0, winui::accent());
-                        }
-                        format_columns(
-                            clip,
-                            row.left(),
-                            row.top() + 13.0,
-                            cells.each_ref().map(String::as_str),
-                            look.ink,
-                        );
-                        look.name = cells.join(", ");
-                    },
-                )
-                .picked
-            })
-            .inner;
-        if enabled && let Some(i) = picked {
-            pick_format(video, code, i);
-        }
-        video_label(ui, o, code_y + 16.0, "Format code", enabled);
-        winui::edit(
-            ui,
-            r(o, FIELD_X, code_y, RIGHT - FIELD_X - 215.0, 24.0),
-            code,
-            enabled,
-            false,
-        );
-        let presets: Vec<_> = choices
+        let mut video_ids: Vec<_> = video
+            .formats
             .iter()
-            .filter(|choice| mdm_tools::resolve::is_audio(choice))
+            .enumerate()
+            .filter(|(_, f)| f.video && format_by_id(video, &f.id).is_some())
+            .map(|(i, _)| i)
             .collect();
-        let mut labels = vec![crate::i18n::mark("Audio presets…").to_owned()];
-        labels.extend(presets.iter().map(|c| choice_label(&c.label)));
-        let names: Vec<_> = labels.iter().map(String::as_str).collect();
-        let selected = presets.iter().position(|c| c.selector == code.trim());
-        if let Some(i) = winui::combo_light(
+        video_ids.sort_by_key(|i| std::cmp::Reverse(video.formats[*i].height));
+        let mut audio_ids: Vec<_> = video
+            .formats
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| f.audio && !f.video && format_by_id(video, &f.id).is_some())
+            .map(|(i, _)| i)
+            .collect();
+        audio_ids.sort_by(|a, b| {
+            video.formats[*b]
+                .tbr
+                .unwrap_or(0.0)
+                .total_cmp(&video.formats[*a].tbr.unwrap_or(0.0))
+        });
+        let right_pane = LEFT + 357.0;
+        let list_height = height - 123.0;
+        let video_rect = r(o, LEFT, 61.0, right_pane - LEFT - 13.0, list_height);
+        let audio_rect = r(o, right_pane, 61.0, RIGHT - right_pane, list_height);
+        let code_y = height - 52.0;
+
+        let video_pick = format_pane(
             ui,
-            r(o, RIGHT - 205.0, code_y, 205.0, 24.0),
-            &names,
-            selected.map_or(0, |i| i + 1),
-            enabled && !presets.is_empty(),
-            "video-audio-presets",
-        ) {
-            *code = i
-                .checked_sub(1)
-                .map_or_else(String::new, |i| presets[i].selector.clone());
+            o,
+            video_rect,
+            "Video",
+            video,
+            &video_ids,
+            code,
+            &mut self.rows,
+            enabled,
+        );
+        if let Some(i) = video_pick {
+            if let Some(index) = video_ids.get(i) {
+                pick_format(video, code, *index);
+            } else {
+                *code = code
+                    .split('+')
+                    .find_map(|id| format_by_id(video, id.trim()).filter(|f| f.audio && !f.video))
+                    .or_else(|| audio_ids.first().map(|i| &video.formats[*i]))
+                    .map(|f| f.id.clone())
+                    .unwrap_or_default();
+            }
         }
-        let invalid = !code.trim().is_empty()
-            && !presets.iter().any(|c| c.selector == code.trim())
-            && format_code_choice(video, code, &self.preferences.container).is_none();
-        let (hint, color) = if invalid {
+        let muxed = code
+            .split('+')
+            .next()
+            .and_then(|id| format_by_id(video, id.trim()))
+            .is_some_and(|f| f.video && f.audio);
+        let audio_pick = format_pane(
+            ui,
+            o,
+            audio_rect,
+            "Audio",
+            video,
+            &audio_ids,
+            code,
+            &mut self.audio_rows,
+            enabled && !muxed,
+        );
+        if muxed {
+            winui::text_right(
+                &p,
+                audio_rect.right(),
+                o.y + 51.0,
+                crate::i18n::t("Already included"),
+                winui::MUTED(),
+            );
+        }
+        if let Some(i) = audio_pick {
+            if let Some(index) = audio_ids.get(i) {
+                pick_format(video, code, *index);
+            } else {
+                *code = code
+                    .split('+')
+                    .find_map(|id| {
+                        format_by_id(video, id.trim())
+                            .filter(|f| f.video)
+                            .map(|f| f.id.clone())
+                    })
+                    .unwrap_or_default();
+            }
+        }
+
+        let summary = r(o, LEFT, code_y - 4.0, RIGHT - LEFT, 49.0);
+        p.rect_filled(summary, 4.0, winui::BG());
+        let field = r(o, RIGHT - 103.0, code_y + 5.0, 93.0, 25.0);
+        text(
+            &p,
+            o.x + RIGHT - 181.0,
+            o.y + code_y + 22.0,
+            crate::i18n::t("Format code"),
+            winui::MUTED(),
+        );
+        winui::edit(ui, field, code, enabled, false);
+        let selected = format_code_choice(video, code, &self.preferences.container);
+        let mut ids = code
+            .split('+')
+            .filter_map(|id| format_by_id(video, id.trim()));
+        let first = ids.next();
+        let second = ids.next();
+        let summary = if let Some(choice) = selected {
+            let streams = match (first, second) {
+                (Some(v), Some(a)) => format!("{} + {}", format_title(v), format_title(a)),
+                (Some(f), None) => format_title(f),
+                _ => String::new(),
+            };
+            let container = choice.ext.to_uppercase();
+            let (size, _) = choice_size(&choice);
+            let description = if second.is_some() {
+                crate::i18n::t("{size} · merged after download")
+            } else {
+                crate::i18n::t("{size}")
+            };
             (
-                crate::i18n::t(
-                    "Choose a media ID, or combine a video-only and audio-only ID with +.",
+                crate::i18n::fmt(
+                    crate::i18n::t("{streams} in one {container} file"),
+                    &[("streams", &streams), ("container", &container)],
                 ),
-                winui::ERROR(),
+                crate::i18n::fmt(description, &[("size", &size)]),
+                winui::TEXT(),
             )
         } else {
+            let text = if code.trim().is_empty() {
+                crate::i18n::t("Choose a video or audio format.")
+            } else {
+                crate::i18n::t("Enter a format ID or a video+audio pair.")
+            };
             (
-                crate::i18n::t(
-                    "Choose one format ID, or select video and audio to join their IDs with +.",
-                ),
-                winui::MUTED(),
+                text.to_owned(),
+                String::new(),
+                if code.trim().is_empty() {
+                    winui::MUTED()
+                } else {
+                    winui::ERROR()
+                },
             )
         };
-        winui::paragraph(
-            &p,
-            o.x + FIELD_X,
-            o.y + code_y + 40.0,
-            hint,
-            color,
-            o.x + RIGHT,
-            14.0,
-        );
+        for (i, label) in [&summary.0, &summary.1].into_iter().enumerate() {
+            winui::fit(
+                ui,
+                &p,
+                o.x + LEFT + 13.0,
+                o.y + code_y + 13.0 + i as f32 * 17.0,
+                label,
+                if i == 0 { summary.2 } else { winui::MUTED() },
+                o.x + RIGHT - 193.0,
+                ("video-format-summary", i),
+            );
+        }
+        // Audio conversions use the same selectors as the quality menu.
+        let presets: Vec<_> = choices
+            .iter()
+            .filter(|c| mdm_tools::resolve::audio_conversion(&c.selector).is_some())
+            .collect();
+        if !presets.is_empty() {
+            let names: Vec<_> = std::iter::once("Audio conversions…".to_owned())
+                .chain(presets.iter().map(|c| choice_label(&c.label)))
+                .collect();
+            let names: Vec<_> = names.iter().map(String::as_str).collect();
+            let selected = presets.iter().position(|c| c.selector == code.trim());
+            if let Some(i) = winui::combo_light(
+                ui,
+                r(o, RIGHT - 365.0, 4.0, 182.0, 24.0),
+                &names,
+                selected.map_or(0, |i| i + 1),
+                enabled,
+                "video-audio-presets",
+            ) && let Some(preset) = i.checked_sub(1).and_then(|i| presets.get(i))
+            {
+                code.clone_from(&preset.selector);
+            }
+        }
     }
 
     fn save_card(&mut self, ui: &mut Ui, o: Pos2, enabled: bool, ffmpeg: bool) {
@@ -1510,9 +2064,16 @@ impl VideoDialog {
         }
     }
 
-    fn footer(&mut self, ui: &mut Ui, o: Pos2, ready: bool, listing: bool) -> Outcome<()> {
+    fn footer(
+        &mut self,
+        ui: &mut Ui,
+        o: Pos2,
+        ready: bool,
+        listing: bool,
+        viewport: f32,
+    ) -> Outcome<()> {
         let p = ui.painter().clone();
-        let y = HEIGHT - 40.0;
+        let y = viewport - 40.0;
         winui::etched_h(&p, o.x + 24.0, o.y + y - 10.0, WIDTH - 48.0);
         let [now, later, cancel] = winui::buttons_to_right(
             &p,
@@ -1523,11 +2084,11 @@ impl VideoDialog {
         )[..] else {
             unreachable!("three buttons")
         };
-        let helpers = winui::button_fit_width(&p, "yt-dlp...", 84.0, 175.0);
+        let helpers = winui::button_fit_width(&p, "Settings...", 84.0, 175.0);
         if winui::button(
             ui,
             r(o, 24.0, y, helpers, 28.0),
-            "yt-dlp...",
+            "Settings...",
             ButtonKind::Normal,
             false,
             None,
@@ -1553,7 +2114,7 @@ impl VideoDialog {
         let later = button(ui, later, "Later", false, ready).clicked();
         let cancel = button(ui, cancel, "Cancel", false, true).clicked();
         let asking = self.list.as_ref().is_some_and(|l| l.asking());
-        if cancel || (winui::escape_pressed(ui) && !asking) {
+        if cancel || (winui::escape_pressed(ui) && !asking && !self.cookie_viewer) {
             return Outcome::Closed;
         }
         if ready && (now || later) {
@@ -1738,6 +2299,17 @@ fn video_label(ui: &Ui, o: Pos2, y: f32, label: &str, enabled: bool) {
     );
 }
 
+fn cookie_count(count: usize) -> String {
+    if count == 1 {
+        crate::i18n::t("1 cookie").to_owned()
+    } else {
+        crate::i18n::fmt(
+            crate::i18n::t("{count} cookies"),
+            &[("count", &count.to_string())],
+        )
+    }
+}
+
 fn format_by_id<'a>(video: &'a Video, id: &str) -> Option<&'a mdm_tools::resolve::Format> {
     (!id.is_empty()
         && id
@@ -1809,41 +2381,172 @@ fn pick_format(video: &Video, code: &mut String, index: usize) {
     *code = matching.unwrap_or_else(|| picked.id.clone());
 }
 
-fn format_cells(format: &mdm_tools::resolve::Format) -> [String; 9] {
-    let resolution = match (format.width, format.height) {
-        (Some(w), Some(h)) => format!("{w}x{h}"),
-        (_, Some(h)) => format!("{h}p"),
-        _ if format.audio && !format.video => crate::i18n::t("Audio only").into(),
-        _ => String::new(),
-    };
-    let size = format.size.map_or_else(String::new, |size| {
-        let approximate = if format.approx { "~" } else { "" };
-        format!("{approximate}{}", crate::dialogs::dialog_size(size))
-    });
-    [
-        format.id.clone(),
-        format.ext.clone(),
-        resolution,
-        format.fps.map_or_else(String::new, |n| format!("{n:.0}")),
-        size,
-        format.tbr.map_or_else(String::new, |n| format!("{n:.0}k")),
-        format.vcodec.clone().unwrap_or_default(),
-        format.acodec.clone().unwrap_or_default(),
-        format.note.clone().unwrap_or_default(),
-    ]
+fn format_title(format: &mdm_tools::resolve::Format) -> String {
+    if format.video {
+        let resolution = format
+            .height
+            .map_or_else(|| format.ext.to_uppercase(), |h| format!("{h}p"));
+        format.fps.map_or_else(
+            || resolution.clone(),
+            |fps| format!("{resolution} · {fps:.0} fps"),
+        )
+    } else {
+        format.tbr.map_or_else(
+            || format.ext.to_uppercase(),
+            |rate| format!("{rate:.0} kbps"),
+        )
+    }
 }
 
-fn format_columns(p: &egui::Painter, x: f32, baseline: f32, values: [&str; 9], ink: egui::Color32) {
-    let mut x = x + 8.0;
-    let font = egui::FontId::monospace(11.0);
-    for (value, width) in values
-        .into_iter()
-        .zip([43.0, 48.0, 79.0, 31.0, 71.0, 48.0, 83.0, 83.0, 100.0])
-    {
-        let label = winui::ellipsize(p, &font, value, width - 5.0);
-        winui::text_font(p, font.clone(), x, baseline, &label, ink);
-        x += width;
+#[allow(clippy::too_many_arguments)]
+fn format_pane(
+    ui: &mut Ui,
+    o: Pos2,
+    rect: egui::Rect,
+    name: &'static str,
+    video: &Video,
+    indices: &[usize],
+    code: &str,
+    rows: &mut winui::RowList,
+    enabled: bool,
+) -> Option<usize> {
+    let audio = name == "Audio";
+    let p = ui.painter().clone();
+    let caption = crate::i18n::t(name);
+    text(&p, rect.left(), o.y + 51.0, caption, winui::TEXT());
+    let count = if indices.len() == 1 {
+        crate::i18n::t("1 option").to_owned()
+    } else {
+        crate::i18n::fmt(
+            crate::i18n::t("{count} options"),
+            &[("count", &indices.len().to_string())],
+        )
+    };
+    text(
+        &p,
+        rect.left() + winui::text_width(&p, caption) + 9.0,
+        o.y + 51.0,
+        &count,
+        winui::MUTED(),
+    );
+    rows.name = caption;
+    rows.selected = indices
+        .iter()
+        .position(|i| code.split('+').any(|id| id.trim() == video.formats[*i].id));
+    if rows.selected.is_none() && !code.is_empty() && !code.contains('+') {
+        rows.selected = Some(indices.len());
     }
+    let selected = rows.selected;
+    ui.add_enabled_ui(enabled, |ui| {
+        winui::row_list(
+            ui,
+            ("video-format-pane", name),
+            rect,
+            indices.len() + 1,
+            37.0,
+            rows,
+            |ui, clip, i, row, look| {
+                let mark = pos2(row.left() + 16.0, row.top() + 18.0);
+                let stroke = if selected == Some(i) {
+                    winui::accent()
+                } else {
+                    winui::MUTED()
+                };
+                clip.circle_stroke(mark, 6.0, (1.2, stroke));
+                if selected == Some(i) {
+                    clip.circle_filled(mark, 3.0, stroke);
+                    clip.rect_filled(r(row.min, 2.0, 10.0, 3.0, 17.0), 1.0, stroke);
+                }
+                let Some(f) = indices.get(i).map(|index| &video.formats[*index]) else {
+                    let (title, detail) = if audio {
+                        ("No audio", "Video without sound")
+                    } else {
+                        ("No video", "Audio only")
+                    };
+                    let title = crate::i18n::t(title);
+                    text(clip, row.left() + 32.0, row.top() + 16.0, title, look.ink);
+                    text(
+                        clip,
+                        row.left() + 32.0,
+                        row.top() + 30.0,
+                        crate::i18n::t(detail),
+                        winui::MUTED(),
+                    );
+                    look.name = title.to_owned();
+                    return;
+                };
+                let title = format_title(f);
+                let mut info = vec![f.ext.to_uppercase()];
+                let codec = if audio {
+                    f.acodec.as_deref().map(|codec| {
+                        match codec.split('.').next().unwrap_or(codec) {
+                            "mp4a" | "aac" => "AAC",
+                            "opus" => "Opus",
+                            "vorbis" => "Vorbis",
+                            "mp3" => "MP3",
+                            _ => codec,
+                        }
+                    })
+                } else {
+                    mdm_tools::resolve::codec_name(f.vcodec.as_deref()).or(f.vcodec.as_deref())
+                };
+                if let Some(codec) = codec {
+                    info.push(codec.to_owned());
+                }
+                if let Some(size) = f.size {
+                    info.push(format!(
+                        "{}{}",
+                        if f.approx { "~" } else { "" },
+                        crate::dialogs::dialog_size(size)
+                    ));
+                }
+                let info = info.join(" · ");
+                winui::fit(
+                    ui,
+                    clip,
+                    row.left() + 32.0,
+                    row.top() + 16.0,
+                    &title,
+                    look.ink,
+                    row.right() - 49.0,
+                    (name, "title", i),
+                );
+                if f.audio && f.video {
+                    let tag = crate::i18n::t("Has audio");
+                    let x = row.left() + 42.0 + winui::text_width(clip, &title);
+                    if x + winui::text_width(clip, tag) < row.right() - 51.0 {
+                        text(
+                            clip,
+                            x,
+                            row.top() + 16.0,
+                            tag,
+                            egui::Color32::from_rgb(97, 210, 136),
+                        );
+                    }
+                }
+                winui::fit(
+                    ui,
+                    clip,
+                    row.left() + 32.0,
+                    row.top() + 30.0,
+                    &info,
+                    winui::MUTED(),
+                    row.right() - 13.0,
+                    (name, "details", i),
+                );
+                winui::text_right(
+                    clip,
+                    row.right() - 10.0,
+                    row.top() + 16.0,
+                    &f.id,
+                    winui::MUTED(),
+                );
+                look.name = format!("{title}, {info}, {}", f.id);
+            },
+        )
+        .picked
+    })
+    .inner
 }
 
 /// "All the uploader's" is offered when they gave two languages or more.
@@ -2094,6 +2797,7 @@ pub(crate) fn look_up_kept(
 pub fn from_browser(c: &mdm_ipc::Command) -> mdm_tools::proc::FromBrowser {
     mdm_tools::proc::FromBrowser {
         private: c.private,
+        cookie_policy: c.video_cookies.clone(),
         referer: c.referer.clone(),
         origin: c.origin.clone(),
         user_agent: c.user_agent.clone(),
@@ -2106,6 +2810,11 @@ pub fn from_browser(c: &mdm_ipc::Command) -> mdm_tools::proc::FromBrowser {
 pub fn from_item(item: &crate::model::Item) -> mdm_tools::proc::FromBrowser {
     mdm_tools::proc::FromBrowser {
         private: item.is_private_window(),
+        cookie_policy: item
+            .video
+            .as_ref()
+            .and_then(|v| v.cookie_policy.clone())
+            .or_else(|| item.context.video_cookies.clone()),
         ..from_browser(&item.context)
     }
 }
@@ -2140,9 +2849,14 @@ pub(crate) fn request_error(e: &str, browser: &mdm_tools::proc::FromBrowser) -> 
             .cookies
             .as_deref()
             .is_some_and(|c| !c.trim().is_empty());
-    let store = (!browser.private && !sent)
-        .then(mdm_tools::proc::browser_cookies)
-        .flatten();
+    let store = match &browser.cookie_policy {
+        Some(VideoCookies::Browser {
+            browser: name,
+            profile,
+        }) if !browser.private => mdm_tools::proc::BrowserCookies::new(name, profile),
+        None if !browser.private && !sent => mdm_tools::proc::browser_cookies(),
+        _ => None,
+    };
     lookup_error(e, sent, store.as_ref())
 }
 
@@ -2470,6 +3184,7 @@ mod tests {
                 Category::Video,
             );
             item.video = Some(crate::model::VideoSpec {
+                cookie_policy: None,
                 ytdlp: None,
                 selector: "best".into(),
                 subs: Default::default(),
@@ -2932,6 +3647,7 @@ mod tests {
         let page = "https://www.dropbox.com/s/abc/Episode%2031.mp4?dl=0";
         let v = Video {
             naming: Default::default(),
+            selected_format: None,
             title: "Episode 31".into(),
             duration: None,
             formats: Vec::new(),

@@ -5968,7 +5968,7 @@ pub fn combo_light(
         &p,
         tahoma(),
         lead(rc) + 5.0 * fwd(),
-        rc.top() + 13.0,
+        baseline_in(rc.top(), rc.height()),
         &label,
         color,
     );
@@ -5981,7 +5981,7 @@ pub fn combo_light(
     } else {
         rc.right() - 13.0
     };
-    chevron_light(&p, pos2(chevron_x, rc.top() + 8.0), enabled);
+    chevron_light(&p, pos2(chevron_x, (rc.center().y - 2.5).floor()), enabled);
     // Over the face (drawn before it, the face hid it).
     show_focus(ui, &resp, rc.shrink(3.0));
     if open {

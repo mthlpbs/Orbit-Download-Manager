@@ -1371,7 +1371,7 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
                                     }
                                     mdm_tools::video::SubReason::Other(w) => w.clone(),
                                 };
-                                (s.code.clone(), s.name.clone(), why, s.beside)
+                                (s.code.clone(), s.name.clone(), why, false)
                             })
                             .collect();
                         if json {

@@ -11,6 +11,8 @@ use crate::proc::{self, ProcError};
 #[derive(Clone, Debug, PartialEq)]
 pub struct Video {
     pub naming: std::collections::BTreeMap<String, String>,
+    /// Format IDs selected by yt-dlp during the lookup, if it selected a download.
+    pub selected_format: Option<String>,
     pub title: String,
     /// Seconds.
     pub duration: Option<f64>,
@@ -122,6 +124,7 @@ pub struct Choice {
 #[derive(Deserialize)]
 struct RawVideo {
     id: Option<String>,
+    format_id: Option<String>,
     uploader: Option<String>,
     upload_date: Option<String>,
     title: Option<String>,
@@ -341,6 +344,7 @@ pub fn parse(json: &[u8]) -> Option<Video> {
         Some(estimate(duration?, tbr))
     };
     Some(Video {
+        selected_format: raw.format_id,
         naming: [
             ("id", raw.id),
             ("uploader", raw.uploader),
@@ -1499,6 +1503,7 @@ mod tests {
         };
         let v = Video {
             naming: Default::default(),
+            selected_format: None,
             title: "t".into(),
             duration: None,
             formats: vec![

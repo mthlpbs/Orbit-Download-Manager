@@ -294,6 +294,7 @@ impl Master {
         }
         Some(Video {
             naming: Default::default(),
+            selected_format: None,
             title: self.title.clone(),
             duration: Some(duration),
             formats,
@@ -935,6 +936,7 @@ mod tests {
             assert_eq!(
                 ours,
                 Video {
+                    selected_format: None,
                     language: None,
                     page_titled: false,
                     ..theirs.clone()
@@ -1415,6 +1417,7 @@ mod tests {
 
     fn browser() -> FromBrowser {
         FromBrowser {
+            cookie_policy: None,
             private: false,
             referer: Some("https://videos.test/watch".into()),
             origin: Some("https://videos.test".into()),
@@ -1493,6 +1496,7 @@ mod tests {
         assert_eq!(
             v,
             Video {
+                selected_format: None,
                 language: None,
                 page_titled: false,
                 ..theirs

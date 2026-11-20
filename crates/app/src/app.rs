@@ -539,6 +539,8 @@ enum Cmd {
     Open,
     OpenWith,
     OpenFolder,
+    #[cfg(windows)]
+    FileExplorerMenu,
     Properties,
     /// Show or hide a list column (data slot).
     ToggleColumn(usize),
@@ -5715,6 +5717,7 @@ impl App {
         let goes = video_goes(add.start_now, from_menu, self.settings.queue_panel_later);
         if let Some(item) = self.item(id) {
             item.video = Some(model::VideoSpec {
+                cookie_policy: item.context.video_cookies.clone(),
                 ytdlp: add.ytdlp,
                 selector: add.selector,
                 subs: add.subs,
@@ -5767,9 +5770,7 @@ impl App {
     /// into the main queue instead, with no queue panel either).
     fn quality_menu(&mut self, cmd: &ipc::Command) -> ipc::api::VideoLookupAnswer {
         use ipc::api::{VideoLookupAnswer, lookup};
-        if mdm_tools::preferences::Preferences::read().use_config
-            || menu_needs_window(cmd, self.headless)
-        {
+        if menu_needs_window(cmd, self.headless) {
             return VideoLookupAnswer::of(lookup::USE_WINDOW);
         }
         let now = Instant::now();
@@ -5854,6 +5855,7 @@ impl App {
             // push_item adds at the end: no search through the list for each one.
             if let Some(item) = self.items.last_mut() {
                 item.video = Some(model::VideoSpec {
+                    cookie_policy: item.context.video_cookies.clone(),
                     ytdlp: mdm_tools::preferences::Preferences::read()
                         .profile(false)
                         .ok(),
@@ -8062,6 +8064,12 @@ impl App {
                     dialogs::show_download_in_folder(&d, moved_away);
                 }
             }
+            #[cfg(windows)]
+            Cmd::FileExplorerMenu => {
+                if let Some(d) = dest {
+                    dialogs::show_file_menu(ctx, crate::MAIN_TITLE, &d, moved_away, None);
+                }
+            }
             Cmd::ToggleColumn(i) => self.list.visible[i] = !self.list.visible[i],
             Cmd::LimiterOn | Cmd::LimiterOff => {
                 self.settings.speed_limit_on = cmd == Cmd::LimiterOn;
@@ -9443,6 +9451,10 @@ impl App {
             // i18n: noun: opens the download's Properties window
             I("Properties", Cmd::Properties, sel, false),
         ];
+        #[cfg(windows)]
+        if done {
+            entries.insert(3, I("File Explorer menu", Cmd::FileExplorerMenu, true, false));
+        }
         // A torrent's own actions (#39), after Verify checksum.
         if let Some((i, spec)) = torrent {
             let busy = self.torrent_host.busy(&spec.hash);
@@ -13281,6 +13293,7 @@ mod same_name_tests {
         let d = dir.path();
         let mut video = row(2, &d.join("master.mp4"), Status::Queued, 0);
         video.video = Some(crate::model::VideoSpec {
+            cookie_policy: None,
             ytdlp: None,
             selector: "b".into(),
             subs: Default::default(),
@@ -13601,6 +13614,7 @@ mod duplicate_tests {
             "not a video"
         );
         item.video = Some(model::VideoSpec {
+            cookie_policy: None,
             ytdlp: None,
             selector: SELECTOR.into(),
             subs: Default::default(),
@@ -13630,6 +13644,7 @@ mod duplicate_tests {
         let first = stream("https://cdn-1.videos.test/hls/123/master.m3u8?hash=a&expires=1");
         let mut item = Item::new(1, first.clone(), PathBuf::from("Clip.mp4"), Category::Video);
         item.video = Some(model::VideoSpec {
+            cookie_policy: None,
             ytdlp: None,
             selector: SELECTOR.into(),
             subs: Default::default(),
@@ -13748,6 +13763,7 @@ mod duplicate_tests {
             Category::Video,
         );
         item.video = Some(model::VideoSpec {
+            cookie_policy: None,
             ytdlp: None,
             selector: SELECTOR.into(),
             subs: Default::default(),
@@ -13825,6 +13841,7 @@ mod duplicate_tests {
             Category::Video,
         );
         item.video = Some(model::VideoSpec {
+            cookie_policy: None,
             ytdlp: None,
             selector: SELECTOR.into(),
             subs: Default::default(),
@@ -13995,6 +14012,7 @@ mod duplicate_tests {
         let mut i = Item::new(id, page(), dir.join(name), Category::Video);
         i.status = status;
         i.video = Some(model::VideoSpec {
+            cookie_policy: None,
             ytdlp: None,
             selector: SELECTOR.into(),
             subs: Default::default(),
@@ -15143,6 +15161,7 @@ mod start_disk_tests {
         b.size = Some(5);
         let mut video = row(5, dir.path().join("v.mp4"), Status::Stopped);
         video.video = Some(model::VideoSpec {
+            cookie_policy: None,
             ytdlp: None,
             selector: "b".into(),
             subs: Default::default(),
@@ -15258,6 +15277,7 @@ mod start_disk_tests {
         gone.url = url::Url::parse("https://hls.cdn.test/one/v/ab/hls.m3u8").unwrap();
         gone.page = Some(PAGE.into());
         gone.video = Some(model::VideoSpec {
+            cookie_policy: None,
             ytdlp: None,
             selector: pick("x").selector,
             subs: Default::default(),
