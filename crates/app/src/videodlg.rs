@@ -24,6 +24,7 @@ pub enum VideoOut {
         page: String,
         context: mdm_ipc::Command,
         profile: mdm_tools::config::Profile,
+        start_now: bool,
     },
     Many(crate::playlistdlg::PlaylistAdd),
 }
@@ -76,6 +77,9 @@ pub struct VideoDialog {
     preferences: mdm_tools::preferences::Preferences,
     use_config: bool,
     advanced: bool,
+    format_code: Option<String>,
+    name_edited: bool,
+    tool_check: std::time::Instant,
     thumbnail: bool,
     preferred_subtitles: bool,
     kept: Option<mdm_tools::video::InfoSlot>,
@@ -117,12 +121,11 @@ pub struct VideoDialog {
     focused: bool,
     /// Download Now (true) or Later, once chosen.
     start_now: Option<bool>,
-    /// Look the page up as soon as yt-dlp is there (opened from Add URL).
-    auto_look: bool,
     /// Asking to create a missing folder.
     asking: crate::dialogs::FolderGate<()>,
     /// Helpers...: where yt-dlp and ffmpeg come from (#51).
     helpers: Option<crate::helpers::Programs>,
+    saved_cookies: Option<(String, String)>,
     /// The looked-up video's subtitle languages (#68) and the one chosen in the Subtitles list
     /// (0: none, then "All the uploader's" when offered, then `subs` in order).
     subs: Vec<SubChoice>,
@@ -137,9 +140,15 @@ pub struct VideoDialog {
     clip: crate::clipboard::Prefill,
 }
 
-/// The top of the window's bottom row of buttons (Helpers..., Download Now, Later, Cancel),
-/// under Embed chapters.
-const BUTTONS_Y: f32 = 389.0;
+const WIDTH: f32 = 680.0;
+const HEIGHT: f32 = 675.0;
+const CARD_GAP: f32 = 8.0;
+const FORMAT_CARD_H: f32 = 86.0;
+const SAVE_CARD_H: f32 = 86.0;
+const EMBED_CARD_H: f32 = 76.0;
+const LEFT: f32 = 37.0;
+const FIELD_X: f32 = 189.0;
+const RIGHT: f32 = WIDTH - LEFT;
 
 /// What is installed in the tools folder: (folder, yt-dlp, ffmpeg).
 type Tools = (
@@ -232,6 +241,9 @@ impl VideoDialog {
             embed: preferences.embed_subtitles,
             preferences,
             advanced: false,
+            format_code: None,
+            name_edited: false,
+            tool_check: std::time::Instant::now(),
             preferred_subtitles: true,
             kept: None,
             page: String::new(),
@@ -256,9 +268,9 @@ impl VideoDialog {
             error: None,
             focused: false,
             start_now: None,
-            auto_look: false,
             asking: Default::default(),
             helpers: None,
+            saved_cookies: None,
             subs: Vec::new(),
             sub_pick: 0,
             pref: Subs::default(),
@@ -301,7 +313,6 @@ impl VideoDialog {
             page: page.clone(),
             from_browser: page,
             context,
-            auto_look: false,
             ..Self::blank(folder)
         }
     }
@@ -431,7 +442,6 @@ impl VideoDialog {
         if let Some(v) = mdm_tools::resolve::parse(SAMPLE.as_bytes()) {
             self.page = "https://video.example/talk".into();
             self.looked_up = self.page.clone();
-            self.auto_look = false;
             self.set_video(v);
         }
     }
@@ -449,7 +459,6 @@ impl VideoDialog {
             v.needs_js_runtime = runtime_said;
             self.page = "https://video.example/talk".into();
             self.looked_up = self.page.clone();
-            self.auto_look = false;
             self.set_video(v);
         }
     }
@@ -459,7 +468,6 @@ impl VideoDialog {
     pub fn show_sample_list(&mut self, pick: &str) {
         self.page = "https://video.example/playlist".into();
         self.looked_up = self.page.clone();
-        self.auto_look = false;
         self.list = Some(crate::playlistdlg::PlaylistView::sample(pick));
     }
 
@@ -499,6 +507,18 @@ impl VideoDialog {
     }
 
     pub fn show(&mut self, ctx: &egui::Context, rt: &tokio::runtime::Handle) -> Outcome<VideoOut> {
+        ctx.request_repaint_after(std::time::Duration::from_secs(2));
+        if self.tool_check.elapsed() >= std::time::Duration::from_secs(2) {
+            self.tool_check = std::time::Instant::now();
+            let refreshed = tools();
+            let had_ffmpeg = self.tools.as_ref().is_some_and(|tools| tools.2.is_some());
+            self.tools = Some(refreshed);
+            if had_ffmpeg != self.tools.as_ref().is_some_and(|tools| tools.2.is_some())
+                && let Some((video, _)) = self.video.take()
+            {
+                self.set_video(video);
+            }
+        }
         if let Some(clip) = self.clip.take() {
             self.fill_from_clipboard(&clip);
         }
@@ -573,7 +593,7 @@ impl VideoDialog {
             ctx,
             "video-page",
             "Download video from a page",
-            [500.0, 538.0],
+            [WIDTH, HEIGHT],
             false,
             winui::BG(),
             |ui, o| self.body(ui, o, rt),
@@ -581,13 +601,15 @@ impl VideoDialog {
         // A playlist's quality chosen, a list or a video looked up: Save to follows (#611).
         self.follow_sound();
         // Helpers... open: on Close, the helpers are read again (another program, or MDM's own).
-        if let Some(h) = &mut self.helpers
-            && !matches!(h.show(ctx, rt), Outcome::Open)
-        {
-            self.helpers = None;
-            self.tools = None;
-            if let Some((v, _)) = self.video.take() {
-                self.set_video(v);
+        if let Some(h) = &mut self.helpers {
+            let outcome = h.show(ctx, rt);
+            self.saved_cookies = h.take_saved_cookies();
+            if !matches!(outcome, Outcome::Open) {
+                self.helpers = None;
+                self.tools = None;
+                if let Some((v, _)) = self.video.take() {
+                    self.set_video(v);
+                }
             }
         }
         if self.use_config && matches!(out, Outcome::Done(())) {
@@ -597,6 +619,7 @@ impl VideoDialog {
                         page: self.page.trim().to_owned(),
                         context: self.context(),
                         profile,
+                        start_now: self.start_now == Some(true),
                     });
                 }
                 Err(e) => {
@@ -614,6 +637,10 @@ impl VideoDialog {
         }
     }
 
+    pub fn take_saved_cookies(&mut self) -> Option<(String, String)> {
+        self.saved_cookies.take()
+    }
+
     /// What Download Now or Later adds: a playlist's videos, each its own download, or the
     /// video looked up (none when there is nothing to add).
     fn added(&self) -> Option<VideoOut> {
@@ -629,24 +656,16 @@ impl VideoDialog {
                 self.category(),
             )));
         }
-        let (Some((_, choices)), Ok(page)) = (&self.video, url::Url::parse(self.page.trim()))
-        else {
-            return None;
+        let page = url::Url::parse(self.page.trim()).ok()?;
+        let c = self.current_choice()?;
+        let suggested = self.suggested_name(&c)?;
+        let name = if self.name.trim().is_empty() {
+            suggested.clone()
+        } else {
+            mdm_engine::naming::sanitize(self.name.trim())
         };
-        let c = choices.get(self.chosen.min(choices.len().checked_sub(1)?))?;
-        let name = mdm_engine::naming::sanitize(self.name.trim());
-        // Not the name the choice gave it (the page's title): the user's (#1102).
-        let named = name
-            != mdm_tools::preferences::filename(
-                &self.preferences.filename_template,
-                &self.video.as_ref()?.0.title,
-                &self.video.as_ref()?.0.naming,
-                if mdm_tools::resolve::is_audio(c) {
-                    &c.ext
-                } else {
-                    &self.preferences.container
-                },
-            );
+        let named = name != suggested;
+        let audio = self.sound_only() == Some(true);
         let chosen = self.chosen_subs();
         // The video the page declares (#1076): its address, the page as its Referer.
         let declared = self
@@ -659,7 +678,13 @@ impl VideoDialog {
             None => (page, self.context()),
         };
         Some(VideoOut::One(VideoAdd {
-            ytdlp: self.manual_profile().ok(),
+            ytdlp: self.manual_profile().ok().map(|profile| {
+                if audio {
+                    audio_profile(profile)
+                } else {
+                    profile
+                }
+            }),
             page,
             selector: c.selector.clone(),
             dest: folder.join(name),
@@ -667,7 +692,11 @@ impl VideoDialog {
             size: c.size,
             start_now,
             context,
-            subs: subs_for_choice(c, &chosen),
+            subs: if audio {
+                Subs::default()
+            } else {
+                subs_for_choice(&c, &chosen)
+            },
             remember: (!self.subs.is_empty()).then_some(chosen),
             preloaded: self
                 .kept
@@ -689,8 +718,9 @@ impl VideoDialog {
         if let Some(list) = &self.list {
             return Some(list.sound_only());
         }
-        let (_, choices) = self.video.as_ref()?;
-        choices.get(self.chosen).map(mdm_tools::resolve::is_audio)
+        self.current_choice()
+            .as_ref()
+            .map(|choice| self.choice_is_audio(choice))
     }
 
     /// The category the download is listed under (#611), and whose folder "Change folder for
@@ -732,22 +762,52 @@ impl VideoDialog {
         crate::dialogs::resolve_path(&self.folder)
     }
 
-    /// The file name, and Save to (#611), follow the choice.
-    fn name_from_choice(&mut self) {
-        if let Some((v, choices)) = &self.video
-            && let Some(c) = choices.get(self.chosen)
-        {
-            let ext = if mdm_tools::resolve::is_audio(c) {
-                c.ext.as_str()
+    fn current_choice(&self) -> Option<Choice> {
+        let (video, choices) = self.video.as_ref()?;
+        if let Some(code) = &self.format_code {
+            return format_code_choice(video, code, &self.preferences.container).or_else(|| {
+                choices
+                    .iter()
+                    .filter(|choice| mdm_tools::resolve::is_audio(choice))
+                    .find(|choice| choice.selector == code.trim())
+                    .cloned()
+            });
+        }
+        choices.get(self.chosen).cloned()
+    }
+
+    fn choice_is_audio(&self, choice: &Choice) -> bool {
+        let raw = self
+            .format_code
+            .as_deref()
+            .and_then(|code| format_by_id(&self.video.as_ref()?.0, code.trim()));
+        raw.map_or_else(
+            || mdm_tools::resolve::is_audio(choice),
+            |f| f.audio && !f.video,
+        )
+    }
+
+    fn suggested_name(&self, choice: &Choice) -> Option<String> {
+        let video = &self.video.as_ref()?.0;
+        Some(mdm_tools::preferences::filename(
+            &self.preferences.filename_template,
+            &video.title,
+            &video.naming,
+            if self.choice_is_audio(choice) {
+                &choice.ext
             } else {
-                self.preferences.container.as_str()
-            };
-            self.name = mdm_tools::preferences::filename(
-                &self.preferences.filename_template,
-                &v.title,
-                &v.naming,
-                ext,
-            );
+                &self.preferences.container
+            },
+        ))
+    }
+
+    /// The default file name and category folder follow the choice.
+    fn name_from_choice(&mut self) {
+        if !self.name_edited
+            && let Some(choice) = self.current_choice()
+            && let Some(name) = self.suggested_name(&choice)
+        {
+            self.name = name;
         }
         self.follow_sound();
     }
@@ -782,167 +842,84 @@ impl VideoDialog {
     fn body(&mut self, ui: &mut Ui, o: Pos2, rt: &tokio::runtime::Handle) -> Outcome<()> {
         let p = ui.painter().clone();
         let (dir, ytdlp, ffmpeg) = self.tools.get_or_insert_with(tools).clone();
-        text(
-            &p,
-            o.x + 11.0,
-            o.y + 21.0,
-            crate::i18n::t("Page address"),
-            winui::TEXT(),
-        );
-        // Look up is as wide as its label in this language (#172); the address ends 8 px before.
+        let busy = self.lookup.is_some() || self.install.is_some();
+        let mut matched =
+            (self.video.is_some() || self.list.is_some()) && self.page.trim() == self.looked_up;
+        video_card(&p, o, 10.0, 65.0, None, true);
+        video_label(ui, o, 35.0, "Page address", true);
         let (look_x, look_w) =
-            winui::buttons_to_right(&p, 489.0, 8.0, &[("Look up", 90.0)], 160.0)[0];
+            winui::buttons_to_right(&p, RIGHT, 10.0, &[("Look up", 84.0)], 145.0)[0];
         let edit = winui::edit(
             ui,
-            r(o, 11.0, 28.0, look_x - 8.0 - 11.0, 21.0),
+            r(o, FIELD_X, 19.0, look_x - FIELD_X - 10.0, 25.0),
             &mut self.page,
-            true,
+            !busy,
             false,
         );
         if !self.focused {
             edit.request_focus();
             self.focused = true;
         }
+        if edit.changed() {
+            self.error = None;
+            matched =
+                (self.video.is_some() || self.list.is_some()) && self.page.trim() == self.looked_up;
+        }
         let was_config = self.use_config;
-        winui::checkbox(
+        let config_label = crate::i18n::mark("Use yt-dlp configuration file");
+        let path_x = (winui::checkbox_caption_end(&p, o.x + FIELD_X, config_label) + 15.0)
+            .min(o.x + RIGHT - 110.0);
+        winui::checkbox_until(
             ui,
-            pos2(o.x + 11.0, o.y + 62.0),
+            pos2(o.x + FIELD_X, o.y + 51.0),
             &mut self.use_config,
-            "Use yt-dlp configuration file",
-            self.lookup.is_none() && self.install.is_none(),
+            config_label,
+            !busy,
+            Some(path_x - 4.0),
         );
         if was_config != self.use_config {
-            self.auto_look = false;
+            self.error = None;
         }
-        let config_status = mdm_tools::config::path()
+        let config_path = mdm_tools::config::path();
+        let config_status = config_path
+            .as_ref()
             .map(|p| p.display().to_string())
-            .unwrap_or_else(|| "No configuration file selected".into());
+            .unwrap_or_else(|| crate::i18n::t("No configuration file selected").into());
         winui::fit(
             ui,
             &p,
-            o.x + 11.0,
-            o.y + 91.0,
+            path_x,
+            o.y + 62.0,
             &config_status,
             winui::MUTED(),
-            o.x + 489.0,
+            o.x + RIGHT,
             "video-config-path",
         );
-        let enabled = !self.use_config;
-        text(
-            &p,
-            o.x + 11.0,
-            o.y + 111.0,
-            "Output container",
-            if enabled {
-                winui::TEXT()
-            } else {
-                winui::TEXT_DISABLED()
-            },
-        );
-        text(
-            &p,
-            o.x + 174.0,
-            o.y + 111.0,
-            "Preferred codec",
-            if enabled {
-                winui::TEXT()
-            } else {
-                winui::TEXT_DISABLED()
-            },
-        );
-        let containers = ["Matroska (MKV)", "MPEG-4 (MP4)", "WebM"];
-        let ci = mdm_tools::preferences::CONTAINERS
-            .iter()
-            .position(|c| *c == self.preferences.container)
-            .unwrap_or(0);
-        let mut changed = false;
-        if let Some(i) = winui::combo_light(
-            ui,
-            r(o, 11.0, 118.0, 151.0, 21.0),
-            &containers,
-            ci,
-            enabled,
-            "video-container",
-        ) {
-            self.preferences.container = mdm_tools::preferences::CONTAINERS[i].into();
-            if i == 2 && self.preferences.codec == 1 {
-                self.preferences.codec = 2;
-            }
-            changed = true;
-        }
-        let codec_ids: Vec<usize> = (0..4)
-            .filter(|i| self.preferences.container != "webm" || *i != 1)
-            .collect();
-        let codec_names: Vec<&str> = codec_ids
-            .iter()
-            .map(|i| mdm_tools::preferences::CODECS[*i])
-            .collect();
-        let selected = codec_ids
-            .iter()
-            .position(|i| *i == self.preferences.codec)
-            .unwrap_or(0);
-        if let Some(i) = winui::combo_light(
-            ui,
-            r(o, 174.0, 118.0, 181.0, 21.0),
-            &codec_names,
-            selected,
-            enabled && !self.advanced,
-            "video-codec",
-        ) {
-            self.preferences.codec = codec_ids[i];
-            changed = true;
-        }
-        let before = self.advanced;
-        winui::checkbox(
-            ui,
-            pos2(o.x + 369.0, o.y + 121.0),
-            &mut self.advanced,
-            "Advanced",
-            enabled,
-        );
-        if changed || before != self.advanced {
-            if let Some((v, _)) = self.video.take() {
-                self.set_video(v);
-            }
-        }
-        let busy = self.lookup.is_some() || self.install.is_some();
-        let page_ok =
-            url::Url::parse(self.page.trim()).is_ok_and(|u| matches!(u.scheme(), "http" | "https"));
-        let can_look = page_ok && !busy && (self.use_config || ytdlp.is_some());
+
+        let page_ok = url::Url::parse(self.page.trim())
+            .is_ok_and(|url| matches!(url.scheme(), "http" | "https") && url.host().is_some());
+        let can_look = page_ok && !busy && !self.use_config && ytdlp.is_some();
         let look = winui::button(
             ui,
-            r(o, look_x, 28.0, look_w, 21.0),
-            if self.use_config {
-                "Download"
-            } else {
-                "Look up"
-            },
-            if can_look {
-                ButtonKind::Default
-            } else {
+            r(o, look_x, 19.0, look_w, 25.0),
+            "Look up",
+            if !can_look {
                 ButtonKind::Disabled
+            } else if matched {
+                ButtonKind::Normal
+            } else {
+                ButtonKind::Default
             },
             false,
             None,
         )
         .clicked()
-            || (edit.has_focus()
-                && can_look
-                && winui::enter_pressed(ui)
-                && winui::take_key(ui, egui::Key::Enter));
-        // Opened for a page: look it up as soon as yt-dlp is there.
-        let look = look || (!self.use_config && can_look && std::mem::take(&mut self.auto_look));
-        if look && can_look && self.use_config {
-            match self.preferences.profile(true) {
-                Ok(_) => return Outcome::Done(()),
-                Err(e) => self.error = Some(e.to_string()),
-            }
-        }
+            || (edit.has_focus() && can_look && winui::take_key(ui, egui::Key::Enter));
         if look
-            && !self.use_config
             && can_look
             && let Some(tool) = &ytdlp
         {
+            matched = false;
             // A typed or pasted address too (#359); the box shows what is looked up.
             self.page = mdm_tools::pages::video_address(self.page.trim());
             let slot: Slot<(Looked, Option<Declared>)> = Arc::new(Mutex::new(None));
@@ -982,314 +959,524 @@ impl VideoDialog {
             self.lookup = Some(slot);
             self.looked_up = self.page.trim().to_owned();
             self.video = None;
+            self.format_code = None;
+            self.advanced = false;
+            self.name.clear();
+            self.name_edited = false;
             // A list being listed stops (dropped).
             self.list = None;
             self.error = None;
         }
 
-        let o = o + egui::vec2(0.0, 116.0);
-        let result=ui.add_enabled_ui(!self.use_config,|ui| {
-        if self.use_config {ui.set_opacity(0.45);}
-        // The status line: a helper missing or installing / looking up / the title.
-        let line_y = o.y + 70.0;
-        let installing = self.install.as_ref().map(|(t, _)| *t);
-        let offer = match (&ytdlp, &ffmpeg) {
-            (None, _) => Some((
-                Tool::YtDlp,
-                // i18n: button: download and install the yt-dlp program
-                crate::i18n::mark("Install yt-dlp"),
-                crate::i18n::t(
-                    "Video lookups use yt-dlp (about 23 MB, checked against its signature).",
-                ),
-            )),
-            // MDM installs ffmpeg on 64-bit Windows only (its builds are Windows ones, x64 and
-            // ARM64); elsewhere the system's package manager has it, and the note says so instead
-            // of a button.
-            (Some(_), None) if mdm_tools::ffmpeg::available() => Some((
-                Tool::Ffmpeg,
-                // i18n: button: download and install the ffmpeg program
-                crate::i18n::mark("Install ffmpeg"),
-                crate::i18n::t("The best qualities, MP3, Opus and FLAC need ffmpeg (about 80 MB)."),
-            )),
-            (Some(_), None) if cfg!(windows) => Some((
-                Tool::Ffmpeg,
-                "",
-                // i18n: in Download video, on 32-bit Windows (no button: no ffmpeg build MDM can check exists for it); Helpers... is the button below
-                crate::i18n::t(
-                    "The best qualities, MP3, Opus and FLAC need ffmpeg, which MDM has no copy of for 32-bit Windows: choose your own with Helpers...",
-                ),
-            )),
-            (Some(_), None) => Some((
-                Tool::Ffmpeg,
-                "",
-                // i18n: in Download video, on macOS and Linux (no button: the system installs it)
-                crate::i18n::t(
-                    "The best qualities, MP3, Opus and FLAC need ffmpeg: install it with your system's package manager (or Homebrew).",
-                ),
-            )),
-            _ => None,
+        let options = matched && !self.use_config && self.lookup.is_none();
+        let installing = self.install.as_ref().map(|(tool, _)| *tool);
+        let offer = if self.use_config {
+            None
+        } else if ytdlp.is_none() && mdm_tools::ytdlp_asset().is_some() {
+            Some((Tool::YtDlp, crate::i18n::mark("Install yt-dlp")))
+        } else if ffmpeg.is_none() && mdm_tools::ffmpeg::available() {
+            Some((Tool::Ffmpeg, crate::i18n::mark("Install ffmpeg")))
+        } else {
+            None
         };
-        // The Install button, as wide as its label in this language, and the status line up to
-        // 9 px before it (to the window's edge without one).
-        let install_at = offer
-            .as_ref()
-            .filter(|(_, label, _)| !label.is_empty() && installing.is_none())
-            .map(|(_, label, _)| {
-                winui::buttons_to_right(&p, 489.0, 8.0, &[(label, 90.0)], 200.0)[0]
-            });
-        let status_right = install_at.map_or(489.0, |(x, _)| x - 9.0);
-        // #351: a page whose better videos need ffmpeg says so in place of its title (still in
-        // File name): YouTube without a JavaScript runtime leaves nothing but the sound to offer
-        // here, and the list alone gives no reason.
-        let merge_note = self
+        let (status, error) = if let Some(error) = &self.error {
+            (Some(error.as_str()), true)
+        } else if let Some(installing) = installing {
+            (
+                Some(if installing == Tool::YtDlp {
+                    crate::i18n::t("Downloading and verifying yt-dlp...")
+                } else {
+                    crate::i18n::t("Downloading and verifying ffmpeg (about 80 MB)...")
+                }),
+                false,
+            )
+        } else if self.lookup.is_some() {
+            (Some(crate::i18n::t("Looking the page up...")), false)
+        } else if self.use_config {
+            (
+                Some(if config_path.is_some() {
+                    crate::i18n::t(
+                        "Format, quality, save and embedding settings come from your yt-dlp configuration file.",
+                    )
+                } else {
+                    crate::i18n::t("Select a configuration file in yt-dlp settings.")
+                }),
+                false,
+            )
+        } else if ytdlp.is_none() {
+            (
+                Some(if offer.is_some() {
+                    crate::i18n::t(
+                        "Video lookups use yt-dlp (about 23 MB, checked against its signature).",
+                    )
+                } else {
+                    crate::i18n::t("Choose a yt-dlp executable in yt-dlp settings.")
+                }),
+                false,
+            )
+        } else if self
             .video
             .as_ref()
-            .filter(|(v, _)| ffmpeg.is_none() && mdm_tools::resolve::needs_merging(v))
-            .and(offer.as_ref())
-            .map(|(_, _, msg)| *msg);
-        // #852: YouTube looked up without a JavaScript runtime lists only some of its qualities
-        // (on some days only the sound): said on the title's line and the one under it, with
-        // the help page's section on installing one.
-        let runtime_note =
-            self.error.is_none() && self.video.as_ref().is_some_and(|(v, _)| v.needs_js_runtime);
-        if let Some(t) = installing {
-            crate::torrentdlg::spinner(ui, pos2(o.x + 18.0, line_y - 4.0), 6.0);
-            let msg = if t == Tool::YtDlp {
-                crate::i18n::t("Downloading and verifying yt-dlp...")
-            } else {
-                crate::i18n::t("Downloading and verifying ffmpeg (about 80 MB)...")
-            };
-            text(&p, o.x + 31.0, line_y, msg, winui::TEXT());
-        } else if self.lookup.is_some() {
-            crate::torrentdlg::spinner(ui, pos2(o.x + 18.0, line_y - 4.0), 6.0);
-            text(
-                &p,
-                o.x + 31.0,
-                line_y,
-                crate::i18n::t("Looking the page up..."),
-                winui::TEXT(),
-            );
-        } else if self.list.is_some() {
-            // The list draws its own (PlaylistView::middle).
-        } else if runtime_note {
-            if winui::note_with_link(
-                ui,
-                &p,
-                o.x + 11.0,
-                line_y,
-                16.0,
-                js_runtime_note(),
-                winui::ERROR(),
-                o.x + status_right,
-                // i18n: link after the note that YouTube needs a JavaScript runtime: opens the help page that says how to install Node.js or Deno
-                "How to install one",
-                "video-runtime",
-            ) {
-                crate::help::open_page(JS_RUNTIME_HELP);
-            }
-        } else if let Some(msg) = merge_note {
-            winui::fit(
-                ui,
-                &p,
-                o.x + 11.0,
-                line_y,
-                msg,
-                winui::MUTED(),
-                o.x + status_right,
-                "video-offer",
-            );
-        } else if let Some((v, _)) = &self.video {
-            let (rect, cut) = winui::text_fit(
-                &p,
-                o.x + 11.0,
-                line_y,
-                &v.title,
-                winui::TEXT(),
-                o.x + status_right,
-            );
-            if cut {
-                winui::full_on_hover(ui, rect, "video-title", &v.title);
-            }
-        } else if let Some((_, _, msg)) = offer {
-            winui::fit(
-                ui,
-                &p,
-                o.x + 11.0,
-                line_y,
-                msg,
-                winui::MUTED(),
-                o.x + status_right,
-                "video-offer",
-            );
-        }
-        if let Some((tool, label, _)) = offer
-            && let Some((x, w)) = install_at
-            && winui::button(
-                ui,
-                r(o, x, 57.0, w, 21.0),
-                label,
-                ButtonKind::Normal,
+            .is_some_and(|(v, _)| options && v.needs_js_runtime)
+        {
+            (Some(js_runtime_note()), false)
+        } else if ffmpeg.is_none() {
+            (
+                Some(crate::i18n::t(
+                    "Install ffmpeg to merge or remux the selected formats.",
+                )),
                 false,
-                None,
             )
-            .clicked()
-            && let Some(dir) = dir.clone()
-        {
-            self.install(tool, dir, rt, ui.ctx());
-        }
-        // An error too long for its line, with no choices below it: read whole in their place.
-        let error_in_list = self.video.is_none()
-            && self.list.is_none()
-            && self
-                .error
-                .as_ref()
-                .is_some_and(|e| winui::text_width(&p, e) > 478.0);
-        if let Some(e) = self.error.as_ref().filter(|_| !error_in_list) {
-            let (rect, cut) =
-                winui::text_fit(&p, o.x + 11.0, o.y + 86.0, e, winui::ERROR(), o.x + 489.0);
-            if cut {
-                winui::full_on_hover(ui, rect, "video-error", e);
-            }
-        } else if !runtime_note
-            && self
-                .video
-                .as_ref()
-                .and_then(|(_, c)| c.get(self.chosen))
-                .is_some_and(|c| c.selector == mdm_tools::resolve::FLAC)
-        {
-            // The honest word on FLAC (#70): the site's sound is compressed with losses already.
-            winui::fit(
-                ui,
-                &p,
-                o.x + 11.0,
-                o.y + 86.0,
-                // i18n: a note in Download video while FLAC is chosen: FLAC keeps the site's (already lossy) sound exactly, it can't make it better, the file is only bigger
-                crate::i18n::t(
-                    "FLAC keeps the sound exactly, but it can't add quality the site's sound doesn't have: the file is only bigger.",
-                ),
-                winui::MUTED(),
-                o.x + 489.0,
-                "video-flac",
-            );
-        }
-
-        // A playlist's or a channel's videos (#69), or the video's choices.
-        if let Some(list) = &mut self.list {
-            // The status line stops short of an Install button beside it.
-            list.middle(ui, o, installing.is_none().then_some(status_right));
+        } else if !options {
+            (
+                Some(crate::i18n::t(
+                    "Click Look up to load the qualities for this page.",
+                )),
+                false,
+            )
         } else {
-            // The choices: the shared row list.
-            let list = r(o, 11.0, 94.0, 478.0, 150.0);
-            let mut picked = None;
-            let defaults=self.preset_choices(None);
-            let choices = self.video.as_ref().map_or(defaults.as_slice(), |(_, c)| c.as_slice());
-            self.rows.selected = Some(self.chosen).filter(|c| *c < choices.len());
-            // i18n: what a screen reader calls the list of a video's formats (1080p, 720p, audio only…)
-            self.rows.name = crate::i18n::t("Quality");
-            let ev = winui::row_list(
-                ui,
-                "video-choices",
-                list,
-                choices.len(),
-                17.0,
-                &mut self.rows,
-                |ui, clip, i, row, look| {
-                    let c = &choices[i];
-                    // The icon of the file this choice gives, then the format ("2160p · VP9 ·
-                    // 60 fps · HDR", left to right); its size at the trailing edge: exactly
-                    // that of the streams it downloads, or "~" before an estimate (#801).
-                    let file = format!("video.{}", c.ext);
-                    let kind = crate::fileicons::Kind::File(&file);
-                    crate::fileicons::paint_at(
-                        ui,
-                        clip,
-                        kind,
-                        pos2(row.left() + 4.0, row.top()),
-                        16.0,
-                    );
-                    let label = if self.advanced {format!("[{}] {}",c.selector.split('/').next().unwrap_or(&c.selector),choice_label(&c.label))}else{choice_label(&c.label)};
-                    let x = row.left() + 4.0 + crate::fileicons::INDENT;
-                    text(clip, x, row.top() + 12.0, &label, look.ink);
-                    let (size, said) = choice_size(c);
-                    // Read as the format and its size (#95: the choices were blank to a screen reader
-                    // and alike to UI Automation), in the user's language, as drawn.
-                    look.name = format!("{label}, {said}");
-                    winui::text_right(clip, row.right() - 6.0, row.top() + 12.0, &size, look.ink);
-                },
-            );
-            if ev.focused
-                && self.rows.type_to(ui, "video-choices", choices.len(), |i| {
-                    choices[i].label.clone()
-                })
-            {
-                picked = self.rows.selected;
-            }
-            if let Some(i) = ev.picked {
-                picked = Some(i);
-            }
-            if let Some(i) = picked {
-                self.chosen = i;
-                if !self.advanced {self.preferences.quality=i;}
-                self.name_from_choice();
-            }
-            // Wrapped in the empty list (#317).
-            if let Some(e) = self.error.as_ref().filter(|_| error_in_list) {
-                winui::paragraph(
-                    &p.with_clip_rect(list),
-                    list.left() + 8.0,
-                    list.top() + 18.0,
-                    e,
-                    winui::ERROR(),
-                    list.right() - 8.0,
-                    16.0,
+            (None, false)
+        };
+        let mut top = 75.0 + CARD_GAP;
+        if let Some(status) = status {
+            let install = offer.filter(|_| !busy).map(|(tool, label)| {
+                let w = winui::button_fit_width(&p, label, 105.0, 155.0);
+                (tool, label, w)
+            });
+            let left = LEFT + 12.0;
+            let right = RIGHT - install.map_or(0.0, |(_, _, w)| w + 12.0);
+            let lines = winui::wrap_lines(&p, status, right - left);
+            let height = (15.0 + 14.0 * lines.len().min(3) as f32).max(35.0);
+            video_card(&p, o, top, height, None, true);
+            let color = if error {
+                winui::ERROR()
+            } else {
+                winui::accent()
+            };
+            p.rect_filled(r(o, LEFT, top + 10.0, 3.0, height - 20.0), 1.0, color);
+            for (i, line) in lines.iter().take(3).enumerate() {
+                text(
+                    &p,
+                    o.x + left,
+                    o.y + top + 18.0 + i as f32 * 14.0,
+                    line,
+                    if error { color } else { winui::TEXT() },
                 );
             }
+            let status_rect = r(o, left, top, right - left, height);
+            winui::readable(ui, status_rect, "video-status", status);
+            if lines.len() > 3 {
+                winui::full_on_hover(ui, status_rect, "video-status-full", status);
+            }
+            if let Some((tool, label, w)) = install
+                && winui::button(
+                    ui,
+                    r(o, RIGHT - w, top + (height - 25.0) / 2.0, w, 25.0),
+                    label,
+                    ButtonKind::Normal,
+                    false,
+                    None,
+                )
+                .clicked()
+                && let Some(dir) = dir
+            {
+                self.install(tool, dir, rt, ui.ctx());
+            }
+            top += height + CARD_GAP;
         }
 
-        // The labels before the boxes: a column as wide as the longest of them in this
-        // language (German's "Speichern unter" is past the English 59 px), up to 150 px, the
-        // boxes after it; longer still, a label is cut and shown whole on hover.
-        let labels = [
-            crate::i18n::t("Save to"),
-            if self.list.is_some() {
-                // i18n: label before the quality chosen for all of a playlist's videos
-                crate::i18n::t("Quality")
+        self.format_card(ui, o + egui::vec2(0.0, top), options);
+        top += FORMAT_CARD_H + CARD_GAP;
+        // Give the format list the room left above the footer. A longer status message reduces
+        // the number of visible rows so the Save and Embedding controls still fit.
+        let quality_height = HEIGHT - 58.0 - top - SAVE_CARD_H - EMBED_CARD_H - 2.0 * CARD_GAP;
+        self.quality_card(ui, o + egui::vec2(0.0, top), options, quality_height);
+        top += quality_height + CARD_GAP;
+        self.save_card(ui, o + egui::vec2(0.0, top), options, ffmpeg.is_some());
+        top += SAVE_CARD_H + CARD_GAP;
+        let embedding = o + egui::vec2(0.0, top);
+        video_card(
+            &p,
+            embedding,
+            0.0,
+            EMBED_CARD_H,
+            Some(crate::i18n::mark("Embedding")),
+            options,
+        );
+        let controls = embedding + egui::vec2(0.0, 23.0);
+        let subtitles =
+            self.list.is_none() && self.subtitles_row(ui, controls, options, ffmpeg.is_some());
+        video_label(ui, controls, 21.0, "Subtitle languages", subtitles);
+        self.chapters_row(ui, controls, options, ffmpeg.is_some());
+        winui::checkbox_until(
+            ui,
+            pos2(o.x + FIELD_X + 158.0, controls.y + 36.0),
+            &mut self.thumbnail,
+            "Embed thumbnail when available",
+            options && ffmpeg.is_some() && self.preferences.container != "webm",
+            Some(o.x + RIGHT),
+        );
+
+        let listing = self.list.as_ref().is_some_and(|list| list.listing());
+        let chosen = self.list.as_ref().map_or_else(
+            || self.current_choice().is_some(),
+            |list| list.chosen() > 0 && !listing,
+        );
+        let ready = !busy
+            && page_ok
+            && if self.use_config {
+                config_path.is_some()
             } else {
-                crate::i18n::t("File name")
-            },
-            // i18n: label before the list of a video's subtitle languages
-            crate::i18n::t("Subtitles"),
-        ];
-        let widest = labels
+                options && chosen && ffmpeg.is_some()
+            };
+        self.footer(ui, o, ready, listing)
+    }
+
+    fn format_card(&mut self, ui: &mut Ui, o: Pos2, enabled: bool) {
+        let p = ui.painter().clone();
+        video_card(
+            &p,
+            o,
+            0.0,
+            FORMAT_CARD_H,
+            Some(crate::i18n::mark("Format")),
+            enabled,
+        );
+        video_label(ui, o, 43.0, "Output container", enabled);
+        video_label(ui, o, 71.0, "Preferred codec", enabled && !self.advanced);
+        let containers = ["Matroska (MKV)", "MPEG-4 (MP4)", "WebM"];
+        let ci = mdm_tools::preferences::CONTAINERS
             .iter()
-            .map(|l| winui::text_width(&p, l))
-            .fold(0.0, f32::max);
-        let bx = (11.0 + widest + 6.0).clamp(70.0, 150.0);
-        let label = |ui: &Ui, y: f32, s: &str, color| {
-            winui::fit(
-                ui,
+            .position(|c| *c == self.preferences.container)
+            .unwrap_or(0);
+        let mut changed = false;
+        if let Some(i) = winui::combo_light(
+            ui,
+            r(o, FIELD_X, 27.0, 230.0, 24.0),
+            &containers,
+            ci,
+            enabled,
+            "video-container",
+        ) {
+            self.preferences.container = mdm_tools::preferences::CONTAINERS[i].into();
+            if i == 2 && self.preferences.codec == 1 {
+                self.preferences.codec = 2;
+            }
+            changed = true;
+        }
+        let ids: Vec<_> = (0..mdm_tools::preferences::CODECS.len())
+            .filter(|i| self.preferences.container != "webm" || *i != 1)
+            .collect();
+        let codecs: Vec<_> = ids
+            .iter()
+            .map(|i| mdm_tools::preferences::CODECS[*i])
+            .collect();
+        let selected = ids
+            .iter()
+            .position(|i| *i == self.preferences.codec)
+            .unwrap_or(0);
+        if let Some(i) = winui::combo_light(
+            ui,
+            r(o, FIELD_X, 55.0, 230.0, 24.0),
+            &codecs,
+            selected,
+            enabled && !self.advanced,
+            "video-codec",
+        ) {
+            self.preferences.codec = ids[i];
+            changed = true;
+        }
+        if self.format_code.is_some() {
+            text(
                 &p,
-                o.x + 11.0,
-                o.y + y,
-                s,
-                color,
-                o.x + bx - 5.0,
-                ("video-label", y as i32),
+                o.x + FIELD_X + 242.0,
+                o.y + 71.0,
+                crate::i18n::t("Set by the format IDs"),
+                winui::MUTED(),
             );
+        }
+        if changed {
+            if !self.advanced
+                && let Some((video, _)) = self.video.take()
+            {
+                let choices = self.preset_choices(Some(&video));
+                self.video = Some((video, choices));
+            }
+            self.name_from_choice();
+        }
+    }
+
+    fn quality_card(&mut self, ui: &mut Ui, o: Pos2, enabled: bool, height: f32) {
+        let p = ui.painter().clone();
+        video_card(
+            &p,
+            o,
+            0.0,
+            height,
+            Some(crate::i18n::mark("Quality")),
+            enabled,
+        );
+        if let Some(list) = &mut self.list {
+            ui.add_enabled_ui(enabled, |ui| {
+                list.middle(
+                    ui,
+                    o + egui::vec2(LEFT - 11.0, 0.0),
+                    RIGHT - LEFT + 22.0,
+                    height,
+                );
+            });
+            return;
+        }
+
+        let shown = crate::i18n::mark("Show all formats");
+        let x = (RIGHT - winui::text_width(&p, crate::i18n::t(shown)) - 23.0).max(FIELD_X);
+        let before = self.advanced;
+        winui::checkbox_until(
+            ui,
+            pos2(o.x + x, o.y + 8.0),
+            &mut self.advanced,
+            shown,
+            enabled,
+            Some(o.x + RIGHT),
+        );
+        if before != self.advanced {
+            if self.advanced {
+                self.format_code = Some(String::new());
+                if let Some((video, _)) = self.video.take() {
+                    let merge = self.tools.as_ref().is_some_and(|t| t.2.is_some());
+                    let choices = mdm_tools::resolve::choices(&video, merge);
+                    self.video = Some((video, choices));
+                }
+            } else {
+                self.format_code = None;
+                if let Some((video, _)) = self.video.take() {
+                    self.set_video(video);
+                }
+            }
+            self.rows = Default::default();
+        }
+        if let Some(mut code) = self.format_code.take() {
+            let previous = code.clone();
+            self.format_table(ui, o, enabled, height, &mut code);
+            let changed = code != previous;
+            self.format_code = Some(code);
+            if changed {
+                self.name_from_choice();
+            }
+        } else {
+            self.quality_list(ui, o, enabled, height);
+        }
+    }
+
+    fn quality_list(&mut self, ui: &mut Ui, o: Pos2, enabled: bool, height: f32) {
+        let defaults = self.preset_choices(None);
+        let choices = if enabled {
+            self.video
+                .as_ref()
+                .map_or(defaults.as_slice(), |(_, c)| c.as_slice())
+        } else {
+            defaults.as_slice()
         };
-        label(ui, 266.0, labels[0], winui::TEXT());
+        self.rows.selected = enabled
+            .then_some(self.chosen)
+            .filter(|i| *i < choices.len());
+        self.rows.name = crate::i18n::t("Quality");
+        let rect = r(o, LEFT, 30.0, RIGHT - LEFT, height - 43.0);
+        let picked = ui
+            .add_enabled_ui(enabled, |ui| {
+                let ev = winui::row_list(
+                    ui,
+                    "video-choices",
+                    rect,
+                    choices.len(),
+                    21.0,
+                    &mut self.rows,
+                    |ui, clip, i, row, look| {
+                        let c = &choices[i];
+                        let label = choice_label(&c.label);
+                        let (size, said) = choice_size(c);
+                        if enabled {
+                            let file = format!("video.{}", c.ext);
+                            crate::fileicons::paint_at(
+                                ui,
+                                clip,
+                                crate::fileicons::Kind::File(&file),
+                                pos2(row.left() + 8.0, row.top() + 2.0),
+                                16.0,
+                            );
+                        }
+                        let ink = if enabled {
+                            look.ink
+                        } else {
+                            winui::TEXT_DISABLED()
+                        };
+                        text(clip, row.left() + 30.0, row.top() + 14.0, &label, ink);
+                        winui::text_right(clip, row.right() - 9.0, row.top() + 14.0, &size, ink);
+                        look.name = format!("{label}, {said}");
+                    },
+                );
+                if ev.focused
+                    && self.rows.type_to(ui, "video-choices", choices.len(), |i| {
+                        choices[i].label.clone()
+                    })
+                {
+                    self.rows.selected
+                } else {
+                    ev.picked
+                }
+            })
+            .inner;
+        if enabled && let Some(i) = picked {
+            self.chosen = i;
+            if !self.advanced {
+                self.preferences.quality = i;
+            }
+            self.name_from_choice();
+        }
+    }
+
+    fn format_table(
+        &mut self,
+        ui: &mut Ui,
+        o: Pos2,
+        enabled: bool,
+        height: f32,
+        code: &mut String,
+    ) {
+        let Some((video, choices)) = &self.video else {
+            return;
+        };
+        let p = ui.painter().clone();
+        let code_y = height - 61.0;
+        let header = [
+            "ID",
+            "EXT",
+            "RESOLUTION",
+            "FPS",
+            "FILESIZE",
+            "TBR",
+            "VCODEC",
+            "ACODEC",
+            "MORE INFO",
+        ];
+        format_columns(&p, o.x + LEFT, o.y + 40.0, header, winui::MUTED());
+        self.rows.name = crate::i18n::t("Available formats");
+        let picked = ui
+            .add_enabled_ui(enabled, |ui| {
+                winui::row_list(
+                    ui,
+                    "video-formats",
+                    r(o, LEFT, 47.0, RIGHT - LEFT, code_y - 56.0),
+                    video.formats.len(),
+                    19.0,
+                    &mut self.rows,
+                    |_, clip, i, row, look| {
+                        let f = &video.formats[i];
+                        let cells = format_cells(f);
+                        let selected = code.split('+').any(|id| id.trim() == f.id);
+                        if selected {
+                            clip.rect_filled(r(row.min, 1.0, 3.0, 3.0, 13.0), 1.0, winui::accent());
+                        }
+                        format_columns(
+                            clip,
+                            row.left(),
+                            row.top() + 13.0,
+                            cells.each_ref().map(String::as_str),
+                            look.ink,
+                        );
+                        look.name = cells.join(", ");
+                    },
+                )
+                .picked
+            })
+            .inner;
+        if enabled && let Some(i) = picked {
+            pick_format(video, code, i);
+        }
+        video_label(ui, o, code_y + 16.0, "Format code", enabled);
         winui::edit(
             ui,
-            r(o, bx, 253.0, 459.0 - bx, 21.0),
+            r(o, FIELD_X, code_y, RIGHT - FIELD_X - 215.0, 24.0),
+            code,
+            enabled,
+            false,
+        );
+        let presets: Vec<_> = choices
+            .iter()
+            .filter(|choice| mdm_tools::resolve::is_audio(choice))
+            .collect();
+        let mut labels = vec![crate::i18n::mark("Audio presets…").to_owned()];
+        labels.extend(presets.iter().map(|c| choice_label(&c.label)));
+        let names: Vec<_> = labels.iter().map(String::as_str).collect();
+        let selected = presets.iter().position(|c| c.selector == code.trim());
+        if let Some(i) = winui::combo_light(
+            ui,
+            r(o, RIGHT - 205.0, code_y, 205.0, 24.0),
+            &names,
+            selected.map_or(0, |i| i + 1),
+            enabled && !presets.is_empty(),
+            "video-audio-presets",
+        ) {
+            *code = i
+                .checked_sub(1)
+                .map_or_else(String::new, |i| presets[i].selector.clone());
+        }
+        let invalid = !code.trim().is_empty()
+            && !presets.iter().any(|c| c.selector == code.trim())
+            && format_code_choice(video, code, &self.preferences.container).is_none();
+        let (hint, color) = if invalid {
+            (
+                crate::i18n::t(
+                    "Choose a media ID, or combine a video-only and audio-only ID with +.",
+                ),
+                winui::ERROR(),
+            )
+        } else {
+            (
+                crate::i18n::t(
+                    "Choose one format ID, or select video and audio to join their IDs with +.",
+                ),
+                winui::MUTED(),
+            )
+        };
+        winui::paragraph(
+            &p,
+            o.x + FIELD_X,
+            o.y + code_y + 40.0,
+            hint,
+            color,
+            o.x + RIGHT,
+            14.0,
+        );
+    }
+
+    fn save_card(&mut self, ui: &mut Ui, o: Pos2, enabled: bool, ffmpeg: bool) {
+        let p = ui.painter().clone();
+        video_card(
+            &p,
+            o,
+            0.0,
+            SAVE_CARD_H,
+            Some(crate::i18n::mark("Save")),
+            enabled,
+        );
+        video_label(ui, o, 43.0, "Save to", enabled);
+        winui::edit(
+            ui,
+            r(o, FIELD_X, 27.0, RIGHT - FIELD_X - 48.0, 24.0),
             &mut self.folder,
-            true,
+            enabled,
             false,
         );
         if winui::button(
             ui,
-            r(o, 467.0, 253.0, 22.0, 21.0),
+            r(o, RIGHT - 38.0, 27.0, 38.0, 24.0),
             "...",
-            ButtonKind::Normal,
+            if enabled {
+                ButtonKind::Normal
+            } else {
+                ButtonKind::Disabled
+            },
             false,
             None,
         )
@@ -1300,73 +1487,46 @@ impl VideoDialog {
                 rfd::FileDialog::new().set_directory(from).pick_folder()
             });
         }
-        if let Some(d) = winui::picked(ui.ctx(), "video-folder") {
-            self.folder = d.display().to_string();
+        if let Some(folder) = winui::picked(ui.ctx(), "video-folder") {
+            self.folder = folder.display().to_string();
         }
-        label(ui, 297.0, labels[1], winui::TEXT());
+        let field = r(o, FIELD_X, 55.0, RIGHT - FIELD_X, 24.0);
         if let Some(list) = &mut self.list {
-            // One quality for every video; their names are their titles (no subtitles).
-            list.quality_row(ui, r(o, bx, 284.0, 489.0 - bx, 21.0), ffmpeg.is_some());
+            video_label(ui, o, 71.0, "Quality", enabled);
+            ui.add_enabled_ui(enabled, |ui| list.quality_row(ui, field, ffmpeg));
         } else {
-            winui::edit(
-                ui,
-                r(o, bx, 284.0, 489.0 - bx, 21.0),
-                &mut self.name,
-                true,
-                false,
-            );
-            let on = self.subtitles_row(ui, o, bx, ffmpeg.is_some());
-            let shade = if on {
-                winui::TEXT()
-            } else {
-                winui::TEXT_DISABLED()
-            };
-            label(ui, 328.0, labels[2], shade);
-        }
-        self.chapters_row(ui, o, bx, ffmpeg.is_some());
-        winui::checkbox(ui,pos2(o.x+bx,o.y+371.0),&mut self.thumbnail,"Embed thumbnail when available",ffmpeg.is_some() && self.preferences.container!="webm");
-
-        // The choices belong to the address looked up: an edited address is looked up first
-        // (it downloaded the new page with the old one's format and name).
-        let stale =
-            (self.video.is_some() || self.list.is_some()) && self.page.trim() != self.looked_up;
-        let listing = self.list.as_ref().is_some_and(|l| l.listing());
-        let chosen = match &self.list {
-            Some(l) => l.chosen() > 0 && !listing,
-            None => {
-                self.video.as_ref().is_some_and(|(_, c)| !c.is_empty())
-                    && !self.name.trim().is_empty()
+            video_label(ui, o, 71.0, "File name", enabled);
+            let edit = winui::edit(ui, field, &mut self.name, enabled, false);
+            self.name_edited |= edit.changed();
+            if self.name.is_empty() && !edit.has_focus() {
+                text(
+                    &p,
+                    o.x + FIELD_X + 5.0,
+                    o.y + 71.0,
+                    crate::i18n::t("Uses the video title if left empty"),
+                    winui::MUTED(),
+                );
             }
-        };
-        let ready = chosen && !busy && !stale && ffmpeg.is_some();
-        let kind = |default: bool| match (ready, default) {
-            (false, _) => ButtonKind::Disabled,
-            (true, true) => ButtonKind::Default,
-            (true, false) => ButtonKind::Normal,
-        };
-        // The bottom row, each button as wide as its label in this language (#172): Helpers at the
-        // left, as wide as the room before Download Now allows.
-        let [now_at, later_at, cancel_at] = winui::buttons_to_right(
+        }
+    }
+
+    fn footer(&mut self, ui: &mut Ui, o: Pos2, ready: bool, listing: bool) -> Outcome<()> {
+        let p = ui.painter().clone();
+        let y = HEIGHT - 40.0;
+        winui::etched_h(&p, o.x + 24.0, o.y + y - 10.0, WIDTH - 48.0);
+        let [now, later, cancel] = winui::buttons_to_right(
             &p,
-            489.0,
+            WIDTH - 24.0,
             8.0,
-            &[("Download Now", 105.0), ("Later", 73.0), ("Cancel", 73.0)],
-            160.0,
+            &[("Download Now", 128.0), ("Later", 84.0), ("Cancel", 84.0)],
+            165.0,
         )[..] else {
             unreachable!("three buttons")
         };
-        let helpers_at = winui::buttons_from_left(
-            &p,
-            11.0,
-            8.0,
-            &[("yt-dlp...", 90.0)],
-            now_at.0 - 8.0 - 11.0,
-        )[0];
-        // Where yt-dlp and ffmpeg come from: MDM's own copies or the person's (#51).
+        let helpers = winui::button_fit_width(&p, "yt-dlp...", 84.0, 175.0);
         if winui::button(
             ui,
-            r(o, helpers_at.0, BUTTONS_Y, helpers_at.1, 21.0),
-            // i18n: button in Download video: where MDM takes yt-dlp and ffmpeg from
+            r(o, 24.0, y, helpers, 28.0),
             "yt-dlp...",
             ButtonKind::Normal,
             false,
@@ -1376,46 +1536,29 @@ impl VideoDialog {
         {
             self.open_helpers();
         }
-        let now = winui::button(
-            ui,
-            r(o, now_at.0, BUTTONS_Y, now_at.1, 21.0),
-            "Download Now",
-            kind(true),
-            false,
-            None,
-        );
-        // i18n: why Download Now is greyed: the page address was changed after the look-up
-        let now = winui::why_disabled(now, stale, "Look up the new address first");
-        // i18n: why Download Now is greyed: a playlist's videos are still being listed
-        let now = winui::why_disabled(now, listing, "Wait for the list, or stop listing").clicked()
-            || (ready && winui::enter_pressed(ui));
-        let later = winui::button(
-            ui,
-            r(o, later_at.0, BUTTONS_Y, later_at.1, 21.0),
-            // i18n: button: add it now, start downloading later
-            "Later",
-            kind(false),
-            false,
-            None,
+        let button = |ui: &mut Ui, (x, w), label, action, enabled| {
+            let kind = match (enabled, action) {
+                (false, _) => ButtonKind::Disabled,
+                (true, true) => ButtonKind::Default,
+                (true, false) => ButtonKind::Normal,
+            };
+            winui::button(ui, r(o, x, y, w, 28.0), label, kind, false, None)
+        };
+        let now = winui::why_disabled(
+            button(ui, now, "Download Now", true, ready),
+            listing,
+            "Wait for the list, or stop listing",
         )
         .clicked();
-        let cancel = winui::button(
-            ui,
-            r(o, cancel_at.0, BUTTONS_Y, cancel_at.1, 21.0),
-            "Cancel",
-            ButtonKind::Normal,
-            false,
-            None,
-        )
-        .clicked();
-        // Escape answers the playlist's question first, when it's asked.
+        let later = button(ui, later, "Later", false, ready).clicked();
+        let cancel = button(ui, cancel, "Cancel", false, true).clicked();
         let asking = self.list.as_ref().is_some_and(|l| l.asking());
         if cancel || (winui::escape_pressed(ui) && !asking) {
             return Outcome::Closed;
         }
         if ready && (now || later) {
-            // A playlist of many asks first; Yes comes back as `confirmed`.
-            if let Some(list) = &mut self.list
+            if !self.use_config
+                && let Some(list) = &mut self.list
                 && list.ask(now)
             {
                 return Outcome::Open;
@@ -1425,27 +1568,12 @@ impl VideoDialog {
         }
         if let Some(now) = self.confirmed.take()
             && ready
+            && !self.use_config
         {
             self.start_now = Some(now);
             return Outcome::Done(());
         }
         Outcome::Open
-        }).inner;
-        if self.use_config
-            && (winui::button(
-                ui,
-                r(o, 416.0, BUTTONS_Y, 73.0, 21.0),
-                "Cancel",
-                ButtonKind::Normal,
-                false,
-                None,
-            )
-            .clicked()
-                || winui::escape_pressed(ui))
-        {
-            return Outcome::Closed;
-        }
-        result
     }
 }
 
@@ -1453,25 +1581,23 @@ impl VideoDialog {
     /// Embed chapters (#827), under Subtitles, for a video and a playlist alike: the chapters a
     /// video's page lists go into its file (ffmpeg writes them; on by default). Greyed without
     /// ffmpeg, and for a choice converted to MP3, Opus or FLAC; its tick stays as it was.
-    fn chapters_row(&mut self, ui: &mut Ui, o: Pos2, bx: f32, ffmpeg: bool) {
+    fn chapters_row(&mut self, ui: &mut Ui, o: Pos2, enabled: bool, ffmpeg: bool) {
         let converts = match &self.list {
             Some(list) => list.converts(),
             None => self
-                .video
-                .as_ref()
-                .and_then(|(_, c)| c.get(self.chosen))
+                .current_choice()
                 .is_some_and(|c| mdm_tools::resolve::audio_conversion(&c.selector).is_some()),
         };
-        let can = ffmpeg && !converts;
-        let mut on = self.chapters && can;
+        let can = enabled && ffmpeg && !converts;
+        let mut on = self.chapters;
         let resp = winui::checkbox_until(
             ui,
-            pos2(o.x + bx, o.y + 350.0),
+            pos2(o.x + FIELD_X, o.y + 36.0),
             &mut on,
             // i18n: checkbox in Download video: the chapters a video's page lists (YouTube's, for one) go into the video file, where players show them and skip between them
             "Embed chapters",
             can,
-            Some(o.x + 489.0),
+            Some(o.x + FIELD_X + 153.0),
         );
         let resp = winui::why_disabled(
             resp,
@@ -1499,14 +1625,12 @@ impl VideoDialog {
     /// captions, saved beside the video (`<name>.<language>.srt`) or put into it (ffmpeg).
     /// The list starts at `bx`, after the labels' column; true when it can be chosen from (its
     /// label is greyed otherwise).
-    fn subtitles_row(&mut self, ui: &mut Ui, o: Pos2, bx: f32, ffmpeg: bool) -> bool {
-        let choice = self
-            .video
+    fn subtitles_row(&mut self, ui: &mut Ui, o: Pos2, enabled: bool, ffmpeg: bool) -> bool {
+        let choice = self.current_choice();
+        let audio = choice
             .as_ref()
-            .and_then(|(_, c)| c.get(self.chosen))
-            .cloned();
-        let audio = choice.as_ref().is_some_and(mdm_tools::resolve::is_audio);
-        let on = !self.subs.is_empty() && !audio;
+            .is_some_and(|choice| self.choice_is_audio(choice));
+        let on = enabled && choice.is_some() && !self.subs.is_empty() && !audio;
         let mut items = sub_items(&self.subs, self.video.is_some());
         items.insert(0, "Preferred subtitle languages".into());
         let shown: Vec<&str> = items.iter().map(String::as_str).collect();
@@ -1517,9 +1641,13 @@ impl VideoDialog {
         };
         if let Some(i) = winui::combo_light(
             ui,
-            r(o, bx, 315.0, 200.0, 21.0),
+            r(o, FIELD_X, 4.0, 230.0, 25.0),
             &shown,
-            pick.min(shown.len().saturating_sub(1)),
+            if enabled {
+                pick.min(shown.len().saturating_sub(1))
+            } else {
+                1
+            },
             on,
             "video-subs",
         ) {
@@ -1532,15 +1660,15 @@ impl VideoDialog {
         let holds = choice
             .as_ref()
             .is_some_and(mdm_tools::resolve::holds_subtitles);
-        let mut embed = self.embed && chosen && ffmpeg && holds;
+        let mut embed = self.embed && (chosen || !enabled);
         let resp = winui::checkbox_until(
             ui,
-            pos2(o.x + bx + 212.0, o.y + 319.0),
+            pos2(o.x + FIELD_X + 242.0, o.y + 10.0),
             &mut embed,
             // i18n: checkbox in Download video: subtitles go inside the video file instead of a separate .srt file beside it
             "Embed subtitles",
             chosen && ffmpeg && holds,
-            Some(o.x + 489.0),
+            Some(o.x + RIGHT),
         );
         let resp = winui::why_disabled(
             resp,
@@ -1558,6 +1686,163 @@ impl VideoDialog {
             self.embed = embed;
         }
         on
+    }
+}
+
+fn video_card(
+    p: &egui::Painter,
+    o: Pos2,
+    top: f32,
+    height: f32,
+    title: Option<&str>,
+    enabled: bool,
+) {
+    let colors = crate::theme::colors();
+    let bounds = r(o, 24.0, top, WIDTH - 48.0, height);
+    let surface = if enabled {
+        colors.tab_page
+    } else {
+        colors.window.lerp_to_gamma(colors.tab_page, 0.45)
+    };
+    p.rect_filled(bounds, 5.0, surface);
+    if let Some(title) = title {
+        winui::text_font(
+            p,
+            winui::tahoma_bold(),
+            o.x + LEFT,
+            o.y + top + 20.0,
+            crate::i18n::t(title),
+            if enabled {
+                colors.text
+            } else {
+                colors.text_disabled
+            },
+        );
+    }
+}
+
+fn video_label(ui: &Ui, o: Pos2, y: f32, label: &str, enabled: bool) {
+    winui::fit(
+        ui,
+        ui.painter(),
+        o.x + LEFT,
+        o.y + y,
+        crate::i18n::t(label),
+        if enabled {
+            winui::TEXT()
+        } else {
+            winui::TEXT_DISABLED()
+        },
+        o.x + FIELD_X - 10.0,
+        ("video-label", label),
+    );
+}
+
+fn format_by_id<'a>(video: &'a Video, id: &str) -> Option<&'a mdm_tools::resolve::Format> {
+    (!id.is_empty()
+        && id
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c)))
+    .then(|| {
+        video
+            .formats
+            .iter()
+            .find(|f| f.id == id && (f.video || f.audio))
+    })
+    .flatten()
+}
+
+fn format_code_choice(video: &Video, code: &str, container: &str) -> Option<Choice> {
+    let mut ids = code.split('+').map(str::trim);
+    let first = format_by_id(video, ids.next()?)?;
+    let audio = if let Some(id) = ids.next() {
+        let other = format_by_id(video, id)?;
+        if !first.video || first.audio || other.video || !other.audio || ids.next().is_some() {
+            return None;
+        }
+        Some(other)
+    } else {
+        None
+    };
+    let selector = audio.map_or_else(|| first.id.clone(), |a| format!("{}+{}", first.id, a.id));
+    let size = match audio {
+        Some(a) => first
+            .size
+            .zip(a.size)
+            .map(|(video, audio)| video.saturating_add(audio)),
+        None => first.size,
+    };
+    Some(Choice {
+        label: selector.clone(),
+        selector,
+        ext: if first.video {
+            container.into()
+        } else {
+            first.ext.clone()
+        },
+        size,
+        approx: first.approx || audio.is_some_and(|a| a.approx),
+        height: first.height,
+        ..Default::default()
+    })
+}
+
+fn pick_format(video: &Video, code: &mut String, index: usize) {
+    let picked = &video.formats[index];
+    if format_by_id(video, &picked.id).is_none() {
+        return;
+    }
+    let mut current = code
+        .split('+')
+        .filter_map(|id| format_by_id(video, id.trim()));
+    let matching = if picked.video && !picked.audio {
+        current
+            .find(|f| f.audio && !f.video)
+            .map(|audio| format!("{}+{}", picked.id, audio.id))
+    } else if picked.audio && !picked.video {
+        current
+            .find(|f| f.video && !f.audio)
+            .map(|video| format!("{}+{}", video.id, picked.id))
+    } else {
+        None
+    };
+    *code = matching.unwrap_or_else(|| picked.id.clone());
+}
+
+fn format_cells(format: &mdm_tools::resolve::Format) -> [String; 9] {
+    let resolution = match (format.width, format.height) {
+        (Some(w), Some(h)) => format!("{w}x{h}"),
+        (_, Some(h)) => format!("{h}p"),
+        _ if format.audio && !format.video => crate::i18n::t("Audio only").into(),
+        _ => String::new(),
+    };
+    let size = format.size.map_or_else(String::new, |size| {
+        let approximate = if format.approx { "~" } else { "" };
+        format!("{approximate}{}", crate::dialogs::dialog_size(size))
+    });
+    [
+        format.id.clone(),
+        format.ext.clone(),
+        resolution,
+        format.fps.map_or_else(String::new, |n| format!("{n:.0}")),
+        size,
+        format.tbr.map_or_else(String::new, |n| format!("{n:.0}k")),
+        format.vcodec.clone().unwrap_or_default(),
+        format.acodec.clone().unwrap_or_default(),
+        format.note.clone().unwrap_or_default(),
+    ]
+}
+
+fn format_columns(p: &egui::Painter, x: f32, baseline: f32, values: [&str; 9], ink: egui::Color32) {
+    let mut x = x + 8.0;
+    let font = egui::FontId::monospace(11.0);
+    for (value, width) in values
+        .into_iter()
+        .zip([43.0, 48.0, 79.0, 31.0, 71.0, 48.0, 83.0, 83.0, 100.0])
+    {
+        let label = winui::ellipsize(p, &font, value, width - 5.0);
+        winui::text_font(p, font.clone(), x, baseline, &label, ink);
+        x += width;
     }
 }
 
@@ -1923,19 +2208,19 @@ pub(crate) fn lookup_error(
         return if lower.contains("could not copy chrome cookie database") {
             // i18n: the Download video window: yt-dlp couldn't read the cookies of the browser chosen in Options (Chrome, Edge...), which holds them while it runs; {browser} = its name
             named(
-                "yt-dlp can't read {browser}'s cookies while {browser} is open. Close {browser} and look the page up again, or choose Firefox in Options → Sites Logins.",
+                "yt-dlp can't read {browser}'s cookies while {browser} is open. Close {browser} and look the page up again, or choose Firefox in yt-dlp settings.",
             )
         } else if lower.contains("could not find") {
             // i18n: the Download video window: the browser chosen in Options has no cookies on this computer (not installed, or another profile); {browser} = its name
             named(
-                "yt-dlp found no cookies of {browser} on this computer. Check the browser and its profile in Options → Sites Logins.",
+                "yt-dlp found no cookies of {browser} on this computer. Check the browser and its profile in yt-dlp settings.",
             )
         } else if cfg!(windows)
             && (lower.contains("decrypt") || lower.contains("unknown cookie version"))
         {
             // i18n: the Download video window: Chrome 127 and later (and Edge, Brave) on Windows encrypt their cookies so only they can read them; {browser} = its name
             named(
-                "{browser} keeps its cookies locked to itself on Windows, so yt-dlp can't read them. Choose Firefox in Options → Sites Logins, or use the Download video button over the video in {browser}.",
+                "{browser} keeps its cookies locked to itself on Windows, so yt-dlp can't read them. Choose Firefox in yt-dlp settings, or open the video with the Orbit browser extension.",
             )
         } else if ["keyring", "secretstorage", "kwallet", "decrypt"]
             .iter()
@@ -2053,6 +2338,34 @@ pub(crate) fn choice_label(label: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn selecting_raw_formats_builds_the_exact_pair_in_either_click_order() {
+        let video = mdm_tools::resolve::parse(br#"{"formats":[
+            {"format_id":"137","ext":"mp4","height":1080,"vcodec":"avc1","acodec":"none","filesize":100},
+            {"format_id":"251","ext":"webm","vcodec":"none","acodec":"opus","filesize":25},
+            {"format_id":"18","ext":"mp4","height":360,"vcodec":"avc1","acodec":"mp4a"},
+            {"format_id":"sb0","ext":"mhtml","vcodec":"none","acodec":"none"}
+        ]}"#).unwrap();
+        for order in [[0, 1], [1, 0]] {
+            let mut code = String::new();
+            for index in order {
+                pick_format(&video, &mut code, index);
+            }
+            let choice = format_code_choice(&video, &code, "mkv").unwrap();
+            assert_eq!(choice.selector, "137+251");
+            assert_eq!(choice.ext, "mkv");
+            assert_eq!(choice.size, Some(125));
+            pick_format(&video, &mut code, 3);
+            assert_eq!(code, "137+251", "storyboards cannot be selected");
+        }
+        assert!(format_code_choice(&video, "18+251", "mkv").is_none());
+        assert!(format_code_choice(&video, "137/18", "mkv").is_none());
+        assert_eq!(
+            format_code_choice(&video, "251", "mkv").unwrap().ext,
+            "webm"
+        );
+    }
 
     #[test]
     fn orbit_audio_choices_keep_their_container_and_explicit_config_overrides() {

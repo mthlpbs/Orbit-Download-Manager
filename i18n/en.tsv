@@ -351,8 +351,6 @@
 #. window title in the Options window
 #. window title: the addresses whose downloads stay with the browser
 	Addresses left to the browser	Addresses left to the browser
-#. checkbox in the Download video window
-	Advanced	Advanced
 #. button in the Options window
 #. the trailing ... means it opens a window: keep it
 	Advanced / Socks...	Advanced / Socks...
@@ -512,6 +510,8 @@
 #. checkbox in helpers.rs
 	Attach info JSON to Matroska files	Attach info JSON to Matroska files
 #. text in the Download video window
+	Audio only	Audio only
+#. text in the Download video window
 #. a choice in the Download video window: only the sound; {type} is MP3, M4A…
 	Audio only {type}	Audio only {type}
 #. text in playlistdlg.rs
@@ -520,6 +520,8 @@
 #. text in the Download video window
 #. a choice in the Download video window: only the sound, the site's own file as it is (not converted); {type} is WEBM, M4A…
 	Audio only, original {type}	Audio only, original {type}
+#. text in the Download video window
+	Audio presets…	Audio presets…
 #. text in the Scheduler window
 	August	August
 #. text in countries.rs
@@ -539,6 +541,8 @@
 	Automatically put in "{category}" category the following file types:	Automatically put in "{category}" category the following file types:
 #. text in the Options window
 	Automatically start downloading the following file types:	Automatically start downloading the following file types:
+#. text in the Download video window
+	Available formats	Available formats
 #. text in countries.rs
 #. a country's name (where a download's server is)
 	Azerbaijan	Azerbaijan
@@ -775,6 +779,12 @@
 #. text in remote.rs
 #. remote control page (on a phone): what the ".torrent file" button does (screen readers)
 	Choose a .torrent file	Choose a .torrent file
+#. text in the Download video window
+	Choose a media ID, or combine a video-only and audio-only ID with +.	Choose a media ID, or combine a video-only and audio-only ID with +.
+#. text in the Download video window
+	Choose a yt-dlp executable in yt-dlp settings.	Choose a yt-dlp executable in yt-dlp settings.
+#. text in the Download video window
+	Choose one format ID, or select video and audio to join their IDs with +.	Choose one format ID, or select video and audio to join their IDs with +.
 #. text in the Options window
 #. Options → Sites Logins → Cookies for video sites: the title of the window, and the tooltip of the button, that pick a browser profile's folder
 	Choose the profile's folder	Choose the profile's folder
@@ -787,6 +797,8 @@
 #. button in the download list; button in the Options window
 #. verb: clears this filter
 	Clear	Clear
+#. text in the Download video window
+	Click Look up to load the qualities for this page.	Click Look up to load the qualities for this page.
 #. message or event log entry in the main window; window title in cnl.rs
 #. title of the notice when Click'n'Load couldn't start
 #. window title: a web page used Click'n'Load (a link site's button that sends its links to this program)
@@ -880,6 +892,8 @@
 #. group box title in the Options window
 #. Options → Sites Logins: group box title: yt-dlp signs in to video sites with a browser's cookies
 	Cookies for video sites	Cookies for video sites
+#. text in helpers.rs
+	Cookies from browser	Cookies from browser
 #. text in the Help menu's windows (About, updates, shortcuts, Tell a friend)
 	Copied to the clipboard.	Copied to the clipboard.
 #. button in the Help menu's windows (About, updates, shortcuts, Tell a friend)
@@ -995,12 +1009,16 @@
 #. text in countries.rs
 #. a country's name (where a download's server is)
 	Denmark	Denmark
+#. text in helpers.rs
+	Deno installation page	Deno installation page
 #. text in a dialog box
 	Description	Description
 #. checkbox in the Find window
 	Description or part of the description	Description or part of the description
 #. text in a download's Properties window
 	Description:	Description:
+#. text in helpers.rs
+	Detect again	Detect again
 #. text in the Options window
 #. column title: a paired phone's or computer's name
 	Device	Device
@@ -1064,6 +1082,8 @@
 #. window title in gallerydlg.rs
 #. window title: download an image gallery's files (gallery-dl)
 	Download a gallery	Download a gallery
+#. text in helpers.rs
+	Download and install	Download and install
 #. window title in a dialog box; text in a dialog box; text in the Options window
 	Download complete	Download complete
 #. text in the Options window
@@ -1252,6 +1272,8 @@
 	Embed subtitles (converted to SRT)	Embed subtitles (converted to SRT)
 #. checkbox in helpers.rs; checkbox in the Download video window
 	Embed thumbnail when available	Embed thumbnail when available
+#. text in the Download video window
+	Embedding	Embedding
 #. text in gallerydlg.rs
 #. in Download a gallery, after the "Files at most" box
 	Empty: all of them. On most sites the newest come first.	Empty: all of them. On most sites the newest come first.
@@ -1467,9 +1489,6 @@
 	First day of the week:	First day of the week:
 #. text in the Batch download window
 	First file:	First file:
-#. text in the Download video window
-#. a note in Download video while FLAC is chosen: FLAC keeps the site's (already lossy) sound exactly, it can't make it better, the file is only bigger
-	FLAC keeps the sound exactly, but it can't add quality the site's sound doesn't have: the file is only bigger.	FLAC keeps the sound exactly, but it can't add quality the site's sound doesn't have: the file is only bigger.
 #. text in categories.rs
 	Folder:	Folder:
 #. text in finish.rs
@@ -1497,6 +1516,12 @@
 #. text in remote.rs
 #. remote control page (on a phone): question before unpairing this phone
 	Forget this device? It needs a new code to connect again.	Forget this device? It needs a new code to connect again.
+#. text in the Download video window
+	Format	Format
+#. text in the Download video window
+	Format code	Format code
+#. text in the Download video window
+	Format, quality, save and embedding settings come from your yt-dlp configuration file.	Format, quality, save and embedding settings come from your yt-dlp configuration file.
 #. text in the Scheduler window
 #. Friday, as short as a calendar's column head (two letters in English)
 	Fr	Fr
@@ -1686,8 +1711,7 @@
 #. button in the Options window
 #. button in Test browser integration: open the help page's section for the problem
 	How to fix it	How to fix it
-#. text in the Download video window; text in videolookup.rs
-#. link after the note that YouTube needs a JavaScript runtime: opens the help page that says how to install Node.js or Deno
+#. text in videolookup.rs
 #. link in the browser's video menu, after the note that YouTube needs a JavaScript runtime: opens the help page that says how to install Node.js or Deno
 	How to install one	How to install one
 #. checkbox in the Options window
@@ -1757,8 +1781,9 @@
 #. in the "7-Zip needed" window, under why
 	Install 7-Zip (free), then right-click the download and choose Extract.	Install 7-Zip (free), then right-click the download and choose Extract.
 #. text in the Download video window
-#. button: download and install the ffmpeg program
 	Install ffmpeg	Install ffmpeg
+#. text in the Download video window
+	Install ffmpeg to merge or remux the selected formats.	Install ffmpeg to merge or remux the selected formats.
 #. button in gallerydlg.rs
 #. button: download and install the gallery-dl program
 	Install gallery-dl	Install gallery-dl
@@ -1769,7 +1794,6 @@
 #. in the "7-Zip needed" window, under why (Linux: 7-Zip comes from the distribution's packages, named 7zip or p7zip)
 	Install your system's 7zip (or p7zip) package, then right-click the download and choose Extract.	Install your system's 7zip (or p7zip) package, then right-click the download and choose Extract.
 #. text in the Download video window
-#. button: download and install the yt-dlp program
 	Install yt-dlp	Install yt-dlp
 #. text in the Help menu's windows (About, updates, shortcuts, Tell a friend)
 #. Check for updates, after Update now downloaded it: unpacking and putting the new version in place
@@ -1926,7 +1950,7 @@
 #. text in a download's Properties window
 #. {last} = the date and time of the last attempt to download
 	Last try  {last}	Last try  {last}
-#. button in gallerydlg.rs; text in the Help menu's windows (About, updates, shortcuts, Tell a friend); text in the Add torrent window; text in the Download video window
+#. button in gallerydlg.rs; text in the Help menu's windows (About, updates, shortcuts, Tell a friend); text in the Add torrent window; button in the Download video window
 #. button: not now (download the update later)
 #. button: add it now, start downloading later
 	Later	Later
@@ -2013,11 +2037,8 @@
 #. checkbox in the Options window
 #. Options → Archives → Link grabber check box (IDM's Download all links looks every link up)
 	Look links up when they arrive (name, size, online)	Look links up when they arrive (name, size, online)
-#. text in the Add torrent window
+#. text in the Add torrent window; button in the Download video window
 	Look up	Look up
-#. tooltip (why a control is greyed) in the Download video window
-#. why Download Now is greyed: the page address was changed after the look-up
-	Look up the new address first	Look up the new address first
 #. text in the Add torrent window
 #. while a magnet link's file list is fetched, before any peer is found
 #. the trailing ... means it is still going on: keep it
@@ -2351,6 +2372,8 @@
 #. text in extension.rs
 #. a check of Test browser integration: no browser's extension has reached MDM
 	No browser's extension has connected yet	No browser's extension has connected yet
+#. text in the Download video window
+	No configuration file selected	No configuration file selected
 #. text in torrent downloads
 #. an error: the app has no folder for its own data
 	no data folder	no data folder
@@ -2614,6 +2637,10 @@
 #. text in the Options window
 #. Options → Add an account: label before the field for the service's API token (the other way to sign in)
 	Or paste your API token:	Or paste your API token:
+#. text in helpers.rs
+#. Video helpers: {version} = the version of MDM's own copy
+#. {version} = a version number (keep the braces as they are)
+	Orbit copy {version}: {path}	Orbit copy {version}: {path}
 #. message or event log entry in the main window; window title in a dialog box; text in the Help menu's windows (About, updates, shortcuts, Tell a friend)
 	Orbit Download Manager	Orbit Download Manager
 #. text in crashui.rs
@@ -2643,10 +2670,8 @@
 #. text in the Help menu's windows (About, updates, shortcuts, Tell a friend)
 #. {version} = a version number (keep the braces as they are)
 	Orbit Download Manager {version} is available (released {date}).	Orbit Download Manager {version} is available (released {date}).
-#. text in helpers.rs
-#. Video helpers: {version} = the version of MDM's own copy
-#. {version} = a version number (keep the braces as they are)
-	Orbit Download Manager's own copy, version {version}	Orbit Download Manager's own copy, version {version}
+#. text in the Download video window
+	Output container	Output container
 #. text in the Link grabber window
 #. Link grabber: the box that edits the selected package
 	Package	Package
@@ -2763,6 +2788,8 @@
 #. text in countries.rs
 #. a country's name (where a download's server is)
 	Portugal	Portugal
+#. text in the Download video window
+	Preferred codec	Preferred codec
 #. text in debrid.rs
 #. Options → Accounts: a debrid account with premium (no end date given)
 	premium	premium
@@ -2782,7 +2809,7 @@
 #. text in the Download video window
 #. a private-window video's authentication failure: only cookies supplied by that private window may be used, even after restarting MDM
 	Private-window downloads do not use Cookies for video sites from Options. Open the page in a private window, sign in there, and use its Download video button again.	Private-window downloads do not use Cookies for video sites from Options. Open the page in a private window, sign in there, and use its Download video button again.
-#. text in the Options window
+#. text in helpers.rs; text in the Options window
 #. Options → Sites Logins → Cookies for video sites: label before the browser profile's name or folder (may stay empty)
 	Profile (optional):	Profile (optional):
 #. text in the download list (sizes, speeds, status)
@@ -2812,8 +2839,6 @@
 #. a country's name (where a download's server is)
 	Qatar	Qatar
 #. text in the Download video window
-#. what a screen reader calls the list of a video's formats (1080p, 720p, audio only…)
-#. label before the quality chosen for all of a playlist's videos
 	Quality	Quality
 #. text in the Scheduler window
 #. the name proposed for a new queue; {n} = its number
@@ -3004,7 +3029,7 @@
 #. text in countries.rs
 #. a country's name (where a download's server is)
 	Saudi Arabia	Saudi Arabia
-#. button in helpers.rs
+#. button in helpers.rs; text in the Download video window
 	Save	Save
 #. text in a dialog box
 	Save As	Save As
@@ -3037,6 +3062,8 @@
 	Scheduler	Scheduler
 #. text in the Batch download window
 	Second file:	Second file:
+#. text in the Download video window
+	Select a configuration file in yt-dlp settings.	Select a configuration file in yt-dlp settings.
 #. button in playlistdlg.rs; button in the Add torrent window; text in torrentfiles.rs
 #. button in Download video for a playlist: tick every video
 	Select all	Select all
@@ -3099,6 +3126,8 @@
 #. text in the Add torrent window
 #. why "Use the proxy" is greyed in Torrent settings
 	Set a socks5:// proxy in Options → Proxy / Socks first	Set a socks5:// proxy in Options → Proxy / Socks first
+#. text in the Download video window
+	Set by the format IDs	Set by the format IDs
 #. checkbox in the Options window
 	Set file creation date as provided by the server	Set file creation date as provided by the server
 #. button in extension.rs; button in the Options window
@@ -3159,6 +3188,8 @@
 #. message or event log entry in the main window
 #. link in the empty download list: go to the All Downloads view
 	Show all downloads	Show all downloads
+#. text in the Download video window
+	Show all formats	Show all formats
 #. text in a download's progress window
 	Show details >>	Show details >>
 #. checkbox in the Options window; checkbox in a download's progress window
@@ -3434,8 +3465,7 @@
 #. Sunday, as short as a calendar's column head (two letters in English)
 	Su	Su
 #. text in the Download video window
-#. label before the list of a video's subtitle languages
-	Subtitles	Subtitles
+	Subtitle languages	Subtitle languages
 #. text in the download list (sizes, speeds, status)
 #. after a video download: {language} = a language's name; its subtitles were to go inside the video, but came on a second try, so they're a separate file beside it
 	Subtitles in {language} came on a second try: they're beside the video, not in it.	Subtitles in {language} came on a second try: they're beside the video, not in it.
@@ -3528,15 +3558,6 @@
 #. text in extracting archives (a download's log, the Archive password window)
 #. in a download's log (Linux and macOS): the downloaded archive, after it was extracted
 	The archive was moved to the Trash	The archive was moved to the Trash
-#. text in the Download video window
-	The best qualities, MP3, Opus and FLAC need ffmpeg (about 80 MB).	The best qualities, MP3, Opus and FLAC need ffmpeg (about 80 MB).
-#. text in the Download video window
-#. in Download video, on 32-bit Windows (no button: no ffmpeg build MDM can check exists for it); Helpers... is the button below
-#. the trailing ... means it is still going on: keep it
-	The best qualities, MP3, Opus and FLAC need ffmpeg, which MDM has no copy of for 32-bit Windows: choose your own with Helpers...	The best qualities, MP3, Opus and FLAC need ffmpeg, which MDM has no copy of for 32-bit Windows: choose your own with Helpers...
-#. text in the Download video window
-#. in Download video, on macOS and Linux (no button: the system installs it)
-	The best qualities, MP3, Opus and FLAC need ffmpeg: install it with your system's package manager (or Homebrew).	The best qualities, MP3, Opus and FLAC need ffmpeg: install it with your system's package manager (or Homebrew).
 #. text in the settings
 #. an error: the browser's VPN or proxy extension logs in to its proxy itself, and MDM can't; Options → Proxy / Socks → Network adapter is where an adapter can be chosen
 	the browser's proxy (a VPN or proxy extension) asks for a login only that extension has: use the VPN's own app, or choose its network adapter in Options → Proxy / Socks	the browser's proxy (a VPN or proxy extension) asks for a login only that extension has: use the VPN's own app, or choose its network adapter in Options → Proxy / Socks
@@ -4164,8 +4185,7 @@
 	Use authorization	Use authorization
 #. text in the Options window
 	Use automatic configuration script	Use automatic configuration script
-#. button in helpers.rs
-#. Video helpers: button: go back to the copy MDM downloads and checks itself
+#. text in helpers.rs
 	Use detected / Orbit copy	Use detected / Orbit copy
 #. checkbox in the Options window
 	Use FTP in PASV mode	Use FTP in PASV mode
@@ -4194,10 +4214,12 @@
 	Use this rule	Use this rule
 #. button in helpers.rs
 	Use user-folder yt-dlp.conf	Use user-folder yt-dlp.conf
-#. checkbox in the Download video window
+#. text in the Download video window
 	Use yt-dlp configuration file	Use yt-dlp configuration file
 #. text in the Options window
 	Used by the list of downloads and the Scheduler.	Used by the list of downloads and the Scheduler.
+#. text in helpers.rs
+	Used when the Orbit extension did not supply cookies for the page.	Used when the Orbit extension did not supply cookies for the page.
 #. text in the Options window
 #. column title: the user name
 	User	User
@@ -4212,6 +4234,8 @@
 	User:	User:
 #. label in the Options window
 	UserName	UserName
+#. text in the Download video window
+	Uses the video title if left empty	Uses the video title if left empty
 #. tooltip (why a control is greyed) in the Add torrent window
 #. why "Connect over uTP too" is greyed in Torrent settings: incoming connections are off
 	uTP uses the port for incoming connections: turn on Accept incoming connections	uTP uses the port for incoming connections: turn on Accept incoming connections
@@ -4274,7 +4298,6 @@
 #. remote control page (on a phone): codes were tried too fast
 	Wait a moment, then try again.	Wait a moment, then try again.
 #. tooltip (why a control is greyed) in the Download video window
-#. why Download Now is greyed: a playlist's videos are still being listed
 	Wait for the list, or stop listing	Wait for the list, or stop listing
 #. text in remote.rs
 #. remote control page (on a phone): "When" choice: the download waits in a queue; {queue} its name
@@ -4421,7 +4444,7 @@
 	YouTube needs a JavaScript runtime to list its video qualities: install Node.js or Deno, then look it up again	YouTube needs a JavaScript runtime to list its video qualities: install Node.js or Deno, then look it up again
 #. text in the Download video window
 #. the Download video window: yt-dlp couldn't read the cookies of the browser chosen in Options (Chrome, Edge...), which holds them while it runs; {browser} = its name
-	yt-dlp can't read {browser}'s cookies while {browser} is open. Close {browser} and look the page up again, or choose Firefox in Options → Sites Logins.	yt-dlp can't read {browser}'s cookies while {browser} is open. Close {browser} and look the page up again, or choose Firefox in Options → Sites Logins.
+	yt-dlp can't read {browser}'s cookies while {browser} is open. Close {browser} and look the page up again, or choose Firefox in yt-dlp settings.	yt-dlp can't read {browser}'s cookies while {browser} is open. Close {browser} and look the page up again, or choose Firefox in yt-dlp settings.
 #. text in the Download video window
 #. the Download video window (Linux, macOS): the key to the browser's cookies is in the system's keyring (GNOME Keyring, KWallet, the macOS keychain), which didn't give it; {browser} = its name
 	yt-dlp couldn't get the key to {browser}'s cookies from the system's keyring. Unlock the keyring and look the page up again.	yt-dlp couldn't get the key to {browser}'s cookies from the system's keyring. Unlock the keyring and look the page up again.
@@ -4446,14 +4469,13 @@
 	yt-dlp downloads it itself: {protocol}	yt-dlp downloads it itself: {protocol}
 #. text in the Download video window
 #. the Download video window: the browser chosen in Options has no cookies on this computer (not installed, or another profile); {browser} = its name
-	yt-dlp found no cookies of {browser} on this computer. Check the browser and its profile in Options → Sites Logins.	yt-dlp found no cookies of {browser} on this computer. Check the browser and its profile in Options → Sites Logins.
+	yt-dlp found no cookies of {browser} on this computer. Check the browser and its profile in yt-dlp settings.	yt-dlp found no cookies of {browser} on this computer. Check the browser and its profile in yt-dlp settings.
 #. message or event log entry in the main window
 	yt-dlp is not installed (Tasks → Download video from a page installs it)	yt-dlp is not installed (Tasks → Download video from a page installs it)
 #. text in the Options window
 #. Options → Sites Logins → Cookies for video sites: the tooltip of its choices
 	yt-dlp signs in to video sites with this browser's cookies, read from its files on this computer only. Used when the browser's extension didn't pass the page's own: a pasted address, a playlist.	yt-dlp signs in to video sites with this browser's cookies, read from its files on this computer only. Used when the browser's extension didn't pass the page's own: a pasted address, a playlist.
 #. button in the Download video window
-#. button in Download video: where MDM takes yt-dlp and ffmpeg from
 #. the trailing ... means it opens a window: keep it
 	yt-dlp...	yt-dlp...
 #. text in helpers.rs
@@ -4482,7 +4504,7 @@
 	{algorithm}: checked when the download finishes	{algorithm}: checked when the download finishes
 #. text in the Download video window
 #. the Download video window: Chrome 127 and later (and Edge, Brave) on Windows encrypt their cookies so only they can read them; {browser} = its name
-	{browser} keeps its cookies locked to itself on Windows, so yt-dlp can't read them. Choose Firefox in Options → Sites Logins, or use the Download video button over the video in {browser}.	{browser} keeps its cookies locked to itself on Windows, so yt-dlp can't read them. Choose Firefox in Options → Sites Logins, or use the Download video button over the video in {browser}.
+	{browser} keeps its cookies locked to itself on Windows, so yt-dlp can't read them. Choose Firefox in yt-dlp settings, or open the video with the Orbit browser extension.	{browser} keeps its cookies locked to itself on Windows, so yt-dlp can't read them. Choose Firefox in yt-dlp settings, or open the video with the Orbit browser extension.
 #. text in extension.rs
 #. a check of Test browser integration: {browser} is a browser's name
 	{browser}: the extension connected	{browser}: the extension connected
@@ -5538,6 +5560,8 @@ menu	Remove with &files	Remove with &files
 #. menu command in the main window
 #. verb: removes the download from the list and its file from the disk
 menu	Remove with files	Remove with files
+#. menu command in the main window
+menu	Reset toolbar	Reset toolbar
 #. menu command in the main window
 menu	Resume Download	Resume Download
 #. menu command in the main window

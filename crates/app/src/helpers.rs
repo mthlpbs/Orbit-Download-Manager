@@ -480,7 +480,11 @@ pub struct Programs {
     config_path: String,
     dir: Option<std::path::PathBuf>,
     /// The helpers as found (read again after each change, not every frame: it reads files).
-    found: [Option<mdm_tools::Installed>; 3],
+    found: [Option<mdm_tools::Installed>; 4],
+    last_detection: std::time::Instant,
+    cookie_browser: String,
+    cookie_profile: String,
+    saved_cookies: Option<(String, String)>,
     /// A chosen program being checked (`--version`), and what it answered.
     checking: Option<(Helper, Answer)>,
     /// MDM's own yt-dlp or gallery-dl being downloaded in place of the system's (#452, #571),
@@ -489,7 +493,12 @@ pub struct Programs {
     error: Option<String>,
 }
 
-const HELPERS: [Helper; 3] = [Helper::YtDlp, Helper::Ffmpeg, Helper::GalleryDl];
+const HELPERS: [Helper; 4] = [
+    Helper::YtDlp,
+    Helper::Ffmpeg,
+    Helper::Deno,
+    Helper::GalleryDl,
+];
 
 /// A check's answer, once it has one (Err: why the program wasn't taken, in words).
 type Answer = Arc<Mutex<Option<Result<(), String>>>>;
@@ -668,6 +677,10 @@ impl Programs {
     pub fn paths() -> Self {
         let mut p = Self::new();
         p.paths_only = true;
+        if let Some(cookies) = mdm_tools::proc::browser_cookies() {
+            p.cookie_browser = cookies.browser;
+            p.cookie_profile = cookies.profile.unwrap_or_default();
+        }
         p
     }
     pub fn new() -> Self {
@@ -680,7 +693,11 @@ impl Programs {
                 .map(|p| p.display().to_string())
                 .unwrap_or_default(),
             dir: mdm_tools::tools_dir(),
-            found: [None, None, None],
+            found: Default::default(),
+            last_detection: std::time::Instant::now(),
+            cookie_browser: String::new(),
+            cookie_profile: String::new(),
+            saved_cookies: None,
             checking: None,
             installing: None,
             error: None,
@@ -689,13 +706,19 @@ impl Programs {
         p
     }
 
+    pub fn take_saved_cookies(&mut self) -> Option<(String, String)> {
+        self.saved_cookies.take()
+    }
+
     fn look(&mut self) {
+        self.last_detection = std::time::Instant::now();
         let Some(dir) = self.dir.as_deref() else {
             return;
         };
         self.found = [
             mdm_tools::installed(dir),
             mdm_tools::ffmpeg::installed(dir),
+            mdm_tools::deno::installed(dir),
             mdm_tools::gallery::installed(dir),
         ];
     }
@@ -718,6 +741,8 @@ impl Programs {
                 mdm_tools::gallery::install_latest(&dir, &net, None).await
             } else if h == Helper::Ffmpeg {
                 mdm_tools::ffmpeg::install_latest(&dir, &net, None).await
+            } else if h == Helper::Deno {
+                mdm_tools::deno::install_latest(&dir, &net).await
             } else {
                 mdm_tools::install_latest(&dir, &net, None).await
             };
@@ -730,6 +755,10 @@ impl Programs {
 
     /// Open until Close.
     pub fn show(&mut self, ctx: &egui::Context, rt: &tokio::runtime::Handle) -> Outcome<()> {
+        ctx.request_repaint_after(std::time::Duration::from_secs(2));
+        if self.last_detection.elapsed() >= std::time::Duration::from_secs(2) {
+            self.look();
+        }
         let answered = self
             .checking
             .as_ref()
@@ -860,7 +889,7 @@ impl Programs {
             } else {
                 "Helpers"
             },
-            [500.0, if self.paths_only { 522.0 } else { 292.0 }],
+            [500.0, if self.paths_only { 605.0 } else { 292.0 }],
             false,
             winui::BG(),
             |ui, o| self.body(ui, o, rt),
@@ -902,25 +931,29 @@ impl Programs {
         };
 
         let shown = if self.paths_only {
-            HELPERS[..2].to_vec()
+            [0, 1, 2]
         } else {
-            HELPERS.to_vec()
+            [0, 1, 3]
         };
-        for (k, h) in shown.into_iter().enumerate() {
+        for (k, i) in shown.into_iter().enumerate() {
+            let h = HELPERS[i];
             let y = o.y + 8.0 + k as f32 * 78.0;
             winui::text_font(
                 &p,
                 winui::tahoma_bold(),
                 o.x + 14.0,
                 y + 16.0,
-                h.name(),
+                if h == Helper::Deno { "Deno" } else { h.name() },
                 winui::TEXT(),
             );
-            let found = self.found[k].as_ref();
-            let chosen = self
-                .dir
-                .as_deref()
-                .and_then(|d| mdm_tools::chosen::chosen(d, h));
+            let found = self.found[i].as_ref();
+            let chosen = self.dir.as_deref().and_then(|d| {
+                if h == Helper::Deno {
+                    mdm_tools::deno::explicit(d)
+                } else {
+                    mdm_tools::chosen::chosen(d, h)
+                }
+            });
             // One of the person's, maybe passed over (a gallery-dl too old, #236).
             let mine = chosen.is_some();
             let too_old = chosen
@@ -935,6 +968,7 @@ impl Programs {
                 Helper::YtDlp => mdm_tools::ytdlp_asset().is_some(),
                 Helper::GalleryDl => mdm_tools::gallery::asset().is_some(),
                 Helper::Ffmpeg => mdm_tools::ffmpeg::available(),
+                Helper::Deno => mdm_tools::deno::available(),
             };
             // The system's copy may be the person's to keep up to date: MDM's own can replace it
             // (#452, #571), where MDM has one for this system and processor.
@@ -957,7 +991,7 @@ impl Programs {
                         ("oldest", mdm_tools::gallery::OLDEST),
                     ],
                 ),
-                (None, Some(i)) if mine => crate::i18n::fmt(
+                (None, Some(i)) if mine && !i.version.is_empty() => crate::i18n::fmt(
                     // i18n: Video helpers: {path} = the program the person chose, {version} = its version
                     crate::i18n::t("Your own program: {path} ({version})"),
                     &[
@@ -965,15 +999,18 @@ impl Programs {
                         ("version", &i.version),
                     ],
                 ),
-                (None, Some(i)) if i.is_system() => crate::i18n::fmt(
+                (None, Some(i)) if i.is_system() || mine => crate::i18n::fmt(
                     // i18n: Video helpers: {path} = the system's yt-dlp, ffmpeg or gallery-dl
                     crate::i18n::t("Your system's: {path}"),
                     &[("path", &crate::i18n::ltr(&i.exe.display().to_string()))],
                 ),
                 (None, Some(i)) => crate::i18n::fmt(
                     // i18n: Video helpers: {version} = the version of MDM's own copy
-                    crate::i18n::t("Orbit Download Manager's own copy, version {version}"),
-                    &[("version", &i.version)],
+                    crate::i18n::t("Orbit copy {version}: {path}"),
+                    &[
+                        ("version", &i.version),
+                        ("path", &crate::i18n::ltr(&i.exe.display().to_string())),
+                    ],
                 ),
                 // Linux and macOS as before: there the system's package manager (or Homebrew)
                 // installs what MDM has no copy of, and MDM finds it.
@@ -998,12 +1035,21 @@ impl Programs {
                 ("helper", k),
             );
             let busy = self.checking.is_some() || self.installing.is_some();
+            let action = if mine {
+                crate::i18n::mark("Use detected / Orbit copy")
+            } else if found.is_none() && has_own {
+                crate::i18n::mark("Download and install")
+            } else if found.is_none() && h == Helper::Deno {
+                crate::i18n::mark("Deno installation page")
+            } else {
+                crate::i18n::mark("Detect again")
+            };
             // As wide as their labels in this language (#192), side by side from the left.
             let [other_at, own_at] = winui::button_row_from_left(
                 &p,
                 &[
                     ("Use another program...", 14.0, 180.0),
-                    ("Use detected / Orbit copy", 202.0, 180.0),
+                    (action, 202.0, 180.0),
                 ],
                 8.0,
                 486.0,
@@ -1037,8 +1083,8 @@ impl Programs {
                 ui,
                 r(o, own_at.0, y - o.y + 46.0, own_at.1, 21.0),
                 // i18n: Video helpers: button: go back to the copy MDM downloads and checks itself
-                "Use detected / Orbit copy",
-                if (mine || (found.is_none() && has_own)) && !busy {
+                action,
+                if !busy {
                     ButtonKind::Normal
                 } else {
                     ButtonKind::Disabled
@@ -1050,15 +1096,25 @@ impl Programs {
                 && let Some(dir) = self.dir.clone()
             {
                 if mine {
-                    self.error = mdm_tools::chosen::forget(&dir, h)
-                        .err()
-                        .map(|e| crate::errors::tools(&e));
+                    let result = if h == Helper::Deno {
+                        mdm_tools::deno::reset(&dir)
+                    } else {
+                        mdm_tools::chosen::forget(&dir, h)
+                    };
+                    self.error = result.err().map(|e| crate::errors::tools(&e));
                     self.look();
+                } else if found.is_none() && has_own {
+                    self.look();
+                    if self.found[i].is_none() {
+                        self.install_own(h, dir, rt, ui.ctx());
+                    }
+                } else if found.is_none() && h == Helper::Deno {
+                    let _ = open::that_detached(mdm_tools::deno::INSTALL_PAGE);
                 } else {
-                    self.install_own(h, dir, rt, ui.ctx());
+                    self.look();
                 }
             }
-            if k + 1 < HELPERS.len() {
+            if self.paths_only || k + 1 < shown.len() {
                 winui::etched_h(&p, o.x + 14.0, o.y + 82.0 + k as f32 * 78.0, 472.0);
             }
         }
@@ -1067,7 +1123,7 @@ impl Programs {
                 ui,
                 &p,
                 o.x + 14.0,
-                o.y + if self.paths_only { 426.0 } else { 254.0 },
+                o.y + if self.paths_only { 512.0 } else { 254.0 },
                 e,
                 winui::ERROR(),
                 o.x + 400.0,
@@ -1075,6 +1131,7 @@ impl Programs {
             );
         }
         if self.paths_only {
+            let o = o + egui::vec2(0.0, 78.0);
             winui::text(
                 &p,
                 o.x + 14.0,
@@ -1159,41 +1216,6 @@ impl Programs {
                 "Orbit handles transfers; external downloader commands are ignored.",
                 winui::TEXT(),
             );
-        }
-        if self.paths_only {
-            winui::text(
-                &p,
-                o.x + 14.0,
-                o.y + 333.0,
-                "Deno executable (optional; detected automatically when blank)",
-                winui::TEXT(),
-            );
-            winui::edit(
-                ui,
-                r(o, 14.0, 342.0, 386.0, 23.0),
-                &mut self.preferences.deno_path,
-                true,
-                false,
-            );
-            if winui::button(
-                ui,
-                r(o, 410.0, 343.0, 77.0, 21.0),
-                "Browse",
-                ButtonKind::Normal,
-                false,
-                None,
-            )
-            .clicked()
-            {
-                winui::start_pick(ui.ctx(), "deno-program", || {
-                    crate::winui::file_dialog("Choose Deno executable")
-                        .add_filter("Windows executable", &["exe"])
-                        .pick_file()
-                });
-            }
-            if let Some(file) = winui::picked(ui.ctx(), "deno-program") {
-                self.preferences.deno_path = file.display().to_string();
-            }
             if winui::button(
                 ui,
                 r(o, 352.0, 222.0, 135.0, 23.0),
@@ -1218,9 +1240,60 @@ impl Programs {
                     Err(e)=>self.error=Some(e.to_string()),
                 }
             }
+            winui::text(
+                &p,
+                o.x + 14.0,
+                o.y + 330.0,
+                crate::i18n::t("Cookies from browser"),
+                winui::TEXT(),
+            );
+            let browsers = mdm_tools::proc::cookie_browsers();
+            let names: Vec<_> = std::iter::once("Off")
+                .chain(browsers.iter().map(|b| crate::videodlg::browser_label(b)))
+                .collect();
+            let selected = browsers
+                .iter()
+                .position(|b| *b == self.cookie_browser)
+                .map_or(0, |i| i + 1);
+            if let Some(i) = winui::combo_light(
+                ui,
+                r(o, 212.0, 315.0, 275.0, 24.0),
+                &names,
+                selected,
+                true,
+                "ytdlp-cookie-browser",
+            ) {
+                self.cookie_browser = i.checked_sub(1).map_or("", |i| browsers[i]).to_owned();
+            }
+            winui::text(
+                &p,
+                o.x + 14.0,
+                o.y + 363.0,
+                crate::i18n::t("Profile (optional):"),
+                winui::TEXT(),
+            );
+            winui::edit(
+                ui,
+                r(o, 212.0, 348.0, 275.0, 24.0),
+                &mut self.cookie_profile,
+                !self.cookie_browser.is_empty(),
+                false,
+            );
+            winui::fit(
+                ui,
+                &p,
+                o.x + 14.0,
+                o.y + 391.0,
+                crate::i18n::t(
+                    "Used when the Orbit extension did not supply cookies for the page.",
+                ),
+                winui::MUTED(),
+                o.x + 487.0,
+                "ytdlp-cookie-note",
+            );
             if winui::button(
                 ui,
-                r(o, 328.0, 446.0, 77.0, 21.0),
+                r(o, 328.0, 451.0, 77.0, 21.0),
                 "Save",
                 ButtonKind::Normal,
                 false,
@@ -1228,7 +1301,10 @@ impl Programs {
             )
             .clicked()
             {
-                self.error = self.preferences.save().err().map(|e| e.to_string());
+                self.saved_cookies = Some((
+                    self.cookie_browser.clone(),
+                    self.cookie_profile.trim().to_owned(),
+                ));
             }
         }
         let close = winui::button(
@@ -1236,7 +1312,7 @@ impl Programs {
             r(
                 o,
                 413.0,
-                if self.paths_only { 446.0 } else { 260.0 },
+                if self.paths_only { 529.0 } else { 260.0 },
                 77.0,
                 21.0,
             ),

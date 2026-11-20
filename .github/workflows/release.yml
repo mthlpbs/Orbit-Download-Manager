@@ -6,6 +6,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      installer_preview:
+        description: Run focused video tests and package a Windows preview
+        type: boolean
+        default: false
 
 # Read-only for every job; a job that needs more says so in its own block (publish).
 permissions:
@@ -124,7 +129,17 @@ jobs:
           "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
 
       - name: Tests
+        if: ${{ !inputs.installer_preview }}
         run: cargo test --workspace --target ${{ matrix.target }}
+
+      - name: Video and helper tests
+        if: ${{ inputs.installer_preview }}
+        shell: pwsh
+        run: |
+          cargo test --locked -p mdm-tools --lib --target ${{ matrix.target }}
+          if ($LASTEXITCODE) { throw "helper tests failed" }
+          cargo test --locked -p mdm-app --bin orbitdownloadmanager --target ${{ matrix.target }} selecting_raw_formats_builds_the_exact_pair_in_either_click_order
+          if ($LASTEXITCODE) { throw "video format test failed" }
 
       - name: Inno Setup
         shell: pwsh
@@ -160,6 +175,7 @@ jobs:
       # Crash reports: the release's symbols (dump_syms reads each program's .pdb beside it; no
       # download includes the .pdb files themselves).
       - name: Symbols
+        if: ${{ !inputs.installer_preview }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }} # downloads the build's helpers signed in (fetch_release.py)

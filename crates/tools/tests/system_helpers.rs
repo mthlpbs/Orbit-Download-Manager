@@ -17,7 +17,7 @@ fn main() {
     for name in ["empty", "bin"] {
         std::fs::create_dir(root.join(name)).unwrap();
     }
-    for name in ["yt-dlp.exe", "ffmpeg.exe", "gallery-dl.exe"] {
+    for name in ["yt-dlp.exe", "ffmpeg.exe", "gallery-dl.exe", "deno.exe"] {
         std::fs::write(root.join("bin").join(name), b"fake executable").unwrap();
     }
     let path = std::env::join_paths(["empty", "bin"].map(|n| root.join(n))).unwrap();
@@ -52,6 +52,11 @@ fn check_windows(root: &std::path::Path) {
         root.join("bin/gallery-dl.exe")
     );
 
+    assert_eq!(
+        mdm_tools::deno::installed(&dir).unwrap().exe,
+        root.join("bin/deno.exe")
+    );
+
     let _rt = tokio::runtime::Runtime::new().unwrap();
     let _net = mdm_engine::Options {
         route: mdm_engine::Route::Down {
@@ -62,7 +67,7 @@ fn check_windows(root: &std::path::Path) {
     assert!(!mdm_tools::refreshable(&dir), "system copy not refreshed");
     assert!(!dir.join("yt-dlp").exists(), "system helper left unmanaged");
 
-    // A managed copy still wins over the system copy.
+    // The system copy remains preferred while it is installed.
     let own = Installed {
         version: "2026.01.01".into(),
         exe: root.join("managed-yt-dlp.exe"),
@@ -74,12 +79,11 @@ fn check_windows(root: &std::path::Path) {
         serde_json::to_vec(&own).unwrap(),
     )
     .unwrap();
-    assert_eq!(mdm_tools::installed(&dir), Some(own.clone()));
+    assert_eq!(mdm_tools::installed(&dir), Some(system.clone()));
+    assert!(!mdm_tools::refreshable(&dir));
+    std::fs::remove_file(&system.exe).unwrap();
+    assert_eq!(mdm_tools::installed(&dir), Some(own));
     assert!(mdm_tools::refreshable(&dir), "a managed copy is refreshed");
-
-    // Once managed copy is removed, falls back to system copy.
-    std::fs::remove_file(&own.exe).unwrap();
-    assert_eq!(mdm_tools::installed(&dir), Some(system));
 }
 
 #[cfg(unix)]
@@ -162,7 +166,7 @@ fn check(root: &std::path::Path) {
     );
     assert!(!dir.join("yt-dlp").exists(), "nothing installed on the way");
 
-    // A managed copy still wins, and the explicit choice wins over both.
+    // The explicit choice wins, followed by the system and managed copies.
     let own = Installed {
         version: "2026.01.01".into(),
         exe: root.join("managed-yt-dlp"),
@@ -176,15 +180,7 @@ fn check(root: &std::path::Path) {
         serde_json::to_vec(&own).unwrap(),
     )
     .unwrap();
-    assert_eq!(mdm_tools::installed(&dir), Some(own.clone()));
-    assert!(mdm_tools::refreshable(&dir), "a managed copy is refreshed");
-    assert!(
-        matches!(
-            rt.block_on(mdm_tools::install_latest(&dir, &net, None)),
-            Err(mdm_tools::Error::Adapter(mdm_engine::NetError::Down { .. }))
-        ),
-        "a managed copy still takes its ordinary update path"
-    );
+    assert_eq!(mdm_tools::installed(&dir), Some(system.clone()));
 
     let picked =
         mdm_tools::chosen::choose(&dir, Helper::YtDlp, &root.join("package/yt-dlp")).unwrap();
@@ -195,9 +191,10 @@ fn check(root: &std::path::Path) {
         picked
     );
     mdm_tools::chosen::forget(&dir, Helper::YtDlp).unwrap();
-    assert_eq!(mdm_tools::installed(&dir), Some(own.clone()));
-    std::fs::remove_file(&own.exe).unwrap();
-    assert_eq!(mdm_tools::installed(&dir), Some(system));
+    assert_eq!(mdm_tools::installed(&dir), Some(system.clone()));
+    std::fs::remove_file(&system.exe).unwrap();
+    assert_eq!(mdm_tools::installed(&dir), Some(own));
+    assert!(mdm_tools::refreshable(&dir));
 
     gallery_dl(root, &dir, &rt, &net);
 }

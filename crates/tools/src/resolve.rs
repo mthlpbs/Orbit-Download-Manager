@@ -62,7 +62,9 @@ pub struct Track {
 pub struct Format {
     pub id: String,
     pub ext: String,
+    pub width: Option<u32>,
     pub height: Option<u32>,
+    pub note: Option<String>,
     pub fps: Option<f64>,
     pub video: bool,
     pub audio: bool,
@@ -190,7 +192,9 @@ pub(crate) fn estimate(duration: f64, tbr: f64) -> u64 {
 struct RawFormat {
     format_id: String,
     ext: Option<String>,
+    width: Option<u32>,
     height: Option<u32>,
+    format_note: Option<String>,
     fps: Option<f64>,
     vcodec: Option<String>,
     acodec: Option<String>,
@@ -357,7 +361,9 @@ pub fn parse(json: &[u8]) -> Option<Video> {
                 audio: has(&f.acodec),
                 id: f.format_id,
                 ext: f.ext.unwrap_or_default(),
+                width: f.width,
                 height: f.height,
+                note: f.format_note,
                 fps: f.fps.filter(|x| x.is_finite() && *x > 0.0),
                 approx: f.filesize.is_none(),
                 size: f.filesize.or(f.filesize_approx).or_else(|| estimate(f.tbr)),
@@ -491,6 +497,7 @@ pub fn look_up_kept(
 ) -> Result<(Looked, proc::LookedUp), ProcError> {
     let mut args: Vec<String> = [
         "-J",
+        "--simulate",
         "--no-playlist",
         "--flat-playlist",
         "--playlist-items",

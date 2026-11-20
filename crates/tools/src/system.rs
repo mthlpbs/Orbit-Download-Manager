@@ -78,6 +78,12 @@ pub(crate) fn extra_dirs() -> Vec<PathBuf> {
         if let Some(scoop_global) = std::env::var_os("SCOOP_GLOBAL") {
             dirs.push(Path::new(&scoop_global).join("shims"));
         }
+        if let Some(scoop) = std::env::var_os("SCOOP") {
+            dirs.push(Path::new(&scoop).join("shims"));
+        }
+        if let Some(deno) = std::env::var_os("DENO_INSTALL") {
+            dirs.push(Path::new(&deno).join("bin"));
+        }
 
         // Python Scripts (pip install --user yt-dlp, gallery-dl)
         if let Some(lad) = &local_app_data {
@@ -116,10 +122,54 @@ pub(crate) fn extra_dirs() -> Vec<PathBuf> {
 /// the UI thread.
 pub(crate) fn installed(name: &str) -> Option<Installed> {
     let path = std::env::var_os("PATH").unwrap_or_default();
-    find_in(name, std::env::split_paths(&path).chain(extra_dirs())).map(|exe| Installed {
+    let dirs = std::env::split_paths(&path).chain(extra_dirs());
+    #[cfg(windows)]
+    let dirs = dirs.chain(windows_paths());
+    find_in(name, dirs).map(|exe| Installed {
         version: crate::SYSTEM.into(),
         exe,
     })
+}
+
+/// Package installers can update PATH after Explorer or Orbit was started.
+#[cfg(windows)]
+fn windows_paths() -> impl Iterator<Item = PathBuf> {
+    use windows_registry::{CURRENT_USER, LOCAL_MACHINE};
+
+    [
+        (CURRENT_USER, "Environment"),
+        (
+            LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment",
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(root, subkey)| root.open(subkey).ok()?.get_string("Path").ok())
+    .flat_map(|path| {
+        let expanded = expand_windows_path(&path);
+        std::env::split_paths(&expanded).collect::<Vec<_>>()
+    })
+}
+
+/// Registry PATH can contain expandable entries such as %SystemRoot%\System32.
+#[cfg(windows)]
+fn expand_windows_path(path: &str) -> std::ffi::OsString {
+    let mut parts = path.split('%');
+    let mut expanded = std::ffi::OsString::from(parts.next().unwrap_or_default());
+    while let Some(name) = parts.next() {
+        let after = parts.next();
+        if let Some(value) = after.and_then(|_| std::env::var_os(name)) {
+            expanded.push(value);
+        } else {
+            expanded.push("%");
+            expanded.push(name);
+            if after.is_some() {
+                expanded.push("%");
+            }
+        }
+        expanded.push(after.unwrap_or_default());
+    }
+    expanded
 }
 
 fn find_in(name: &str, dirs: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {

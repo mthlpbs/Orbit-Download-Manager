@@ -42,7 +42,8 @@ pub struct Preferences {
     pub embed_metadata: bool,
     pub embed_info_json: bool,
     pub filename_template: String,
-    pub deno_path: String,
+    // Kept for installations configured before Deno had its own program entry.
+    pub(crate) deno_path: String,
     pub remote_ejs: bool,
 }
 
@@ -69,8 +70,11 @@ impl Default for Preferences {
 
 impl Preferences {
     pub fn read() -> Self {
-        crate::tools_dir()
-            .and_then(|d| std::fs::read(d.join("video-preferences.json")).ok())
+        crate::tools_dir().map_or_else(Self::default, |dir| Self::read_from(&dir))
+    }
+    pub(crate) fn read_from(dir: &Path) -> Self {
+        std::fs::read(dir.join("video-preferences.json"))
+            .ok()
             .and_then(|b| serde_json::from_slice(&b).ok())
             .unwrap_or_default()
     }
@@ -78,10 +82,16 @@ impl Preferences {
         self.validate()?;
         let dir = crate::tools_dir()
             .ok_or_else(|| io::Error::other("Orbit's tools folder is unavailable"))?;
-        std::fs::create_dir_all(&dir)?;
-        let temp = dir.join("video-preferences.json.tmp");
-        std::fs::write(&temp, serde_json::to_vec_pretty(self)?)?;
-        std::fs::rename(temp, dir.join("video-preferences.json"))
+        let mut preferences = self.clone();
+        preferences.deno_path = Self::read_from(&dir).deno_path;
+        preferences.save_to(&dir)
+    }
+    pub(crate) fn save_to(&self, dir: &Path) -> io::Result<()> {
+        std::fs::create_dir_all(dir)?;
+        craft_atomic::atomic_write(
+            &dir.join("video-preferences.json"),
+            &serde_json::to_vec_pretty(self)?,
+        )
     }
     pub fn validate(&self) -> io::Result<()> {
         if self.quality >= HEIGHTS.len()
@@ -99,11 +109,6 @@ impl Preferences {
         {
             return Err(io::Error::other(
                 "Enter subtitle language codes separated by commas",
-            ));
-        }
-        if !self.deno_path.trim().is_empty() && !Path::new(self.deno_path.trim()).is_file() {
-            return Err(io::Error::other(
-                "The selected Deno executable does not exist",
             ));
         }
         Ok(())
@@ -136,17 +141,16 @@ impl Preferences {
             }
         )
     }
-    pub fn profile(&self, use_file: bool) -> io::Result<crate::config::Profile> {
-        let mut args = Vec::new();
-        if !self.deno_path.trim().is_empty() {
-            args.extend([
-                "--js-runtimes".into(),
-                format!("deno:{}", self.deno_path.trim()),
-            ]);
-        }
+    pub(crate) fn runtime_args(&self) -> Vec<String> {
         if self.remote_ejs {
-            args.extend(["--remote-components".into(), "ejs:github".into()]);
+            vec!["--remote-components".into(), "ejs:github".into()]
+        } else {
+            Vec::new()
         }
+    }
+
+    pub fn profile(&self, use_file: bool) -> io::Result<crate::config::Profile> {
+        let mut args = self.runtime_args();
         args.extend([
             "--merge-output-format".into(),
             self.container.clone(),

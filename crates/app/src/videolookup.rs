@@ -1508,7 +1508,9 @@ mod tests {
             notice
                 .url
                 .starts_with("https://github.com/mthlpbs/Orbit-Download-Manager/")
-                && notice.url.ends_with("/blob/main/docs/video.md#javascript-runtime"),
+                && notice
+                    .url
+                    .ends_with("/blob/main/docs/video.md#javascript-runtime"),
             "{}",
             notice.url
         );

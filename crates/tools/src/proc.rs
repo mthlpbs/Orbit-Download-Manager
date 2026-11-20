@@ -195,6 +195,22 @@ fn refused_with_cookies(url: &str, message: &str) -> bool {
         || (crate::youtube::is_youtube(url) && crate::youtube::refused_signed_in(message))
 }
 
+fn retry_cookie_lookup(
+    ours: &[String],
+    configured: &[String],
+    chosen: Option<&BrowserCookies>,
+    url: &str,
+    message: &str,
+) -> bool {
+    let uses_config_cookies = configured
+        .iter()
+        .any(|a| a == "--cookies" || a == "--cookies-from-browser");
+    !uses_config_cookies
+        && with_cookies(ours, chosen)
+        && (refused_with_cookies(url, message)
+            || (!browser_cookie_args(ours, chosen).is_empty() && cookie_trouble(message)))
+}
+
 /// A page's `-J` output, whether it took looking the page up without cookies, and yt-dlp's
 /// `WARNING:` lines on the way (#852: the one saying it has no JavaScript runtime).
 pub struct LookedUp {
@@ -234,10 +250,17 @@ pub fn look_up(
             without_cookies: false,
             warnings,
         }),
-        Err(first)
-            if with_cookies(ours, browser_cookies().as_ref())
-                && refused_with_cookies(url, &first.to_string()) =>
-        {
+        Err(first) => {
+            let configured = crate::config::profile().unwrap_or_default();
+            if !retry_cookie_lookup(
+                ours,
+                &configured.args,
+                browser_cookies().as_ref(),
+                url,
+                &first.to_string(),
+            ) {
+                return Err(first);
+            }
             match run(&without_cookies(ours)) {
                 Ok((json, warnings)) => {
                     tracing::info!(
@@ -257,7 +280,6 @@ pub fn look_up(
                 }
             }
         }
-        Err(e) => Err(e),
     }
 }
 
@@ -1065,6 +1087,15 @@ fn with_usable_path(cmd: &mut Command) {
 /// be run, cached for the session). Kept once found; while there is none it is looked for again
 /// at each run, so one installed meanwhile counts at the next look-up (#852).
 fn js_runtime_found(exe: &Path) -> Option<Vec<String>> {
+    if let Some(deno) = crate::tools_dir()
+        .as_deref()
+        .and_then(crate::deno::installed)
+    {
+        return Some(vec![
+            "--js-runtimes".into(),
+            format!("deno:{}", deno.exe.display()),
+        ]);
+    }
     static FOUND: Mutex<Option<Vec<String>>> = Mutex::new(None);
     let mut found = FOUND
         .lock()
@@ -2276,6 +2307,25 @@ foreach ($d in $env:PATH.Split(';')) {
     /// site's with no format left (#352); on YouTube only, its refusals of a signed-in viewer,
     /// in yt-dlp's real words (`tests/fixtures/ytdlp-refusals`), never a video that needs the
     /// sign-in.
+    #[test]
+    fn an_unreadable_browser_store_allows_a_public_lookup_retry() {
+        let browser = BrowserCookies::new("chrome", "").unwrap();
+        let url = "https://videos.example/watch";
+        let error = "ERROR: Could not copy Chrome cookie database";
+        assert!(retry_cookie_lookup(&[], &[], Some(&browser), url, error));
+        assert!(!retry_cookie_lookup(&[], &[], None, url, error));
+        let file = ["--cookies".into(), "cookies.txt".into()];
+        assert!(!retry_cookie_lookup(&file, &[], Some(&browser), url, error));
+        assert!(!retry_cookie_lookup(&[], &file, Some(&browser), url, error));
+        assert!(!retry_cookie_lookup(
+            &without_cookies(&[]),
+            &[],
+            Some(&browser),
+            url,
+            error
+        ));
+    }
+
     #[test]
     fn a_look_up_refused_with_cookies_is_made_without_them_on_youtube_only() {
         let error = |stderr: &str| {

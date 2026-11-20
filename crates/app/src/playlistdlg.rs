@@ -332,20 +332,20 @@ impl PlaylistView {
 
     /// The status line, up to English x `status` (none: a helper's install has the line), then
     /// the checklist and its buttons, between the address and Save to.
-    pub fn middle(&mut self, ui: &mut Ui, o: Pos2, status: Option<f32>) {
+    pub fn middle(&mut self, ui: &mut Ui, o: Pos2, width: f32, height: f32) {
         self.take(ui.ctx());
-        if let Some(right) = status {
-            self.status_line(ui, o, right);
-        }
-        self.notes(ui, o);
-        self.checklist(ui, o);
-        self.buttons(ui, o, self.entries.len());
+        let right = width - 11.0;
+        let buttons_y = height - 32.0;
+        self.status_line(ui, o, right);
+        self.notes(ui, o, right);
+        self.checklist(ui, o, width, buttons_y - 68.0);
+        self.buttons(ui, o, self.entries.len(), buttons_y, right);
     }
 
     /// Listing (a spinner, how far) or listed (the title, how many).
     fn status_line(&self, ui: &mut Ui, o: Pos2, right: f32) {
         let p = ui.painter().clone();
-        let line_y = o.y + 70.0;
+        let line_y = o.y + 38.0;
         let n = self.entries.len();
         let status = if self.listing.is_some() {
             crate::torrentdlg::spinner(ui, pos2(o.x + 18.0, line_y - 4.0), 6.0);
@@ -412,7 +412,7 @@ impl PlaylistView {
     }
 
     /// Why nothing is listed, or that the list was cut at the most MDM lists.
-    fn notes(&self, ui: &mut Ui, o: Pos2) {
+    fn notes(&self, ui: &mut Ui, o: Pos2, right: f32) {
         let p = ui.painter().clone();
         let (text, color) = if let Some(e) = &self.error {
             (e.clone(), winui::ERROR())
@@ -433,17 +433,17 @@ impl PlaylistView {
             ui,
             &p,
             o.x + 11.0,
-            o.y + 86.0,
+            o.y + 54.0,
             &text,
             color,
-            o.x + 489.0,
+            o.x + right,
             "playlist-note",
         );
         winui::readable(ui, rc, "playlist-note", &text);
     }
 
     /// The checklist: only the rows in view are drawn, whatever the list's length.
-    fn checklist(&mut self, ui: &mut Ui, o: Pos2) {
+    fn checklist(&mut self, ui: &mut Ui, o: Pos2, width: f32, height: f32) {
         let n = self.entries.len();
         // i18n: what a screen reader calls the list of a playlist's videos
         self.rows.name = crate::i18n::t("Videos");
@@ -454,7 +454,7 @@ impl PlaylistView {
         let ev = winui::row_list(
             ui,
             "playlist-rows",
-            r(o, 11.0, 94.0, 478.0, 120.0),
+            r(o, 11.0, 62.0, width - 22.0, height),
             n,
             17.0,
             &mut self.rows,
@@ -514,7 +514,7 @@ impl PlaylistView {
     }
 
     /// Select all, Select none; Stop listing or Load more; how many are chosen.
-    fn buttons(&mut self, ui: &mut Ui, o: Pos2, n: usize) {
+    fn buttons(&mut self, ui: &mut Ui, o: Pos2, n: usize, y: f32, right: f32) {
         let p = ui.painter().clone();
         // i18n: button in Download video for a channel: list its next videos
         let load_more = crate::i18n::mark("Load more");
@@ -541,7 +541,7 @@ impl PlaylistView {
         };
         let all = winui::button(
             ui,
-            r(o, all_at.0, 222.0, all_at.1, 21.0),
+            r(o, all_at.0, y, all_at.1, 21.0),
             // i18n: button in Download video for a playlist: tick every video
             "Select all",
             ButtonKind::Normal,
@@ -551,7 +551,7 @@ impl PlaylistView {
         .clicked();
         let none = winui::button(
             ui,
-            r(o, none_at.0, 222.0, none_at.1, 21.0),
+            r(o, none_at.0, y, none_at.1, 21.0),
             // i18n: button in Download video for a playlist: untick every video
             "Select none",
             ButtonKind::Normal,
@@ -569,7 +569,7 @@ impl PlaylistView {
         if self.listing.is_some() {
             if winui::button(
                 ui,
-                r(o, third_at.0, 222.0, third_at.1, 21.0),
+                r(o, third_at.0, y, third_at.1, 21.0),
                 stop,
                 ButtonKind::Normal,
                 false,
@@ -586,7 +586,7 @@ impl PlaylistView {
         } else if self.more
             && winui::button(
                 ui,
-                r(o, third_at.0, 222.0, third_at.1, 21.0),
+                r(o, third_at.0, y, third_at.1, 21.0),
                 third,
                 ButtonKind::Normal,
                 false,
@@ -606,7 +606,7 @@ impl PlaylistView {
                 ("total", &crate::i18n::integer(n as u64)),
             ],
         );
-        winui::text_right(&p, o.x + 489.0, o.y + 236.0, &chosen, winui::MUTED());
+        winui::text_right(&p, o.x + right, o.y + y + 14.0, &chosen, winui::MUTED());
     }
 
     /// The Quality drop-down (where a single video has its File name).

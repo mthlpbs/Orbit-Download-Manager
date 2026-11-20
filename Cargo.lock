@@ -4805,6 +4805,7 @@ dependencies = [
  "tracing",
  "url",
  "win32job",
+ "windows-registry",
  "zip",
 ]
 
