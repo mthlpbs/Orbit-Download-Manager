@@ -1053,7 +1053,7 @@ fn usable_dir(dir: &Path) -> Option<PathBuf> {
 
 /// A junction, a link or a mounted volume's folder.
 #[cfg(windows)]
-fn reparse_point(p: &Path) -> bool {
+pub(crate) fn reparse_point(p: &Path) -> bool {
     use std::os::windows::fs::MetadataExt;
     const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
     std::fs::symlink_metadata(p)
@@ -1063,7 +1063,7 @@ fn reparse_point(p: &Path) -> bool {
 /// `\\?\C:\x` as `C:\x` and `\\?\UNC\server\share` as `\\server\share`, the way PATH writes
 /// them (`canonicalize` gives the long forms).
 #[cfg(windows)]
-fn without_verbatim(p: PathBuf) -> PathBuf {
+pub(crate) fn without_verbatim(p: PathBuf) -> PathBuf {
     let s = p.to_string_lossy();
     if let Some(unc) = s.strip_prefix(r"\\?\UNC\") {
         return PathBuf::from(format!(r"\\{unc}"));

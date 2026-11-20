@@ -149,11 +149,95 @@ fn date_digits(http: &str) -> Option<String> {
 
 /// The ffmpeg to use: an explicit choice, then an existing system install, then Orbit's copy
 /// (`dir/ffmpeg/current.json`).
-/// yt-dlp is given the executable path, including when the custom filename differs.
+/// Resolve a launcher or link to the executable yt-dlp can run.
 pub fn installed(dir: &Path) -> Option<Installed> {
-    crate::chosen::chosen(dir, crate::chosen::Helper::Ffmpeg)
-        .or_else(|| crate::system::installed("ffmpeg"))
-        .or_else(|| own(dir))
+    chosen(dir)
+        .or_else(|| crate::system::installed("ffmpeg").and_then(resolved))
+        .or_else(|| own(dir).and_then(resolved))
+}
+
+fn chosen(dir: &Path) -> Option<Installed> {
+    crate::chosen::configured(dir, crate::chosen::Helper::Ffmpeg).and_then(resolved)
+}
+
+fn resolved(mut tool: Installed) -> Option<Installed> {
+    tool.exe = location(&tool.exe);
+    tool.exe.is_file().then_some(tool)
+}
+
+/// Path to pass to yt-dlp, which launches FFmpeg and looks for FFprobe beside it.
+/// Resolve plain Scoop shims through their sidecar and avoid passing a junction to a
+/// child process with stricter Windows traversal rules.
+pub(crate) fn location(path: &Path) -> PathBuf {
+    let path = crate::workdir::absolute(path);
+    #[cfg(windows)]
+    {
+        let path = scoop_target(&path).unwrap_or(path);
+        if let Ok(real) = std::fs::canonicalize(&path) {
+            return crate::proc::without_verbatim(real);
+        }
+        scoop_version_path(&path).unwrap_or(path)
+    }
+    #[cfg(not(windows))]
+    path
+}
+
+#[cfg(windows)]
+fn scoop_target(path: &Path) -> Option<PathBuf> {
+    if !path.is_file()
+        || !path.extension()?.eq_ignore_ascii_case("exe")
+        || !path.parent()?.file_name()?.eq_ignore_ascii_case("shims")
+    {
+        return None;
+    }
+    let shim = std::fs::read_to_string(path.with_extension("shim")).ok()?;
+    let mut fields = shim
+        .trim_start_matches('\u{feff}')
+        .lines()
+        .map(str::trim)
+        .filter(|line| {
+            !line.is_empty() && !line.starts_with(['#', ';']) && !line.starts_with("//")
+        });
+    let (name, target) = fields.next()?.split_once('=')?;
+    // Launchers with custom arguments or environment settings still need the launcher.
+    if !name.trim().eq_ignore_ascii_case("path") || fields.next().is_some() {
+        return None;
+    }
+    let target = target.trim();
+    let target = target
+        .strip_prefix('"')
+        .and_then(|s| s.strip_suffix('"'))
+        .unwrap_or(target);
+    let target = PathBuf::from(target);
+    target.is_absolute().then_some(target)
+}
+
+/// Scoop's `current` names a version directory in the same package. On Windows with
+/// Redirection Guard, opening the executable through a user-created junction can fail even
+/// though the version directory and the executable are accessible by their own names.
+#[cfg(windows)]
+fn scoop_version_path(path: &Path) -> Option<PathBuf> {
+    let current = path.ancestors().find(|dir| {
+        dir.file_name()
+            .is_some_and(|name| name.eq_ignore_ascii_case("current"))
+    })?;
+    let package = current.parent()?;
+    if !package.parent()?.file_name()?.eq_ignore_ascii_case("apps") {
+        return None;
+    }
+    // Read the junction itself. Only accept a concrete sibling under the same Scoop package.
+    let installed = crate::proc::without_verbatim(std::fs::read_link(current).ok()?);
+    if installed.parent()? != package
+        || installed.file_name()?.eq_ignore_ascii_case("current")
+        || !std::fs::symlink_metadata(&installed).ok()?.is_dir()
+        || crate::proc::reparse_point(&installed)
+    {
+        return None;
+    }
+    let exe = installed.join(path.strip_prefix(current).ok()?);
+    std::fs::canonicalize(exe)
+        .ok()
+        .map(crate::proc::without_verbatim)
 }
 
 /// MDM's own install in `dir`.
@@ -172,7 +256,7 @@ pub async fn install_latest(
     progress: Option<&crate::update::Progress>,
 ) -> Result<Installed, Error> {
     // The person's own copy: theirs to update (#51).
-    if let Some(mine) = crate::chosen::chosen(dir, crate::chosen::Helper::Ffmpeg) {
+    if let Some(mine) = chosen(dir) {
         return Ok(mine);
     }
     let Some(build) = build() else {
@@ -315,6 +399,36 @@ fn unpack(zip_path: &Path, root: &Path, version: &str, from: &str) -> Result<Pat
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn scoop_launcher_resolves_to_ffmpeg_beside_ffprobe() {
+        let dir = tempfile::tempdir().unwrap();
+        let shims = dir.path().join("shims");
+        let bin = dir.path().join("FFmpeg Nightly/bin");
+        std::fs::create_dir_all(&shims).unwrap();
+        std::fs::create_dir_all(&bin).unwrap();
+        let shim = shims.join("ffmpeg.exe");
+        let exe = bin.join("ffmpeg.exe");
+        for file in [&shim, &exe, &bin.join("ffprobe.exe")] {
+            std::fs::write(file, []).unwrap();
+        }
+        let sidecar = shim.with_extension("shim");
+        let path = format!("\u{feff}path = \"{}\"\r\n", exe.display());
+        std::fs::write(&sidecar, &path).unwrap();
+        assert_eq!(location(&shim), location(&exe));
+        assert!(location(&shim).with_file_name("ffprobe.exe").is_file());
+
+        std::fs::write(&sidecar, format!("{path}args = -hide_banner\r\n")).unwrap();
+        assert_eq!(scoop_target(&shim), None, "keep configured shim behavior");
+        std::fs::write(&sidecar, &path).unwrap();
+        std::fs::remove_file(&exe).unwrap();
+        assert_eq!(
+            location(&shim),
+            exe,
+            "do not use a shim whose target is gone"
+        );
+    }
 
     fn line(name: &str) -> Option<&str> {
         stable_line(name, "win64")

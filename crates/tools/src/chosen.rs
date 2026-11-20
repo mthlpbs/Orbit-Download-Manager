@@ -99,7 +99,13 @@ fn slot(p: &mut Programs, h: Helper) -> &mut Option<Installed> {
 
 /// The program the person chose for `h`, if any and still there.
 pub fn chosen(dir: &Path, h: Helper) -> Option<Installed> {
-    configured(dir, h).filter(|i| i.exe.is_file())
+    configured(dir, h).filter(|i| {
+        if h == Helper::Ffmpeg {
+            crate::ffmpeg::location(&i.exe).is_file()
+        } else {
+            i.exe.is_file()
+        }
+    })
 }
 
 pub(crate) fn configured(dir: &Path, h: Helper) -> Option<Installed> {
@@ -148,7 +154,11 @@ pub fn ask(h: Helper, exe: &Path) -> Result<Installed, Error> {
 
 /// What `exe` says its version is, asked as `h` asks it; not `h` if it doesn't answer as `h`.
 fn version_of(h: Helper, exe: &Path) -> Result<String, Error> {
-    let mut cmd = Command::new(exe);
+    let mut cmd = if h == Helper::Ffmpeg {
+        Command::new(crate::ffmpeg::location(exe))
+    } else {
+        Command::new(exe)
+    };
     cmd.arg(match h {
         Helper::YtDlp | Helper::GalleryDl | Helper::Deno => "--version",
         Helper::Ffmpeg => "-version",

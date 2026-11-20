@@ -2026,10 +2026,11 @@ impl VideoJob {
         retry_base.extend(theirs.iter().cloned());
         ours.extend(theirs.iter().cloned());
         choose.extend(theirs.iter().cloned());
-        if let Some(dir) = ffmpeg {
+        if let Some(exe) = ffmpeg {
+            let location = crate::ffmpeg::location(exe).to_string_lossy().into_owned();
             let merge = [
                 "--ffmpeg-location".into(),
-                dir.to_string_lossy().into_owned(),
+                location.clone(),
                 "--merge-output-format".into(),
                 crate::config::profile()
                     .ok()
@@ -2038,10 +2039,7 @@ impl VideoJob {
             ];
             ours.extend(merge.clone());
             choose.extend(merge);
-            retry_base.extend([
-                "--ffmpeg-location".into(),
-                dir.to_string_lossy().into_owned(),
-            ]);
+            retry_base.extend(["--ffmpeg-location".into(), location]);
         }
         // With the engine, every HLS stream is yt-dlp's hlsnative's (`--hls-prefer-native`): the
         // engine joins its pieces as hlsnative does, and yt-dlp's fixups after it then follow
