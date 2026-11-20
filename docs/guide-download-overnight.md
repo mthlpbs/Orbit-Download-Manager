@@ -2,7 +2,7 @@
 
 [← Back to docs index](README.md)
 
-Queue big files during the day and let MDM download them at night, when nobody needs the connection. It can turn the computer off when it is done.
+Queue big files during the day and let ODM download them at night, when nobody needs the connection. It can turn the computer off when it is done.
 
 ## 1. Put the downloads in a queue
 
@@ -43,17 +43,17 @@ The **Q** column now shows a queue icon for each of them.
 
 Back on the **Schedule** tab:
 
-- Tick **Turn off computer when done** and choose **Shut down**, **Sleep** or **Hibernate**. MDM shows a 30-second countdown first, so you can still cancel if you're at the computer.
+- Tick **Turn off computer when done** and choose **Shut down**, **Sleep** or **Hibernate**. ODM shows a 30-second countdown first, so you can still cancel if you're at the computer.
 - Or tick **Exit Orbit Download Manager when done**.
 
 ![The Scheduler's choices for when the queue is done, Turn off computer when done among them](images/help/overnight-done.webp)
-*When the queue is done: open a file, quit MDM, or turn the computer off.*
+*When the queue is done: open a file, quit ODM, or turn the computer off.*
 
-## 5. Apply and leave MDM running
+## 5. Apply and leave ODM running
 
 1. Click **Apply**, then **Close**.
-2. Leave MDM running. Closing the main window is fine: MDM keeps going in the tray. Don't use **Tasks → Exit**.
-3. Make sure the computer doesn't go to sleep before the start time. Once the downloads are running, MDM keeps the computer from going to sleep by itself until they're done; the screen still turns off as usual.
+2. Leave ODM running. Closing the main window is fine: ODM keeps going in the tray. Don't use **Tasks → Exit**.
+3. Make sure the computer doesn't go to sleep before the start time. Once the downloads are running, ODM keeps the computer from going to sleep by itself until they're done; the screen still turns off as usual.
 
 At the start time the queue starts on its own. In the morning, the finished files are under **Finished** in the categories.
 

@@ -1,4 +1,4 @@
-//! What the shell says of MDM's notification-area icon, asked off the window's thread (#747).
+//! What the shell says of ODM's notification-area icon, asked off the window's thread (#747).
 //! Windows' questions about an icon wait for Explorer: for seconds when it is busy (8 s in #747,
 //! the window frozen meanwhile). So a thread of its own asks ([`Watch`]), every [`EVERY`], and
 //! sets the icon's tip too; the window takes the last answer ([`Watch::latest`]), which never
@@ -8,8 +8,8 @@
 //! No answer is not an answer: none yet, one too old ([`STALE`]: the shell stopped answering) or
 //! one being written as the window looks ([`Icon::Unknown`]) never decides that the icon is gone.
 //! Only the shell saying so does ([`Icon::Gone`]): no taskbar at all (Explorer isn't running), or
-//! a taskbar that answers and has no icon of MDM's, in any place. A window hidden while the answer
-//! is unknown can still come back: from the icon once it answers, and a second start of MDM always
+//! a taskbar that answers and has no icon of ODM's, in any place. A window hidden while the answer
+//! is unknown can still come back: from the icon once it answers, and a second start of ODM always
 //! brings the window back (`App::handle_command`).
 
 // The watcher asks Windows' shell; elsewhere only the answers' meaning is used (macOS asks the
@@ -26,7 +26,7 @@ pub const EVERY: Duration = Duration::from_secs(2);
 /// give the next (three questions' time).
 pub const STALE: Duration = Duration::from_secs(6);
 
-/// How long a running shell must have said, answer after answer, that it has no icon of MDM's
+/// How long a running shell must have said, answer after answer, that it has no icon of ODM's
 /// before a window hidden in the notification area comes back to the taskbar: longer than
 /// Explorer takes to start again and be given the icon back (`TaskbarCreated`).
 pub const RESCUE_AFTER: Duration = Duration::from_secs(10);
@@ -64,7 +64,7 @@ pub enum Icon {
     There,
     /// No answer, or none recent: nothing is concluded either way.
     Unknown,
-    /// The shell said it has no icon of MDM's, or there is no taskbar.
+    /// The shell said it has no icon of ODM's, or there is no taskbar.
     Gone,
 }
 
@@ -93,7 +93,7 @@ pub fn icon(seen: Option<Seen>, now: Instant) -> Icon {
 }
 
 /// Whether a window hidden in the notification area comes back to the taskbar (minimized): only
-/// once a running shell has said for [`RESCUE_AFTER`] that it has no icon of MDM's. Never on no
+/// once a running shell has said for [`RESCUE_AFTER`] that it has no icon of ODM's. Never on no
 /// answer, an old one, or while there is no taskbar: Explorer gives the icon back as it starts
 /// again, and a window brought out then would only be in the way.
 pub fn rescue(seen: Option<Seen>, now: Instant) -> bool {
@@ -435,7 +435,7 @@ mod tests {
         let start = Instant::now();
         for _ in 0..10_000 {
             assert_eq!(w.latest(), None);
-            assert!(w.tip("MDM"));
+            assert!(w.tip("ODM"));
             assert_eq!(icon(w.latest(), Instant::now()), Icon::Unknown);
         }
         drop(w);
@@ -458,7 +458,7 @@ mod tests {
         assert_eq!(w.latest(), None);
         assert_eq!(icon(w.latest(), Instant::now()), Icon::Unknown);
         assert!(
-            !w.tip("MDM"),
+            !w.tip("ODM"),
             "a busy watch takes the tip at the next frame"
         );
     }
@@ -472,7 +472,7 @@ mod tests {
         let w = Watch::every(QUICK, port, move || {
             let _ = woke.send(());
         });
-        tip(&w, "MDM 1");
+        tip(&w, "ODM 1");
         // Not held yet: no tip set.
         was_asked.recv_timeout(Duration::from_secs(5)).unwrap();
         answer.send(NONE).unwrap();
@@ -485,7 +485,7 @@ mod tests {
         woken.recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(
             tipped.recv_timeout(Duration::from_secs(5)).unwrap(),
-            "MDM 1"
+            "ODM 1"
         );
         // The same answer again: no wake, and the tip isn't sent again.
         was_asked.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -493,12 +493,12 @@ mod tests {
         assert!(woken.recv_timeout(Duration::from_millis(300)).is_err());
         assert!(tipped.try_recv().is_err());
         // A new tip goes with the next answer.
-        tip(&w, "MDM 2");
+        tip(&w, "ODM 2");
         was_asked.recv_timeout(Duration::from_secs(5)).unwrap();
         answer.send(HELD).unwrap();
         assert_eq!(
             tipped.recv_timeout(Duration::from_secs(5)).unwrap(),
-            "MDM 2"
+            "ODM 2"
         );
         // The icon lost and added back (Explorer started again): the tip is set again.
         was_asked.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -508,7 +508,7 @@ mod tests {
         answer.send(HELD).unwrap();
         assert_eq!(
             tipped.recv_timeout(Duration::from_secs(5)).unwrap(),
-            "MDM 2"
+            "ODM 2"
         );
     }
 

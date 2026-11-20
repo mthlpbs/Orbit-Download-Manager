@@ -9,7 +9,7 @@ use std::process::{Command, Stdio};
 const LAUNCHER: &str = env!("CARGO_BIN_EXE_orbitdownloadmanager-cli");
 
 fn main() {
-    if let Some(launch) = mdm_cli::launched(std::env::args_os().collect()) {
+    if let Some(launch) = odm_cli::launched(std::env::args_os().collect()) {
         let mut input = String::new();
         std::io::stdin().read_to_string(&mut input).unwrap();
         println!("args {:?}", launch.args);

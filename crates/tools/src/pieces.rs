@@ -1,6 +1,6 @@
-//! A stream in pieces downloaded by MDM's engine (#769): HLS (yt-dlp's `m3u8_native`) and DASH
+//! A stream in pieces downloaded by ODM's engine (#769): HLS (yt-dlp's `m3u8_native`) and DASH
 //! (`http_dash_segments`), brought in as yt-dlp's own downloaders for them (hlsnative,
-//! dashsegments) do, by MDM: the pieces listed (an HLS media playlist read as hlsnative reads it,
+//! dashsegments) do, by ODM: the pieces listed (an HLS media playlist read as hlsnative reads it,
 //! DASH's from yt-dlp's `fragments`), downloaded several at once (as many as Options →
 //! Connection gives a file) over the engine's connections (proxy, network adapter, DNS), under
 //! the speed limits, each kept on disk once whole so that a stop goes on from the pieces there,
@@ -27,9 +27,9 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use mdm_engine::browserlike::{self, Connection};
-use mdm_engine::download::{ConnStatus, ConnView, SegmentView};
-use mdm_engine::limiter::Limiter;
+use odm_engine::browserlike::{self, Connection};
+use odm_engine::download::{ConnStatus, ConnView, SegmentView};
+use odm_engine::limiter::Limiter;
 use reqwest::header::{HeaderMap, HeaderValue, RANGE};
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
@@ -51,7 +51,7 @@ pub struct Key {
     pub iv: [u8; 16],
 }
 
-/// Why a playlist's pieces can't be MDM's to download.
+/// Why a playlist's pieces can't be ODM's to download.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Unlisted {
     /// No end yet: a live stream still being recorded.
@@ -301,11 +301,9 @@ pub enum Target {
     Files(Vec<PathBuf>),
 }
 
-/// Where a stream's pieces wait until they are joined: `<file>.mdm.pieces`.
+/// Where a stream's pieces wait until they are joined: `<file>.odm.pieces`.
 pub fn folder(path: &Path) -> PathBuf {
-    let mut s = path.as_os_str().to_owned();
-    s.push(".mdm.pieces");
-    PathBuf::from(s)
+    odm_engine::state::artifact_path(path, "pieces")
 }
 
 /// A piece's file in the folder: `<index>` once whole.
@@ -433,7 +431,7 @@ struct Run {
     /// goes on it from then on (#1289).
     browser: Mutex<Option<Connection>>,
     /// The engine's options, the browser-like connection's (its proxy, DNS, adapter).
-    opts: mdm_engine::Options,
+    opts: odm_engine::Options,
     headers: HeaderMap,
     pieces: Mutex<Vec<Piece>>,
     /// Bumped when the list is asked again: a piece of an older list asks again with the new.
@@ -467,7 +465,7 @@ pub async fn download(
     pieces: Vec<Piece>,
     target: Target,
     headers: HeaderMap,
-    opts: mdm_engine::Options,
+    opts: odm_engine::Options,
     limiter: Arc<Limiter>,
     cancel: CancellationToken,
     shared: Arc<Shared>,
@@ -496,7 +494,7 @@ pub async fn download(
     let Some(first) = pieces.first() else {
         return Ended::Failed("no pieces".into());
     };
-    let client = match mdm_engine::http_client(&opts, &first.url) {
+    let client = match odm_engine::http_client(&opts, &first.url) {
         Ok(c) => c,
         Err(e) => return Ended::Failed(e.to_string()),
     };
@@ -613,7 +611,7 @@ pub async fn download(
 /// the folder removed. The file's size.
 fn join(dir: &Path, n: usize, path: &Path) -> std::io::Result<u64> {
     use std::io::Write;
-    let part = mdm_engine::naming::part_path(path);
+    let part = odm_engine::naming::part_path(path);
     let mut out = std::io::BufWriter::new(std::fs::File::create(&part)?);
     let mut size = 0;
     for i in 0..n {
@@ -851,7 +849,7 @@ fn retry_after(headers: &HeaderMap) -> Option<Duration> {
         .map(Duration::from_secs)
 }
 
-/// An answer on MDM's own connection or on the browser-like one (#1289).
+/// An answer on ODM's own connection or on the browser-like one (#1289).
 enum Answer {
     Http(reqwest::Response),
     Browser(browserlike::Answer),
@@ -921,7 +919,7 @@ impl Run {
     }
 }
 
-/// `url` (its part `range`) asked on the connection the pieces go on: MDM's own, or the
+/// `url` (its part `range`) asked on the connection the pieces go on: ODM's own, or the
 /// browser-like one once a piece needed it. A refusal as a program's (`refuses_programs`) is
 /// asked again the way a browser connects (#1289). The answer as it came, whatever its status;
 /// a refusal of the browser-like connection too is `PieceError::Refused`.
@@ -957,7 +955,7 @@ async fn ask(
     };
     let answer = match browser.get(url.clone(), headers, &run.cancel).await {
         Ok(a) => a,
-        Err(mdm_engine::Error::Cancelled) => return Err(PieceError::Stopped),
+        Err(odm_engine::Error::Cancelled) => return Err(PieceError::Stopped),
         Err(e) => return Err(PieceError::Again(format!("{what}: {e}"))),
     };
     if browserlike::refuses_programs(answer.status, &answer.headers) {
@@ -1044,11 +1042,7 @@ async fn fetch_piece(run: &Run, c: usize, i: usize, piece: &Piece) -> Result<(),
         None => body,
     };
     let file = run.file(i);
-    let part = {
-        let mut s = file.as_os_str().to_owned();
-        s.push(".mdm.part");
-        PathBuf::from(s)
-    };
+    let part = odm_engine::naming::part_path(&file);
     let size = data.len() as u64;
     let written = tokio::task::spawn_blocking(move || {
         std::fs::write(&part, &data).and_then(|_| std::fs::rename(&part, &file))
@@ -1284,7 +1278,7 @@ mod tests {
     fn a_busy_server_gets_fewer_connections() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let lab = rt
-            .block_on(mdm_labserver::LabServer::start(Default::default()))
+            .block_on(odm_labserver::LabServer::start(Default::default()))
             .unwrap();
         let dir = tempfile::tempdir().unwrap();
         let n = 6u64;
@@ -1303,7 +1297,7 @@ mod tests {
             .map(|i| dir.path().join(format!("{i}.jpg")))
             .collect();
         let shared = Arc::new(Shared::default());
-        let opts = mdm_engine::Options {
+        let opts = odm_engine::Options {
             max_connections: 4,
             retry_delay: Duration::from_millis(50),
             ..Default::default()
@@ -1322,7 +1316,7 @@ mod tests {
         assert!(matches!(ended, Ended::Done(_)), "{ended:?}");
         for (i, p) in paths.iter().enumerate() {
             let mut want = vec![0; 128 * 1024];
-            mdm_labserver::content::fill(40 + i as u64, 0, &mut want);
+            odm_labserver::content::fill(40 + i as u64, 0, &mut want);
             assert!(std::fs::read(p).unwrap() == want, "file {i}");
         }
         let notes = shared.take_notes();
@@ -1334,7 +1328,7 @@ mod tests {
 
     /// An HLS playlist's pieces from the lab server, each 96 KiB with the seed 100 + its index
     /// and `faults` of its own, and what they join into.
-    fn lab_playlist(lab: &mdm_labserver::LabServer, n: u64, faults: &str) -> (Vec<Piece>, Vec<u8>) {
+    fn lab_playlist(lab: &odm_labserver::LabServer, n: u64, faults: &str) -> (Vec<Piece>, Vec<u8>) {
         let mut text = "#EXTM3U\n#EXT-X-TARGETDURATION:4\n".to_owned();
         let mut whole = Vec::new();
         for i in 0..n {
@@ -1343,7 +1337,7 @@ mod tests {
                 100 + i
             ));
             let mut piece = vec![0; 96 * 1024];
-            mdm_labserver::content::fill(100 + i, 0, &mut piece);
+            odm_labserver::content::fill(100 + i, 0, &mut piece);
             whole.extend_from_slice(&piece);
         }
         text.push_str("#EXT-X-ENDLIST\n");
@@ -1369,7 +1363,7 @@ mod tests {
             })
         };
         let shared = Arc::new(Shared::default());
-        let opts = mdm_engine::Options {
+        let opts = odm_engine::Options {
             max_connections: connections,
             retry_delay: Duration::from_millis(50),
             ..Default::default()
@@ -1394,7 +1388,7 @@ mod tests {
     /// way from the start, several at once; the list isn't asked for again.
     ///
     /// Run where the engine has the connection (`cargo test` of the workspace, whose app asks
-    /// for it, or with `-p mdm-engine` beside `-p mdm-tools`); skipped without it.
+    /// for it, or with `-p odm-engine` beside `-p odm-tools`); skipped without it.
     #[test]
     fn pieces_behind_a_bot_check_come_the_way_a_browser_connects() {
         if !browserlike::AVAILABLE {
@@ -1403,7 +1397,7 @@ mod tests {
         }
         let rt = tokio::runtime::Runtime::new().unwrap();
         let lab = rt
-            .block_on(mdm_labserver::LabServer::start(Default::default()))
+            .block_on(odm_labserver::LabServer::start(Default::default()))
             .unwrap();
         let (list, whole) = lab_playlist(&lab, 8, "browser_only=1&rate=1M");
         let dir = tempfile::tempdir().unwrap();
@@ -1451,7 +1445,7 @@ mod tests {
     fn an_expired_piece_is_listed_again() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let lab = rt
-            .block_on(mdm_labserver::LabServer::start(Default::default()))
+            .block_on(odm_labserver::LabServer::start(Default::default()))
             .unwrap();
         let (expired, _) = lab_playlist(&lab, 4, "refuse=403");
         let (fresh, whole) = lab_playlist(&lab, 4, "rate=4M");

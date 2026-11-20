@@ -9,7 +9,7 @@ pub const REPO: &str = "mthlpbs/Orbit-Download-Manager";
 /// to fit (the full one goes in as the attached file).
 pub const URL_BUDGET: usize = 7000;
 
-/// The form's fields MDM fills, besides the report: (field id, value).
+/// The form's fields ODM fills, besides the report: (field id, value).
 pub type Fields = Vec<(&'static str, String)>;
 
 fn enc(s: &str) -> String {

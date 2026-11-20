@@ -1,5 +1,5 @@
 [package]
-name = "mdm-app"
+name = "odm-app"
 description = "Orbit Download Manager, desktop app (egui)"
 version.workspace = true
 edition.workspace = true
@@ -15,14 +15,14 @@ path = "src/main.rs"
 
 [features]
 default = ["browser-connection"]
-# The engine's browser-like connection (#668), for sites that refuse MDM's own as a program's.
+# The engine's browser-like connection (#668), for sites that refuse ODM's own as a program's.
 # Built from BoringSSL’s C sources on the Windows build machine.
-browser-connection = ["mdm-engine/browser-connection"]
-# Update now's end-to-end tests only, never in a release (see mdm-tools): a test key for a fake
-# release (MDM_TEST_UPDATE_KEY), `/show update-now` (Update now in the window `/show updates`
-# opens), and MDM_TEST_UPDATE_HOLD (seconds the update waits before it's put in place, to see and
+browser-connection = ["odm-engine/browser-connection"]
+# Update now's end-to-end tests only, never in a release (see odm-tools): a test key for a fake
+# release (ODM_TEST_UPDATE_KEY), `/show update-now` (Update now in the window `/show updates`
+# opens), and ODM_TEST_UPDATE_HOLD (seconds the update waits before it's put in place, to see and
 # close the window meanwhile). tools/lab/update runs them.
-test-update = ["mdm-tools/test-update"]
+test-update = ["odm-tools/test-update"]
 
 [dependencies]
 arboard.workspace = true
@@ -38,15 +38,15 @@ skrifa.workspace = true
 image.workspace = true
 craft-i18n.workspace = true
 # orbitdownloadmanager-cli's commands: its launcher runs this program for them (main.rs).
-mdm-cli.workspace = true
-mdm-engine.workspace = true
-mdm-extract.workspace = true
-mdm-geo.workspace = true
-mdm-ipc.workspace = true
+odm-cli.workspace = true
+odm-engine.workspace = true
+odm-extract.workspace = true
+odm-geo.workspace = true
+odm-ipc.workspace = true
 # The remote control (#141): a paired phone adds and controls downloads over the local network.
-mdm-remote.workspace = true
-mdm-tools.workspace = true
-mdm-torrent.workspace = true
+odm-remote.workspace = true
+odm-tools.workspace = true
+odm-torrent.workspace = true
 open.workspace = true
 reqwest.workspace = true
 serde.workspace = true
@@ -60,12 +60,12 @@ rfd = "0.17.2"
 qrcodegen = "1.8.0"
 # Line breaks between characters keep a letter and its marks together (Thai, Khmer, Indic).
 unicode-segmentation = "1.13.3"
-# The text MDM hands to the system: isolates made into marks by each letter's direction (#919).
+# The text ODM hands to the system: isolates made into marks by each letter's direction (#919).
 unicode-bidi = "0.3.18"
 # Crash and freeze reports: the monitor, minidumps, symbolicated stacks, release logs.
-mdm-cnl.workspace = true
-mdm-crash.workspace = true
-mdm-debrid.workspace = true
+odm-cnl.workspace = true
+odm-crash.workspace = true
+odm-debrid.workspace = true
 tracing.workspace = true
 # RSS feeds (rss.rs): reading them (no DTDs), and the rules' regular expressions; both already
 # in the tree (resvg's SVG, the engine's dependencies).
@@ -103,7 +103,7 @@ tempfile.workspace = true
 # secrets.rs's test that no secret reaches the log.
 tracing-subscriber.workspace = true
 # The command line's tests (tests/cli_*.rs) download from it.
-mdm-labserver.workspace = true
+odm-labserver.workspace = true
 
 [lints]
 workspace = true

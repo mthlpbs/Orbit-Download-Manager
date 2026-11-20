@@ -1,4 +1,4 @@
-//! Click'n'Load in the app (`mdm_cnl`, #37): the links a page's Click'n'Load button posts while
+//! Click'n'Load in the app (`odm_cnl`, #37): the links a page's Click'n'Load button posts while
 //! Options → Archives and Link grabber → "Accept Click'n'Load from web pages" is on.
 //!
 //! Any web page can post them, so:
@@ -8,11 +8,11 @@
 //!   its archive password, and is marked as sent by a page: Link grabber doesn't look it up (no
 //!   request leaves for it, with or without the user's site logins or debrid accounts) and
 //!   nothing is downloaded until the user adds it to the queue;
-//! - the listener takes at most `mdm_cnl::POSTS_PER_MINUTE` posts a minute from each site, and
+//! - the listener takes at most `odm_cnl::POSTS_PER_MINUTE` posts a minute from each site, and
 //!   at most [`WAITING`] wait here for an answer; the window asks one site at a time, and a
-//!   site brings MDM's window up at most once a minute ([`RAISE_EVERY`]);
+//!   site brings ODM's window up at most once a minute ([`RAISE_EVERY`]);
 //! - the site is the one the browser names; a page it names none for is an unknown site, asked
-//!   about every time, and links to this computer or its network never arrive (`mdm_cnl`).
+//!   about every time, and links to this computer or its network never arrive (`odm_cnl`).
 //!
 //! The listener runs off the window's thread; what arrives waits in an inbox the window empties
 //! each frame (`App::poll_cnl`).
@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use mdm_cnl::{Found, Package};
+use odm_cnl::{Found, Package};
 
 use crate::dialogs::{Outcome, window};
 use crate::transfer::Imported;
@@ -29,7 +29,7 @@ use crate::winui::{self, ButtonKind, LIGHT_BG, LIGHT_TEXT};
 
 /// The most posts waiting for the window: the inbox and those waiting for the site's answer.
 pub const WAITING: usize = 20;
-/// How often one site's posts bring MDM's window up: its links still arrive in between, in
+/// How often one site's posts bring ODM's window up: its links still arrive in between, in
 /// Link grabber, without the window coming to the front again.
 pub const RAISE_EVERY: Duration = Duration::from_secs(60);
 
@@ -38,7 +38,7 @@ pub struct Cnl {
     rt: tokio::runtime::Handle,
     ctx: egui::Context,
     inbox: Arc<Mutex<Vec<Found>>>,
-    listener: Option<mdm_cnl::Listener>,
+    listener: Option<odm_cnl::Listener>,
     waiting: Vec<Found>,
     /// When each site last brought the window up (None: the pages that name no site).
     raised: HashMap<Option<String>, Instant>,
@@ -80,7 +80,7 @@ impl Cnl {
             return Ok(());
         }
         let (inbox, ctx) = (self.inbox.clone(), self.ctx.clone());
-        let on_found: mdm_cnl::OnFound = Arc::new(move |found| {
+        let on_found: odm_cnl::OnFound = Arc::new(move |found| {
             let mut inbox = inbox.lock().unwrap();
             if inbox.len() >= WAITING {
                 return false;
@@ -89,8 +89,8 @@ impl Cnl {
             ctx.request_repaint();
             true
         });
-        let addr = std::net::SocketAddr::from(([127, 0, 0, 1], mdm_cnl::PORT));
-        match mdm_cnl::Listener::start(&self.rt, addr, on_found) {
+        let addr = std::net::SocketAddr::from(([127, 0, 0, 1], odm_cnl::PORT));
+        match odm_cnl::Listener::start(&self.rt, addr, on_found) {
             Ok(l) => {
                 self.listener = Some(l);
                 Ok(())
@@ -103,7 +103,7 @@ impl Cnl {
                         crate::i18n::t(
                             "Click'n'Load can't start: another program (JDownloader?) is using port {port}. Close it, then turn Click'n'Load off and on again in Options.",
                         ),
-                        &[("port", &mdm_cnl::PORT.to_string())],
+                        &[("port", &odm_cnl::PORT.to_string())],
                     )
                 } else {
                     crate::i18n::fmt(
@@ -118,7 +118,7 @@ impl Cnl {
 
     /// What arrived since the last frame, sorted by `sites` (Options' answers, site → allowed):
     /// an allowed site's links for Link grabber now; a blocked site's dropped; the others wait,
-    /// and the first of them is asked about. With them, whether MDM's window comes up for it:
+    /// and the first of them is asked about. With them, whether ODM's window comes up for it:
     /// for an allowed site's links or a new question, once every [`RAISE_EVERY`] for each site.
     pub fn take(&mut self, sites: &[(String, bool)]) -> (Vec<Imported>, bool) {
         self.take_at(sites, Instant::now())
@@ -257,7 +257,7 @@ impl SiteDialog {
                         ),
                         &[("site", &crate::i18n::isolate(site))],
                     ),
-                    // i18n: Click'n'Load window: a page whose web site the browser doesn't name, so MDM can't tell which site it is
+                    // i18n: Click'n'Load window: a page whose web site the browser doesn't name, so ODM can't tell which site it is
                     None => crate::i18n::tn(
                         n,
                         "An unknown site wants to send {n} link to Link grabber.",

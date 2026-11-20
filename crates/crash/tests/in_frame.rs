@@ -1,7 +1,8 @@
 //! The end-to-end test's crashy keeps a copy of the app's handler in front of crash-handler's
 //! (#1239): the app keeps its `unsafe` code in its own unix.rs (CLAUDE.md, rule 3), so the two
 //! can't share one file. This checks the copy is the same, so the crashes crashy reports go
-//! through what MDM runs. (Text only: it runs on every system.)
+//! through what ODM runs. The Windows checkout only ships the Windows app, so
+//! the source comparison runs on Unix and the marker parser is tested everywhere.
 
 const BEGIN: &str = "// ---- The handler in front of crash-handler's (#1239).";
 const END: &str = "// ---- End of the handler in front of crash-handler's.";
@@ -14,6 +15,7 @@ fn handler(source: &str) -> Option<String> {
     Some(source[from..to].replace('\r', ""))
 }
 
+#[cfg(unix)]
 #[test]
 fn crashys_handler_is_the_apps() {
     let app = handler(include_str!("../../app/src/unix.rs")).expect("the app's handler, marked");

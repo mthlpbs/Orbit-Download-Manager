@@ -2,12 +2,12 @@
 
 [← Back to docs index](README.md)
 
-MDM downloads videos from their web pages: YouTube, Vimeo, Dailymotion, Twitch, TikTok, X, Instagram, Facebook, Reddit, SoundCloud and well over a thousand other sites. **yt-dlp**, an open-source program whose community keeps it working as sites change, finds the video on the page; MDM's own downloader then brings it in, the way it downloads any file.
+ODM downloads videos from their web pages: YouTube, Vimeo, Dailymotion, Twitch, TikTok, X, Instagram, Facebook, Reddit, SoundCloud and well over a thousand other sites. **yt-dlp**, an open-source program whose community keeps it working as sites change, finds the video on the page; ODM's own downloader then brings it in, the way it downloads any file.
 
 ## Start a video download
 
-- Give the video's page address to **Add URL** (**Ctrl+N**). MDM recognises video pages and opens the video window, already looking the page up.
-- Or choose **Tasks → Download video from a page...**, paste the address into **Page address** and click **Look up**.
+- Give the video's page address to **Add URL** (**Ctrl+N**). ODM recognises video pages and opens the video window, already looking the page up.
+- Or choose **Add video download** from the **Tasks** menu or the tray icon's right-click menu, paste the address into **Page address** and click **Look up**.
 
 Any other page address that turns out to be a web page, not a file, is offered to the video window too. On a site yt-dlp has no reader of its own for, the video is the one the page says it is about, when it names one (in what it tells search engines and link previews: its JSON-LD, `og:video` or `twitter:player`), rather than the first player written in its HTML, and the file is named as the page names it.
 
@@ -22,21 +22,21 @@ Any other page address that turns out to be a web page, not a file, is offered t
 
 ## yt-dlp and ffmpeg
 
-MDM offers its two helpers on its first start, and again the first time they are needed. It
+ODM offers its two helpers on its first start, and again the first time they are needed. It
 downloads them from their official releases with its own downloader, so a cut connection
 resumes, and uses your proxy settings:
 
-- **yt-dlp** (about 23 MB) looks the page up and finds where the video and its sound come from; MDM downloads them ([How a video comes down](#how-a-video-comes-down)). The first time, click **Install yt-dlp**. MDM checks the download against the signature yt-dlp's developers publish before it uses it.
-- **ffmpeg** (about 80 MB) joins a video and its sound when a site keeps them apart, which most sites do for the higher qualities, and turns the sound into an MP3, Opus or FLAC file. Click **Install ffmpeg** when MDM offers it. MDM checks it against the checksums its release publishes.
-- **Each processor gets its own build:** yt-dlp's for x64, ARM64 and 32-bit Windows and for Linux on ARM, and ffmpeg's for x64 and ARM64 Windows. No ffmpeg is built for 32-bit Windows that MDM can check, so there MDM offers none: choose your own in **Helpers...** (below), or download the qualities that come with their sound.
+- **yt-dlp** (about 23 MB) looks the page up and finds where the video and its sound come from; ODM downloads them ([How a video comes down](#how-a-video-comes-down)). The first time, click **Install yt-dlp**. ODM checks the download against the signature yt-dlp's developers publish before it uses it.
+- **ffmpeg** (about 80 MB) joins a video and its sound when a site keeps them apart, which most sites do for the higher qualities, and turns the sound into an MP3, Opus or FLAC file. Click **Install ffmpeg** when ODM offers it. ODM checks it against the checksums its release publishes.
+- **Each processor gets its own build:** yt-dlp's for x64, ARM64 and 32-bit Windows and for Linux on ARM, and ffmpeg's for x64 and ARM64 Windows. No ffmpeg is built for 32-bit Windows that ODM can check, so there ODM offers none: choose your own in **Helpers...** (below), or download the qualities that come with their sound.
 
-Both are kept in a `tools` folder in MDM's data folder.
+Both are kept in a `tools` folder in ODM's data folder.
 
 ### Use your own copies
 
-On Linux and macOS, MDM finds yt-dlp, ffmpeg and gallery-dl on your `PATH` and in the usual package-manager folders, including Homebrew's. A program you selected yourself takes priority, followed by MDM's own installed copy. The system copy is used when neither is present, and your package manager keeps it up to date: MDM never downloads over it on its own. If your distribution's yt-dlp is old, **Use MDM's own copy** in Helpers downloads MDM's, which keeps itself current and is used from then on.
+On Linux and macOS, ODM finds yt-dlp, ffmpeg and gallery-dl on your `PATH` and in the usual package-manager folders, including Homebrew's. A program you selected yourself takes priority, followed by ODM's own installed copy. The system copy is used when neither is present, and your package manager keeps it up to date: ODM never downloads over it on its own. If your distribution's yt-dlp is old, **Use ODM's own copy** in Helpers downloads ODM's, which keeps itself current and is used from then on.
 
-Already have yt-dlp or ffmpeg for another program? Use those instead of a second copy: in **Download video from a page**, click **Helpers...**, then **Use another program...** beside yt-dlp or ffmpeg, and choose the program. MDM runs it once to check that it is that program, and uses it from then on, the command line too. MDM doesn't update a program you chose: keep it up to date yourself (yt-dlp: `yt-dlp -U`, or your package manager). **Use MDM's own copy** goes back to the one MDM downloads and checks.
+Already have yt-dlp or ffmpeg for another program? Use those instead of a second copy: in **Download video from a page**, click **Helpers...**, then **Use another program...** beside yt-dlp or ffmpeg, and choose the program. ODM runs it once to check that it is that program, and uses it from then on, the command line too. ODM doesn't update a program you chose: keep it up to date yourself (yt-dlp: `yt-dlp -U`, or your package manager). **Use ODM's own copy** goes back to the one ODM downloads and checks.
 
 ![The video helpers window: yt-dlp and ffmpeg, each with its version and Use another program...](images/help/video-helpers.webp)
 *Helpers...: use your own yt-dlp or ffmpeg instead.*
@@ -44,9 +44,9 @@ Already have yt-dlp or ffmpeg for another program? Use those instead of a second
 <a id="javascript-runtime"></a>
 
 ### A JavaScript runtime for YouTube
-YouTube hides most of a video's qualities behind small puzzles that yt-dlp solves with a JavaScript runtime: **Deno**, **Node.js** or **Bun**. Without one, the list is short, sometimes only the sound and a low quality, and MDM says so: *YouTube needs a JavaScript runtime to list its video qualities*. Other sites don't need one.
+YouTube hides most of a video's qualities behind small puzzles that yt-dlp solves with a JavaScript runtime: **Deno**, **Node.js** or **Bun**. Without one, the list is short, sometimes only the sound and a low quality, and ODM says so: *YouTube needs a JavaScript runtime to list its video qualities*. Other sites don't need one.
 
-Install one of them, either works, then look the video up again. MDM finds Deno, Node.js (also one installed with nvm) and Bun by itself. If it still says so, the new program's folder isn't on the `PATH` MDM started with (Windows' installers add it for programs started after them): quit MDM (**Tasks → Exit**) and start it again.
+Install one of them, either works, then look the video up again. ODM finds Deno, Node.js (also one installed with nvm) and Bun by itself. If it still says so, the new program's folder isn't on the `PATH` ODM started with (Windows' installers add it for programs started after them): quit ODM (**Tasks → Exit**) and start it again.
 
 - **Windows**: `winget install DenoLand.Deno`, or `winget install OpenJS.NodeJS.LTS`. The installers on [deno.com](https://deno.com) and [nodejs.org](https://nodejs.org) work too.
 - **Ubuntu and Debian**: `sudo apt install nodejs`
@@ -55,13 +55,13 @@ Install one of them, either works, then look the video up again. MDM finds Deno,
 - **macOS**: `brew install deno`, or `brew install node`
 - **Any system**, Deno for your user alone: `curl -fsSL https://deno.land/install.sh | sh` (on Windows, in PowerShell: `irm https://deno.land/install.ps1 | iex`)
 
-A distribution's yt-dlp can also be too old for YouTube: if the list stays short, click **Use MDM's own copy** beside yt-dlp in **Helpers...**.
+A distribution's yt-dlp can also be too old for YouTube: if the list stays short, click **Use ODM's own copy** beside yt-dlp in **Helpers...**.
 
 ## Choose the quality
 
 1. Wait for the list. It shows each quality with its size, best first, then the sound alone:
    - A video's line says its resolution, its codec, its frame rate and whether it is HDR: `2160p · AV1 · 60 fps · HDR`. A resolution that comes in several (AV1, VP9 and H.264, HDR and SDR) has a line for each: AV1 makes the smallest file, H.264 plays on the most devices, and an HDR video looks washed out on a screen without HDR. `SDR` is said only beside an HDR line of the same resolution.
-   - **Most compatible (H.264 + AAC)**, second in the list: the best H.264 video the site has (YouTube's usually go up to 1080p) with AAC sound (in stereo when the site has it beside surround), in an MP4 that Premiere Pro and other editors, older TVs and most phones open as it is. YouTube's best qualities are AV1 or VP9 with Opus sound, which some of them can't read. The line says its resolution: `Most compatible (H.264 + AAC) · 1080p`. MDM picks those streams, it doesn't convert anything: when the site has no H.264 video with AAC sound the line isn't there, and when the best line already is that, it isn't listed twice.
+   - **Most compatible (H.264 + AAC)**, second in the list: the best H.264 video the site has (YouTube's usually go up to 1080p) with AAC sound (in stereo when the site has it beside surround), in an MP4 that Premiere Pro and other editors, older TVs and most phones open as it is. YouTube's best qualities are AV1 or VP9 with Opus sound, which some of them can't read. The line says its resolution: `Most compatible (H.264 + AAC) · 1080p`. ODM picks those streams, it doesn't convert anything: when the site has no H.264 video with AAC sound the line isn't there, and when the best line already is that, it isn't listed twice.
    - The size is that of exactly what downloads, the video and its sound. A size with `~` before it (`~532 MB`) is only an estimate: the site didn't say the size, so it comes from the stream's bitrate and length.
    - **Audio only, original**: the site's own file, not converted, once for each type the site has it in (WebM with Opus inside, M4A), the best first. The best sound there is, in the smallest file.
    - **Audio only MP3** at its best variable bitrate (VBR) and at 320, 256, 192 and 128 kbps, for players that only take MP3.
@@ -76,17 +76,17 @@ The video then downloads like any other file, with its own row in the list and i
 
 ## How a video comes down
 
-yt-dlp looks the page up and picks the quality's video and sound. MDM's own downloader then brings each of them in, one after the other, the way it downloads any file:
+yt-dlp looks the page up and picks the quality's video and sound. ODM's own downloader then brings each of them in, one after the other, the way it downloads any file:
 
 - **Over several connections**: as many as **Options → Connection** gives a file. The progress window's connections table shows each one, and the segment map shows the video and then its sound.
-- **A stream sent in many small pieces** (HLS, DASH, as most sites other than YouTube send theirs) comes down that many pieces at once, each kept on disk as it arrives, then joined in order into one file, as yt-dlp joins them. Pieces encrypted with AES-128 are decrypted with the key the stream's playlist names. When their addresses expire, MDM asks yt-dlp for the stream's new list and carries on with the pieces still missing.
+- **A stream sent in many small pieces** (HLS, DASH, as most sites other than YouTube send theirs) comes down that many pieces at once, each kept on disk as it arrives, then joined in order into one file, as yt-dlp joins them. Pieces encrypted with AES-128 are decrypted with the key the stream's playlist names. When their addresses expire, ODM asks yt-dlp for the stream's new list and carries on with the pieces still missing.
 - **Under your speed limits**: the **Speed Limiter**'s, the video's own (its progress window's **Speed Limiter** tab), and the limit for all downloads together. A change applies at once.
-- **Paused and resumed** like a file, also after quitting MDM: it carries on from the bytes already saved.
-- **When an address stops working**: a video's addresses are signed and expire after a few hours (YouTube's after six). MDM asks yt-dlp for a fresh one for the same quality and carries on from where it stopped.
+- **Paused and resumed** like a file, also after quitting ODM: it carries on from the bytes already saved.
+- **When an address stops working**: a video's addresses are signed and expire after a few hours (YouTube's after six). ODM asks yt-dlp for a fresh one for the same quality and carries on from where it stopped.
 
 Then yt-dlp does what it does after a download: it joins the video and its sound with ffmpeg into one MP4, saves or embeds the subtitles, puts the chapters into the file, and converts the sound for an MP3, Opus or FLAC choice.
 
-YouTube serves each connection's long requests slowly, so MDM asks for the video in pieces of 10 MB at most, as yt-dlp does, and several at once.
+YouTube serves each connection's long requests slowly, so ODM asks for the video in pieces of 10 MB at most, as yt-dlp does, and several at once.
 
 Some videos yt-dlp still downloads by itself, over its own connection, and the progress window says so:
 
@@ -107,9 +107,9 @@ When the video has subtitles, the **Subtitles** list offers them: the uploader's
 - **Put them into the video** puts them inside the file instead, as tracks you switch on in the player. It needs ffmpeg, and an MP4 or MKV video.
 - A sound-only choice (**Audio only**, MP3, Opus, FLAC) has no subtitles.
 
-MDM offers the same choice again for the next video when it has that language.
+ODM offers the same choice again for the next video when it has that language.
 
-A site may refuse subtitles when it's asked too often: YouTube does, most of all for its translated captions. The video is saved all the same. MDM asks for the subtitles once more after 20 seconds, and if they still don't come, the **Download complete** window and the download's log say which ones are missing and why. Try them again later. When subtitles meant to go inside the video only come on that second try, they're saved beside it instead.
+A site may refuse subtitles when it's asked too often: YouTube does, most of all for its translated captions. The video is saved all the same. ODM asks for the subtitles once more after 20 seconds, and if they still don't come, the **Download complete** window and the download's log say which ones are missing and why. Try them again later. When subtitles meant to go inside the video only come on that second try, they're saved beside it instead.
 
 ## Chapters
 
@@ -135,19 +135,19 @@ Paste the address of a playlist (`youtube.com/playlist?list=…`) or a channel's
 
 **Download Now** adds each video as its own download and starts the main queue, which runs as many at once as you set in the [Scheduler](queues-and-scheduler.md) (**Download N files at the same time**). **Later** adds them without starting. Adding more than 500 at once asks first.
 
-MDM lists at most 20,000 videos of one list.
+ODM lists at most 20,000 videos of one list.
 
 A page address that points at one video inside a playlist or a mix (for example `watch?v=…&list=…`) downloads that one video, never the whole list.
 
 ## Speed limits
 
-Videos keep to the [Speed Limiter](connections-and-speed.md#speed-limiter): the limit for one file, a video's own limit (the **Speed Limiter** tab of its progress window), and the limit for all downloads together, which they share with every other download. MDM's own downloader brings them in, so a change applies at once, as for a file.
+Videos keep to the [Speed Limiter](connections-and-speed.md#speed-limiter): the limit for one file, a video's own limit (the **Speed Limiter** tab of its progress window), and the limit for all downloads together, which they share with every other download. ODM's own downloader brings them in, so a change applies at once, as for a file.
 
-A video yt-dlp downloads by itself ([How a video comes down](#how-a-video-comes-down)) takes a limit only as it starts: when you turn the limiter on or off, change its settings or the video's own limit, MDM stops it and starts it again with the new limit, and it goes on from where it was (the log says "Stopped: the speed limit changed; starting again with it"). Under the limit for all downloads, such videos share it evenly: when another starts, the ones running with more than their share start again with it; when one ends, the others keep theirs. A gallery's pictures that MDM brings in follow a change at once; what gallery-dl still fetches itself starts again with the new limit, skipping the files already saved. Other changes (torrents taking more or less of the limit for all downloads, **Only while I'm using the computer**) apply to the next one that starts.
+A video yt-dlp downloads by itself ([How a video comes down](#how-a-video-comes-down)) takes a limit only as it starts: when you turn the limiter on or off, change its settings or the video's own limit, ODM stops it and starts it again with the new limit, and it goes on from where it was (the log says "Stopped: the speed limit changed; starting again with it"). Under the limit for all downloads, such videos share it evenly: when another starts, the ones running with more than their share start again with it; when one ends, the others keep theirs. A gallery's pictures that ODM brings in follow a change at once; what gallery-dl still fetches itself starts again with the new limit, skipping the files already saved. Other changes (torrents taking more or less of the limit for all downloads, **Only while I'm using the computer**) apply to the next one that starts.
 
 ## Through a VPN's adapter
 
-With **Options → Proxy / Socks → [Network adapter](options.md#proxy--socks)** set, video downloads go through that adapter too, with the same kill switch as other downloads. MDM's own downloader opens its connections through the adapter as for any file; for yt-dlp's look-ups (and what it downloads itself, with the ffmpeg it starts) MDM hands it a proxy of its own on this computer, and opens every connection through the adapter, looking the names up with the DNS you chose in **Options → Connection** (without an adapter, yt-dlp uses the system's DNS). When the adapter disconnects, the video download stops, and it starts again when the adapter is back. Formats sent over RTMP, RTSP, MMS or FTP can't go through it and are refused.
+With **Options → Proxy / Socks → [Network adapter](options.md#proxy--socks)** set, video downloads go through that adapter too, with the same kill switch as other downloads. ODM's own downloader opens its connections through the adapter as for any file; for yt-dlp's look-ups (and what it downloads itself, with the ffmpeg it starts) ODM hands it a proxy of its own on this computer, and opens every connection through the adapter, looking the names up with the DNS you chose in **Options → Connection** (without an adapter, yt-dlp uses the system's DNS). When the adapter disconnects, the video download stops, and it starts again when the adapter is back. Formats sent over RTMP, RTSP, MMS or FTP can't go through it and are refused.
 
 ## Sites that want you signed in
 
@@ -173,14 +173,14 @@ cookies, the small files that keep you signed in.
 
 Signed in, YouTube sometimes refuses what it gives a visitor: its servers answer the video with
 *HTTP Error 403: Forbidden*, or the look-up with its bot check, where a private window plays it.
-When YouTube refuses a video anyone may watch that way, MDM looks it up once more without your
+When YouTube refuses a video anyone may watch that way, ODM looks it up once more without your
 cookies, as a private window would, and the download's log says so. A private, members' or
 age-restricted video keeps them.
 
 ![Options, Sites Logins: Cookies for video sites, From browser: Firefox](images/help/options-logins.webp)
 *Cookies for video sites: off, or a browser and its profile.*
 
-Sign in to the site in that browser first. MDM never logs or shows the cookies; the download's
+Sign in to the site in that browser first. ODM never logs or shows the cookies; the download's
 log names only the browser they came from.
 
 ### Which browsers
@@ -205,16 +205,16 @@ or its folder; empty, the profile used last.
 
 ## When a video server can't be reached
 
-Some sites, YouTube among them, send each viewer to a nearby video server, sometimes one inside the internet provider's own network. If that server can't be reached from your connection, a browser quietly switches to another one, but yt-dlp on its own would give up. Before each video download MDM checks the servers in the video's links and, if one doesn't answer, switches to the next one the site lists. The download's log says when this happens.
+Some sites, YouTube among them, send each viewer to a nearby video server, sometimes one inside the internet provider's own network. If that server can't be reached from your connection, a browser quietly switches to another one, but yt-dlp on its own would give up. Before each video download ODM checks the servers in the video's links and, if one doesn't answer, switches to the next one the site lists. The download's log says when this happens.
 
 ## If a video won't download
 
 - Hover over the download's **Status**, or open its progress window, to read yt-dlp's message.
 - **No video this can download on that page** means yt-dlp found nothing on the page. Check that the address is the video's own page.
 - **This video needs you to be signed in**, or the site wants you signed in: see [Sites that want you signed in](#sites-that-want-you-signed-in).
-- Sites change often, and a newer yt-dlp usually fixes it. MDM doesn't update yt-dlp on its own yet. To get the newest one: quit MDM (**Tasks → Exit**), delete the `tools\yt-dlp` folder in MDM's data folder (`%APPDATA%\orbitdownloadmanager`, or the `data` folder of a portable copy), start MDM, open the video window and click **Install yt-dlp**.
-- **The path is too long for Windows** (or **the file name is too long**) means the folder and the file name together, with the files saved beside the video while it downloads, are longer than the system allows: 259 characters on Windows unless long paths are turned on there, 255 a name (255 bytes on Linux and macOS). MDM shortens a title by itself, so this comes from a name you typed or a very deep **Save to** folder: add the video again with a shorter name, or a folder nearer the top of the drive.
-- Videos protected with DRM (most paid streaming services) can't be downloaded, and MDM doesn't try. The browser extension's [Media on this page](browser-integration.md#media-on-this-page) shows such a stream as **Protected** and doesn't send it.
+- Sites change often, and a newer yt-dlp usually fixes it. ODM doesn't update yt-dlp on its own yet. To get the newest one: quit ODM (**Tasks → Exit**), delete the `tools\yt-dlp` folder in ODM's data folder (`%APPDATA%\orbitdownloadmanager`, or the `data` folder of a portable copy), start ODM, open the video window and click **Install yt-dlp**.
+- **The path is too long for Windows** (or **the file name is too long**) means the folder and the file name together, with the files saved beside the video while it downloads, are longer than the system allows: 259 characters on Windows unless long paths are turned on there, 255 a name (255 bytes on Linux and macOS). ODM shortens a title by itself, so this comes from a name you typed or a very deep **Save to** folder: add the video again with a shorter name, or a folder nearer the top of the drive.
+- Videos protected with DRM (most paid streaming services) can't be downloaded, and ODM doesn't try. The browser extension's [Media on this page](browser-integration.md#media-on-this-page) shows such a stream as **Protected** and doesn't send it.
 - A page whose video the window can't find: play the video in your browser, then use the extension's [Media on this page](browser-integration.md#media-on-this-page) to send the stream the page loaded.
 - Downloading may be against some sites' terms. Checking that is up to you.
 - Still stuck? Use **Help → Report a problem** and include the page address.

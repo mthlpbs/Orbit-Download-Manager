@@ -101,8 +101,8 @@ pub fn isolate(value: &str) -> String {
     craft_i18n::isolate(value)
 }
 
-/// Text MDM hands to the system to draw (#919): a window's title (the taskbar, its preview and
-/// tip, Alt+Tab), the notification-area icon's tip, a file dialog's title. MDM's own drawing
+/// Text ODM hands to the system to draw (#919): a window's title (the taskbar, its preview and
+/// tip, Alt+Tab), the notification-area icon's tip, a file dialog's title. ODM's own drawing
 /// keeps a file name or a number apart from the sentence around it with Unicode's isolates
 /// (FSI, LRI, RLI … PDI: [`isolate`], [`ltr`], [`fmt`]), which Unicode added in 2013 and
 /// Windows 10's shell draws as boxes. They go:
@@ -112,7 +112,7 @@ pub fn isolate(value: &str) -> String {
 /// - elsewhere each isolate becomes the older controls that keep the same order, which Windows
 ///   has drawn as nothing since Windows 2000 (its text boxes offer them under "Insert Unicode
 ///   control character"): an embedding (LRE U+202A or RLE U+202B … PDF U+202C) in the value's
-///   own direction, so a Hebrew name with a Latin ".txt" reads as it does in MDM, and the
+///   own direction, so a Hebrew name with a Latin ".txt" reads as it does in ODM, and the
 ///   surrounding text's mark (LRM U+200E, RLM U+200F) on each side of it, so a number or a
 ///   bracket next to it stays on its own side ("71%" before an English name in an Arabic
 ///   title). The text outside every isolate takes the interface's direction, which the first
@@ -336,7 +336,7 @@ mod tests {
     }
 
     /// #919: what goes to the system has no isolate (Windows 10's taskbar drew them as boxes),
-    /// and reads in the same order as MDM's own drawing of it.
+    /// and reads in the same order as ODM's own drawing of it.
     #[test]
     fn text_for_the_system_has_no_isolates_and_keeps_its_order() {
         let name = |n: &str| isolate(n);
@@ -391,11 +391,11 @@ mod tests {
                 "{os:?}"
             );
             for line in text.split('\n').zip(os.split('\n')) {
-                let mdm = shown(line.0, Some(*rtl));
-                assert_eq!(shown(line.1, Some(*rtl)), mdm, "{text:?} as {os:?}");
+                let odm = shown(line.0, Some(*rtl));
+                assert_eq!(shown(line.1, Some(*rtl)), odm, "{text:?} as {os:?}");
                 // A shell that finds the direction itself, from the first letter, too.
                 if line.1.chars().any(|c| matches!(c, '\u{200E}' | '\u{200F}')) {
-                    assert_eq!(shown(line.1, None), mdm, "{text:?} as {os:?}, by itself");
+                    assert_eq!(shown(line.1, None), odm, "{text:?} as {os:?}, by itself");
                 }
             }
             // Given its own result, it gives it back.

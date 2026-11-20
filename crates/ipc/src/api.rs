@@ -1,7 +1,7 @@
 //! The automation API's answers, shared by the app (which writes them) and the programs that
 //! read them (the command line, the MCP server), so both sides keep one shape.
 //! `docs/automation-api.schema.json` is made from these types and [`crate::Command`]
-//! (`MDM_WRITE_SCHEMA=1 cargo test -p mdm-ipc schema`); a test fails while it is out of date.
+//! (`ODM_WRITE_SCHEMA=1 cargo test -p odm-ipc schema`); a test fails while it is out of date.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -271,7 +271,7 @@ pub struct VideoLookupAnswer {
     /// by its address, as the Download video window names it ([`crate::Command::video_title`]).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// `ready`: the qualities to choose from, labelled in MDM's language; `video_pick` takes a
+    /// `ready`: the qualities to choose from, labelled in ODM's language; `video_pick` takes a
     /// place in this list.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub choices: Vec<VideoChoice>,
@@ -285,7 +285,7 @@ pub struct VideoLookupAnswer {
     /// `failed`: [`lookup::NO_YTDLP`], [`lookup::NO_CHOICES`] or [`lookup::ERROR`].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
-    /// `failed` with [`lookup::ERROR`]: why, in MDM's words and language.
+    /// `failed` with [`lookup::ERROR`]: why, in ODM's words and language.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
     /// `ready` (and `failed` with [`lookup::NO_CHOICES`]): what the look-up lacked and how to
@@ -295,7 +295,7 @@ pub struct VideoLookupAnswer {
     pub notice: Option<VideoNotice>,
 }
 
-/// A word in the browser's quality menu on what the look-up lacked (#852), in MDM's language.
+/// A word in the browser's quality menu on what the look-up lacked (#852), in ODM's language.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct VideoNotice {
@@ -303,7 +303,7 @@ pub struct VideoNotice {
     pub text: String,
     /// The link's words ("How to install one").
     pub link: String,
-    /// The help page it opens, on MDM's website.
+    /// The help page it opens, on ODM's website.
     pub url: String,
 }
 
@@ -311,7 +311,7 @@ pub struct VideoNotice {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
 pub struct VideoChoice {
-    /// What the menu shows ("720p mp4"), in MDM's language.
+    /// What the menu shows ("720p mp4"), in ODM's language.
     pub label: String,
     /// The file's type (`mp4`, `mp3`).
     pub ext: String,
@@ -360,7 +360,7 @@ pub mod lookup {
     pub const READY: &str = "ready";
     /// Not found: `reason`, with `message` for an error.
     pub const FAILED: &str = "failed";
-    /// The page is a list of videos (a playlist, a channel): chosen in MDM's window.
+    /// The page is a list of videos (a playlist, a channel): chosen in ODM's window.
     pub const LIST: &str = "list";
     /// Two look-ups are running already.
     pub const BUSY: &str = "busy";
@@ -368,16 +368,16 @@ pub mod lookup {
     pub const OFF: &str = "off";
     /// No such token (never given, or forgotten after 10 minutes).
     pub const GONE: &str = "gone";
-    /// The Download video window does it instead (MDM not running, an older MDM, a Google Drive
-    /// file, MDM without a window, a choice that doesn't fit its look-up).
+    /// The Download video window does it instead (ODM not running, an older ODM, a Google Drive
+    /// file, ODM without a window, a choice that doesn't fit its look-up).
     pub const USE_WINDOW: &str = "use-window";
     /// The choice is downloading.
     pub const STARTED: &str = "started";
     /// The choice was added to the queue (Options: "only add to the queue").
     pub const QUEUED: &str = "queued";
-    /// MDM took the choice, and it isn't a new download: it is in the list already in that
+    /// ODM took the choice, and it isn't a new download: it is in the list already in that
     /// quality (Options' "If a duplicate download link is added": that one was opened or
-    /// resumed, or MDM asks what to do in its own window). From the browser's host: MDM didn't
+    /// resumed, or ODM asks what to do in its own window). From the browser's host: ODM didn't
     /// say in time what became of it (`timeout`); the command is in its queue and will run.
     /// Either way the Download video window mustn't do it a second time; the extension takes it
     /// for `started`.
@@ -472,7 +472,7 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../docs/automation-api.schema.json");
         let made = serde_json::to_string_pretty(&schema()).unwrap() + "\n";
-        if std::env::var_os("MDM_WRITE_SCHEMA").is_some() {
+        if std::env::var_os("ODM_WRITE_SCHEMA").is_some() {
             std::fs::write(&path, &made).unwrap();
         }
         let file = std::fs::read_to_string(&path)
@@ -480,7 +480,7 @@ mod tests {
             .replace("\r\n", "\n");
         assert!(
             file == made,
-            "docs/automation-api.schema.json is out of date: MDM_WRITE_SCHEMA=1 cargo test -p mdm-ipc schema"
+            "docs/automation-api.schema.json is out of date: ODM_WRITE_SCHEMA=1 cargo test -p odm-ipc schema"
         );
     }
 

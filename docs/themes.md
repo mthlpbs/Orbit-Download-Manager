@@ -2,7 +2,7 @@
 
 [← Back to docs index](README.md)
 
-A theme changes how MDM looks and keeps everything where it was: the same windows, menus and
+A theme changes how ODM looks and keeps everything where it was: the same windows, menus and
 buttons in the same places, drawn in other colours, shapes and icons. Each theme has a light and
 a dark side.
 
@@ -12,7 +12,7 @@ Open **View → Theme** and click a theme: the whole window changes at once, not
 **View → Dark Mode support** and **View → Always dark** then choose its light or dark side, as
 for the classic look ([Dark mode](getting-started.md#dark-mode)).
 
-The built-in themes are **Classic** (MDM's own look, the default), **Native** (your system's
+The built-in themes are **Classic** (ODM's own look, the default), **Native** (your system's
 accent colour and contrast), **High contrast**, and the style themes **Metro**, **Adwaita**,
 **Breeze**, **Luna**, **Aero**, **Aqua** and **Emerald**, each with its own control shapes and
 icons, and on Windows its own title bar. [Getting started](getting-started.md#themes) describes
@@ -21,8 +21,8 @@ all, light and dark.
 
 ## Where theme files go
 
-Theme files you make or download go in MDM's themes folder. **View → Theme → Open themes folder**
-opens it (and makes it the first time). It is in MDM's data folder:
+Theme files you make or download go in ODM's themes folder. **View → Theme → Open themes folder**
+opens it (and makes it the first time). It is in ODM's data folder:
 
 | System | Folder |
 |---|---|
@@ -37,8 +37,8 @@ it gives itself. After you edit a file, pick it again in **View → Theme** to s
 A theme can be one file (`harbour.toml`) or a folder of its own (`harbour/theme.toml`) when it
 brings icons.
 
-**View → Theme → Add a theme file…** does it for you: pick a file anywhere, and MDM copies it into
-the themes folder and uses it at once. A file that isn't a theme stays out, and MDM says why.
+**View → Theme → Add a theme file…** does it for you: pick a file anywhere, and ODM copies it into
+the themes folder and uses it at once. A file that isn't a theme stays out, and ODM says why.
 
 ## Base16 and pywal colour schemes
 
@@ -57,16 +57,16 @@ the wallpaper).
 **pywal itself:** once `wal` has run, **View → Theme** lists **pywal**, read straight from where
 pywal writes its colours: `~/.cache/wal/colors.json` (on Windows
 `%USERPROFILE%\.cache\wal\colors.json`, where winwal and pywal write it; `$PYWAL_CACHE_DIR` or
-`$XDG_CACHE_HOME/wal` when you set them). Pick it and MDM follows your wallpaper: each time `wal`
-writes new colours, MDM takes them within two seconds. It looks only at the file's date and size,
+`$XDG_CACHE_HOME/wal` when you set them). Pick it and ODM follows your wallpaper: each time `wal`
+writes new colours, ODM takes them within two seconds. It looks only at the file's date and size,
 every two seconds, and only while pywal is the theme. A copy added with **Add a theme file…**
 keeps the colours it had.
 
 A scheme changes colours only, on the classic look: every window, button and menu stays where it
-was. A dark scheme makes MDM dark and a light one light, whatever **View → Always dark** says. The
+was. A dark scheme makes ODM dark and a light one light, whatever **View → Always dark** says. The
 scheme's colours go where they mean the same:
 
-| MDM | Base16 | pywal |
+| ODM | Base16 | pywal |
 |---|---|---|
 | The download list, text boxes and menus | `base00` (the background) | `special.background` |
 | Windows, dialogs, the toolbar, the menu bar and column headers | `base01` (the lighter background) | the background a step toward the foreground |
@@ -80,7 +80,7 @@ scheme's colours go where they mean the same:
 Borders and the hover and pressed shades are mixed from these, as for a theme file's `[seeds]`.
 Text stays readable: text and secondary text at 4.5:1 or more against every background they sit
 on (WCAG AA), the accent at 3:1. A scheme short of that has those colours moved a little darker
-(lighter on a dark scheme) until they pass; MDM's log says which.
+(lighter on a dark scheme) until they pass; ODM's log says which.
 
 To change more than colours, make a theme file that inherits the scheme by its file name and adds
 what you like:
@@ -132,7 +132,7 @@ focus = "ring"
   another theme file in the same folder, by its file name without `.toml`. A file that inherits
   another can be inherited in turn; a theme can't inherit itself.
 - **`[seeds]`** — a handful of colours (`background`, `surface`, `header`, `text`, `accent`,
-  `selection`, `error`, `warning`, `success`) that MDM spreads over every control.
+  `selection`, `error`, `warning`, `success`) that ODM spreads over every control.
   `[seeds.light]` and `[seeds.dark]` give each side its own.
 - **`[colors]`** — single colour roles (such as `window`, `accent` or `"segments.done"`) on both
   sides; **`[light]`** and **`[dark]`** on one side only. A colour is `#rrggbb`, or `#rrggbbaa`
@@ -144,12 +144,12 @@ focus = "ring"
 - **`contrast = "high"`** — strengthens every edge and text colour on top of the rest.
 
 Every colour role, size and control style, with what it sets, is listed on the website's
-[Themes page](https://github.com/mthlpbs/Orbit-Download-Manager/themes.html#make-your-own) (read from MDM's own
+[Themes page](https://github.com/mthlpbs/Orbit-Download-Manager/themes.html#make-your-own) (read from ODM's own
 code, so it never drifts). The built-in themes are written the same way:
 [read them on GitHub](https://github.com/mthlpbs/Orbit-Download-Manager/tree/main/crates/app/assets/themes).
 
-A key MDM doesn't know, or a value it can't read, is skipped and written to MDM's log (the `logs`
-folder beside the themes folder), so a file made for a newer MDM still loads. A file that isn't
+A key ODM doesn't know, or a value it can't read, is skipped and written to ODM's log (the `logs`
+folder beside the themes folder), so a file made for a newer ODM still loads. A file that isn't
 valid TOML or JSON doesn't load, and the log says why. A file named like a built-in theme
 (`metro.toml`) is passed over: give yours a name of its own.
 
@@ -182,7 +182,7 @@ Made something others would like? Open a
 - the `.toml` file, and its folder of icons if it has one;
 - screenshots of the main window in its light and its dark side;
 - a `SOURCES.txt` beside any icons, saying who drew them and under which licence. Icons must be
-  your own or under a licence that lets MDM share them (GPL-3.0), never copied from another
+  your own or under a licence that lets ODM share them (GPL-3.0), never copied from another
   program.
 
 Not sure yet? Show it in the

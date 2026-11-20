@@ -31,7 +31,7 @@ pub(crate) const PACKAGE_DIRS: [&str; 3] = ["/opt/homebrew/bin", "/usr/local/bin
 ///   and global Scoop's own places, read from `%ChocolateyInstall%` and `%SCOOP_GLOBAL%` (set
 ///   by their installers, so they say the program is really there). No fixed folder anyone can
 ///   create (`C:\yt-dlp`, the default `C:\ProgramData\chocolatey\bin`, `%ALLUSERSPROFILE%\scoop\shims`):
-///   a program MDM runs just because it exists there is too easy to plant.
+///   a program ODM runs just because it exists there is too easy to plant.
 pub(crate) fn extra_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     #[cfg(unix)]

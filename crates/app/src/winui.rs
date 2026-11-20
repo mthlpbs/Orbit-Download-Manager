@@ -227,7 +227,7 @@ pub fn galley(p: &Painter, font: FontId, s: &str, color: Color32) -> std::sync::
 }
 
 /// The banner atop a first-start window (the browser extension's offer, the video helpers):
-/// MDM's logo at the start side, a bold headline, and a muted subline that wraps. 84 px tall, and
+/// ODM's logo at the start side, a bold headline, and a muted subline that wraps. 84 px tall, and
 /// taller by what a long translation's extra lines need: that extra is returned, for the window
 /// to add to its height and to move what is below the banner down by (it is known from the frame
 /// before: [`crate::dialogs::grow_extra`] under `key`).
@@ -247,7 +247,7 @@ pub fn banner(
     // `r` gives the rect where it is on screen (mirrored in RTL): the logo at the start side.
     p.rect_filled(r(o, 0.0, 0.0, w, h), 0.0, FIELD());
     fill_l(p, o.x, o.y + h, o.x + w - 1.0, o.y + h, FIELD_EDGE());
-    egui::Image::new(egui::include_image!("../assets/icons/app/mdm-48.png"))
+    egui::Image::new(egui::include_image!("../assets/icons/app/odm-48.png"))
         .paint_at(ui, r(o, 18.0, 18.0, 48.0, 48.0));
     // The headline on one line: cut with "..." at the far edge (a long translation), whole on
     // hover.
@@ -418,7 +418,7 @@ fn paint_galley(
     drawn
 }
 
-/// `MDM_FIT_AUDIT=<file>` (a check for translations, beyond IDM): every distinct text drawn past
+/// `ODM_FIT_AUDIT=<file>` (a check for translations, beyond IDM): every distinct text drawn past
 /// the edge of what its painter may show (the window, a box), and every two texts drawn over each
 /// other in one window, are appended to the file, so a run through the windows in each language
 /// lists what doesn't fit. Off otherwise (one env lookup).
@@ -436,7 +436,7 @@ fn fit_audit(p: &Painter, drawn: Rect, text: &str) {
     )>;
     static AUDIT: OnceLock<Option<Audit>> = OnceLock::new();
     let Some(audit) = AUDIT.get_or_init(|| {
-        let path = std::env::var_os("MDM_FIT_AUDIT")?;
+        let path = odm_ipc::env_var_os("ODM_FIT_AUDIT")?;
         let file = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -5273,7 +5273,7 @@ pub fn saved_name(was: &str, picked: &std::path::Path) -> std::path::PathBuf {
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let mut name = mdm_engine::naming::sanitize(&typed);
+    let mut name = odm_engine::naming::sanitize(&typed);
     if ext(&name).is_none()
         && let Some(e) = ext(was)
     {
@@ -5333,7 +5333,7 @@ struct PickStarter;
 
 impl egui::Plugin for PickStarter {
     fn debug_name(&self) -> &'static str {
-        "mdm-system-dialogs"
+        "odm-system-dialogs"
     }
 
     fn on_begin_pass(&mut self, ui: &mut Ui) {
@@ -5367,7 +5367,7 @@ impl egui::Plugin for PickStarter {
 /// It starts once every menu is closed (#615): a menu item is chosen in a frame that still
 /// draws its menu, whose window closes only at the end of the next frame. On macOS the dialog
 /// runs in a modal loop on the app's main thread (rfd hands it there), which began before that
-/// frame: the menu's window stayed on top of every window until MDM quit. Every system dialog
+/// frame: the menu's window stayed on top of every window until ODM quit. Every system dialog
 /// starts here, so every menu item that opens one closes its menus first, on every system. And
 /// each is counted open while it runs (`crash::system_dialog`): the freeze watchdog doesn't take
 /// the time macOS's window thread spends in it for a frozen window (#1192).
@@ -6791,10 +6791,10 @@ pub mod caption {
         title: &str,
         buttons: &[(CaptionButton, bool)],
     ) -> TitleBar {
-        // MDM_TEST_ACTIVE: every bar drawn as the active window's (pictures of windows off the
+        // ODM_TEST_ACTIVE: every bar drawn as the active window's (pictures of windows off the
         // screens, which never have the focus).
         static ALWAYS_ACTIVE: std::sync::LazyLock<bool> =
-            std::sync::LazyLock::new(|| std::env::var_os("MDM_TEST_ACTIVE").is_some());
+            std::sync::LazyLock::new(|| std::env::var_os("ODM_TEST_ACTIVE").is_some());
         let active = *ALWAYS_ACTIVE || ui.ctx().input(|i| i.viewport().focused) != Some(false);
         let rtl = rtl();
         let p = ui.painter().clone();
@@ -6844,7 +6844,7 @@ pub mod caption {
             } else {
                 pos2(rect.left() + 16.0, rect.center().y)
             };
-            egui::Image::new(egui::include_image!("../assets/icons/app/mdm-32.png"))
+            egui::Image::new(egui::include_image!("../assets/icons/app/odm-32.png"))
                 .paint_at(ui, Rect::from_center_size(icon_c.round(), vec2(16.0, 16.0)));
         }
         let font = if st.bold {
@@ -7001,7 +7001,7 @@ mod tests {
     /// extension kept or replaced as typed, the same on every system.
     #[test]
     fn a_name_typed_in_the_save_dialog_is_the_one_saved() {
-        let dir = std::env::temp_dir().join("mdm-1088");
+        let dir = std::env::temp_dir().join("odm-1088");
         let was = "MPC-BE.1.9.3.x86.7z";
         // As a dialog answers, the name whole after the folder (`join` would read `a:` as a
         // drive on Windows).
@@ -7369,14 +7369,14 @@ mod tests {
     fn data_keeps_its_own_lines_and_reads_left_to_right() {
         with_painter(|p| {
             // A report's lines (Windows' line ends too) stay lines; only a long one wraps.
-            let report = "Kind: freeze\r\nTime: 2026-11-06 10:00:01\n\n  at mdm::app::update\nend";
+            let report = "Kind: freeze\r\nTime: 2026-11-06 10:00:01\n\n  at odm::app::update\nend";
             assert_eq!(
                 wrap_lines(p, report, 1000.0),
                 vec![
                     "Kind: freeze",
                     "Time: 2026-11-06 10:00:01",
                     "",
-                    "  at mdm::app::update",
+                    "  at odm::app::update",
                     "end"
                 ]
             );

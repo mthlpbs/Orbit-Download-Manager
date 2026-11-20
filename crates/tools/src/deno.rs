@@ -72,7 +72,7 @@ fn own(dir: &Path) -> Option<Installed> {
     current.exe.is_file().then_some(current)
 }
 
-pub async fn install_latest(dir: &Path, net: &mdm_engine::Options) -> Result<Installed, Error> {
+pub async fn install_latest(dir: &Path, net: &odm_engine::Options) -> Result<Installed, Error> {
     static INSTALL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
     let _guard = INSTALL.lock().await;
     if let Some(current) = installed(dir) {

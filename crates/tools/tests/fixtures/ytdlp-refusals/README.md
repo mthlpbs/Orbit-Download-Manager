@@ -4,7 +4,7 @@ What `crates/tools/src/youtube.rs` reads to tell a refusal of the signed-in path
 look-up without the browser's cookies gets past, from a video that needs a sign-in, which keeps
 them. Each file is yt-dlp's stderr as it wrote it.
 
-Run on 2026-11-14 with yt-dlp **2026.10.26** (the Windows `yt-dlp.exe` MDM installs), without
+Run on 2026-11-14 with yt-dlp **2026.10.26** (the Windows `yt-dlp.exe` ODM installs), without
 any cookies and signed in nowhere:
 
     yt-dlp --ignore-config --no-cache-dir -J --no-playlist https://www.youtube.com/watch?v=<id>

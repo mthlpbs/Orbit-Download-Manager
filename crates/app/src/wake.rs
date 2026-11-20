@@ -2,15 +2,15 @@
 //! shortly before a queue's start time, and kept awake while that queue runs.
 //!
 //! The times are worked out here, the same on every system; the waking itself is the system's:
-//! - Windows: a waitable timer that resumes the computer (`win32::wake_at`), owned by MDM's
-//!   process, as the Scheduler's starts are (MDM has to be running, in the tray if need be).
+//! - Windows: a waitable timer that resumes the computer (`win32::wake_at`), owned by ODM's
+//!   process, as the Scheduler's starts are (ODM has to be running, in the tray if need be).
 //!   Windows' power options must allow wake timers; when they don't, the Scheduler says so.
 //! - Linux: the clock chip's wake alarm (`/sys/class/rtc/rtc0/wakealarm`), which only an
 //!   administrator may set unless they let users set it (the guide shows how). A systemd user
 //!   timer can't wake the system (`WakeSystem=` needs the system manager), nor can `rtcwake`
 //!   or a timer on an alarm clock without root or CAP_WAKE_ALARM.
 //! - macOS: `pmset schedule wake` and IOKit's scheduled power events need an administrator;
-//!   MDM never asks for one by itself, so the option says why.
+//!   ODM never asks for one by itself, so the option says why.
 //!
 //! While a queue with the option runs, and while any download runs (#939), the computer is kept
 //! from sleeping by itself (Windows: a power request; Linux: logind's sleep inhibitor; macOS:
@@ -28,7 +28,7 @@ use crate::queue::{Queue, Schedule};
 /// The computer is woken this long before the start, so the network is back by then.
 pub const LEAD: Duration = Duration::seconds(60);
 
-/// Whether this computer can be woken by MDM, and if not, why.
+/// Whether this computer can be woken by ODM, and if not, why.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Support {
     // macOS never can (see unix::wake_support).
@@ -133,14 +133,14 @@ pub fn support() -> Support {
     s
 }
 
-/// An off-screen test run (MDM_OFFSCREEN) may play another system's answer with MDM_TEST_WAKE
+/// An off-screen test run (ODM_OFFSCREEN) may play another system's answer with ODM_TEST_WAKE
 /// (`timers-off`, `battery-off`, `not-on-battery`, `needs-admin`, `no-alarm`, `mac-admin`), so
 /// every state of the Scheduler's line can be shown and checked on one computer.
 fn test_support() -> Option<Support> {
     if !crate::offscreen() {
         return None;
     }
-    Some(match std::env::var("MDM_TEST_WAKE").ok()?.as_str() {
+    Some(match std::env::var("ODM_TEST_WAKE").ok()?.as_str() {
         "timers-off" => Support::TimersOff { battery: false },
         "battery-off" => Support::TimersOff { battery: true },
         "not-on-battery" => Support::NotOnBattery,
@@ -355,8 +355,8 @@ impl Waker {
         self.refused = Some((std::time::Instant::now(), n + 1));
     }
 
-    /// Cancel the wake (MDM is quitting: Linux's alarm would outlive it). The computer may sleep
-    /// again: waited for at most [`QUIT_WAIT`] (the system lets go of it when MDM ends anyway).
+    /// Cancel the wake (ODM is quitting: Linux's alarm would outlive it). The computer may sleep
+    /// again: waited for at most [`QUIT_WAIT`] (the system lets go of it when ODM ends anyway).
     pub fn clear(&mut self) {
         self.clear_within(QUIT_WAIT);
     }
@@ -519,7 +519,7 @@ impl Holder {
                 Ok(_) => {}
                 Err(_) => {
                     tracing::warn!(
-                        "wake: the system hasn't answered within {limit:?}; MDM's hold ends with it"
+                        "wake: the system hasn't answered within {limit:?}; ODM's hold ends with it"
                     );
                     return false;
                 }
@@ -839,7 +839,7 @@ mod tests {
     fn quitting_waits_for_a_hanging_system_at_most_a_second() {
         let (mut w, sys) = waker();
         w.keep_awake(Some(Awake::Queue(QUEUE)));
-        // The system takes the hold and never answers while MDM quits.
+        // The system takes the hold and never answers while ODM quits.
         assert!(sys.next().is_some());
         let t = Instant::now();
         w.clear();

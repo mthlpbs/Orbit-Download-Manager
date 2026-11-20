@@ -1,15 +1,15 @@
-//! The browser's quality menu over a video (the extension's button, crates/nmhost): MDM looks
+//! The browser's quality menu over a video (the extension's button, crates/nmhost): ODM looks
 //! the video up with yt-dlp on a thread of its own and answers at once with a token
 //! (`video_lookup`); the browser asks how it goes (`video_poll`) and sends the choice made there
-//! (`video_pick`), a place in the list MDM offered, which MDM downloads with its own selector for
+//! (`video_pick`), a place in the list ODM offered, which ODM downloads with its own selector for
 //! it and the look-up's own browser context.
 //!
 //! Faster than a look-up and a download each running yt-dlp on the page:
-//! - an HLS stream's playlist MDM can read exactly as yt-dlp would is read by MDM itself
-//!   (`mdm_tools::manifest`), and its qualities offered a second and more sooner; yt-dlp looks
+//! - an HLS stream's playlist ODM can read exactly as yt-dlp would is read by ODM itself
+//!   (`odm_tools::manifest`), and its qualities offered a second and more sooner; yt-dlp looks
 //!   it up at the same time, for the download;
 //! - yt-dlp's look-up is kept as it answered (`InfoSlot`), and the download chosen from it
-//!   starts from it instead of reading the page again (`mdm_tools::video::Preloaded`);
+//!   starts from it instead of reading the page again (`odm_tools::video::Preloaded`);
 //! - a second click on the same video, with exactly the same browser context, shares the first
 //!   one's look-up while it runs or once it found the video ([`Lookups::share`]).
 //!
@@ -22,10 +22,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
-use mdm_ipc::api::{VideoChoice, VideoLookupAnswer, VideoNotice, lookup};
-use mdm_tools::resolve::{Choice, Looked, Video};
-use mdm_tools::video::{InfoSlot, LOOKUP_WAIT, Preloaded, Subs};
-use mdm_tools::{config::Profile, preferences::Preferences};
+use odm_ipc::api::{VideoChoice, VideoLookupAnswer, VideoNotice, lookup};
+use odm_tools::resolve::{Choice, Looked, Video};
+use odm_tools::video::{InfoSlot, LOOKUP_WAIT, Preloaded, Subs};
+use odm_tools::{config::Profile, preferences::Preferences};
 
 use crate::videodlg::VideoAdd;
 
@@ -48,7 +48,7 @@ pub enum Found {
     Looking,
     /// A video, with the choices offered for it (none: nothing this can download).
     Video(Video, Vec<Choice>),
-    /// A list of videos (a playlist, a channel): chosen from in MDM's window.
+    /// A list of videos (a playlist, a channel): chosen from in ODM's window.
     List,
     /// yt-dlp's error.
     Failed(String),
@@ -60,7 +60,7 @@ impl Found {
     pub fn of(res: Result<Looked, String>, merge: bool) -> Found {
         match res {
             Ok(Looked::Video(v)) => {
-                let choices = mdm_tools::resolve::choices(&v, merge);
+                let choices = odm_tools::resolve::choices(&v, merge);
                 Found::Video(v, choices)
             }
             Ok(Looked::List(_)) => Found::List,
@@ -83,7 +83,7 @@ struct Search {
     address: String,
     /// The browser's request context it came with ([`context_of`]): yt-dlp's, then its
     /// download's.
-    context: mdm_ipc::Command,
+    context: odm_ipc::Command,
     /// The browser's cookie store it came from.
     store_id: Option<String>,
     created: Instant,
@@ -102,7 +102,7 @@ struct MenuSettings {
 }
 
 impl MenuSettings {
-    fn read(context: &mdm_ipc::Command) -> Option<Self> {
+    fn read(context: &odm_ipc::Command) -> Option<Self> {
         context.video_cookies.as_ref()?;
         let preferences = Preferences::read();
         let profile = preferences.profile(preferences.use_config).ok()?;
@@ -132,11 +132,11 @@ impl MenuSettings {
             };
             (!f.video || wanted) && (prefs.container != "webm" || f.ext == "webm")
         });
-        let preferred = mdm_tools::resolve::choices(&preferred, merge);
+        let preferred = odm_tools::resolve::choices(&preferred, merge);
         let mut heights = std::collections::HashSet::new();
         let mut rows: Vec<Choice> = fallback
             .iter()
-            .filter(|c| !mdm_tools::resolve::is_audio(c))
+            .filter(|c| !odm_tools::resolve::is_audio(c))
             .filter(|c| c.height.is_none_or(|h| heights.insert(h)))
             .map(|c| {
                 let mut row = preferred
@@ -153,7 +153,7 @@ impl MenuSettings {
         rows.extend(
             fallback
                 .iter()
-                .filter(|c| mdm_tools::resolve::is_audio(c))
+                .filter(|c| odm_tools::resolve::is_audio(c))
                 .cloned(),
         );
         if !prefs.use_config && !has_video {
@@ -171,7 +171,7 @@ impl MenuSettings {
                     rows.iter().position(matches_ids).or_else(|| {
                         let picked = fallback.iter().find(|c| matches_ids(c))?;
                         let index = rows.iter().position(|c| {
-                            c.height == picked.height && !mdm_tools::resolve::is_audio(c)
+                            c.height == picked.height && !odm_tools::resolve::is_audio(c)
                         })?;
                         rows[index] = picked.clone();
                         rows[index].ext = self.container().to_owned();
@@ -180,12 +180,12 @@ impl MenuSettings {
                 });
             (selector, index)
         } else {
-            let height = mdm_tools::preferences::HEIGHTS
+            let height = odm_tools::preferences::HEIGHTS
                 .get(prefs.quality)
                 .copied()
                 .flatten();
             let index = rows.iter().position(|c| {
-                !mdm_tools::resolve::is_audio(c)
+                !odm_tools::resolve::is_audio(c)
                     && height.is_none_or(|h| c.height.is_some_and(|got| got <= h))
             });
             (prefs.selector(prefs.quality), index)
@@ -196,7 +196,7 @@ impl MenuSettings {
         }
 
         // A custom selector may be valid without matching any of the grouped rows.
-        let ext = mdm_tools::resolve::audio_conversion(&selector)
+        let ext = odm_tools::resolve::audio_conversion(&selector)
             .map(|a| a.format)
             .unwrap_or(if selector == "ba/b" {
                 "m4a"
@@ -233,8 +233,8 @@ struct Key {
     private: bool,
     store_id: Option<String>,
     cookies: Option<String>,
-    jar: Vec<mdm_ipc::BrowserCookie>,
-    cookie_policy: Option<mdm_ipc::VideoCookies>,
+    jar: Vec<odm_ipc::BrowserCookie>,
+    cookie_policy: Option<odm_ipc::VideoCookies>,
     referer: Option<String>,
     origin: Option<String>,
     user_agent: Option<String>,
@@ -243,7 +243,7 @@ struct Key {
 }
 
 impl Key {
-    fn of(context: &mdm_ipc::Command, store_id: &Option<String>, merge: bool) -> Key {
+    fn of(context: &odm_ipc::Command, store_id: &Option<String>, merge: bool) -> Key {
         Key {
             address: context.video_page.clone().unwrap_or_default(),
             private: context.private,
@@ -284,7 +284,7 @@ pub struct Job {
     pub token: String,
     pub address: String,
     /// yt-dlp's view of the look-up's browser context.
-    pub browser: mdm_tools::proc::FromBrowser,
+    pub browser: odm_tools::proc::FromBrowser,
     pub found: Shared,
     pub info: InfoSlot,
     /// The qualities that need merging are offered (ffmpeg is there).
@@ -297,7 +297,7 @@ pub struct Job {
 #[derive(Debug)]
 pub struct Picked {
     pub address: String,
-    pub context: mdm_ipc::Command,
+    pub context: odm_ipc::Command,
     pub video: Video,
     pub choice: Choice,
     /// yt-dlp's look-up, for the download (its `Debug` shows nothing of it).
@@ -321,8 +321,8 @@ impl Lookups {
     /// already).
     pub fn start(
         &mut self,
-        ask: &mdm_ipc::VideoLookup,
-        cmd: &mdm_ipc::Command,
+        ask: &odm_ipc::VideoLookup,
+        cmd: &odm_ipc::Command,
         exe: PathBuf,
         rt: tokio::runtime::Handle,
         now: Instant,
@@ -334,9 +334,9 @@ impl Lookups {
             return VideoLookupAnswer::failed(lookup::ERROR, Some(error.to_string()));
         }
         // The qualities that need merging, when ffmpeg is there (as the window offers them).
-        let merge = mdm_tools::tools_dir()
+        let merge = odm_tools::tools_dir()
             .as_deref()
-            .and_then(mdm_tools::ffmpeg::installed)
+            .and_then(odm_tools::ffmpeg::installed)
             .is_some();
         if let Some(token) = self.share(ask, cmd, merge, now) {
             return self.poll(&token, now);
@@ -365,8 +365,8 @@ impl Lookups {
     /// never shared: the click looks it up again. None: nothing to share.
     pub fn share(
         &mut self,
-        ask: &mdm_ipc::VideoLookup,
-        cmd: &mdm_ipc::Command,
+        ask: &odm_ipc::VideoLookup,
+        cmd: &odm_ipc::Command,
         merge: bool,
         now: Instant,
     ) -> Option<String> {
@@ -385,7 +385,7 @@ impl Lookups {
         })?;
         let (found, info) = (earlier.found.clone(), earlier.info.clone());
         self.make_room();
-        let token = mdm_ipc::random_token();
+        let token = odm_ipc::random_token();
         self.searches.insert(
             token.clone(),
             Search {
@@ -406,8 +406,8 @@ impl Lookups {
     /// qualities), for the caller to run ([`run`]); none (`busy`) while [`RUNNING`] run already.
     pub fn begin(
         &mut self,
-        ask: &mdm_ipc::VideoLookup,
-        cmd: &mdm_ipc::Command,
+        ask: &odm_ipc::VideoLookup,
+        cmd: &odm_ipc::Command,
         merge: bool,
         now: Instant,
     ) -> Option<Job> {
@@ -420,7 +420,7 @@ impl Lookups {
         self.running.fetch_add(1, Ordering::SeqCst);
         let running = Running(self.running.clone());
         self.make_room();
-        let token = mdm_ipc::random_token();
+        let token = odm_ipc::random_token();
         let context = context_of(ask, cmd);
         let address = context.video_page.clone().unwrap_or_default();
         let store_id = store(&ask.store_id);
@@ -494,7 +494,7 @@ impl Lookups {
     /// same cookie store. Taken once: the look-up is forgotten then.
     pub fn pick(
         &mut self,
-        pick: &mdm_ipc::VideoPick,
+        pick: &odm_ipc::VideoPick,
         private: bool,
         now: Instant,
     ) -> Option<Picked> {
@@ -552,9 +552,9 @@ fn cut(s: &str, max: usize) -> String {
 /// Download video window keeps the click's): the address looked up (as the window looks it up,
 /// `pages::video_address`), the page's referrer, cookies and User-Agent, whether from a private
 /// window, and the page's title (a video yt-dlp knows only by its address is named by it, #345).
-pub fn context_of(ask: &mdm_ipc::VideoLookup, cmd: &mdm_ipc::Command) -> mdm_ipc::Command {
-    mdm_ipc::Command {
-        video_page: Some(mdm_tools::pages::video_address(&ask.address)),
+pub fn context_of(ask: &odm_ipc::VideoLookup, cmd: &odm_ipc::Command) -> odm_ipc::Command {
+    odm_ipc::Command {
+        video_page: Some(odm_tools::pages::video_address(&ask.address)),
         video_title: ask
             .title
             .as_deref()
@@ -578,11 +578,11 @@ pub fn context_of(ask: &mdm_ipc::VideoLookup, cmd: &mdm_ipc::Command) -> mdm_ipc
 /// The title video `v`, looked up at `address` with the browser's `context`, is offered and
 /// saved under, as the Download video window names it: the page's when yt-dlp knows it only by
 /// that address (#345), else yt-dlp's.
-fn title_of<'a>(v: &'a Video, address: &str, context: &'a mdm_ipc::Command) -> &'a str {
+fn title_of<'a>(v: &'a Video, address: &str, context: &'a odm_ipc::Command) -> &'a str {
     crate::videodlg::page_title(context, v, address).unwrap_or(&v.title)
 }
 
-/// Choice `c` as the browser's quality menu shows it: its label in MDM's language, and what the
+/// Choice `c` as the browser's quality menu shows it: its label in ODM's language, and what the
 /// menu's line says beside it (#755: height, codec, frame rate, range; #801: an about size;
 /// #1439: the most compatible one).
 fn menu_choice(c: &Choice) -> VideoChoice {
@@ -590,20 +590,20 @@ fn menu_choice(c: &Choice) -> VideoChoice {
         label: crate::videodlg::choice_label(&c.label),
         ext: c.ext.clone(),
         size: c.size,
-        audio: mdm_tools::resolve::is_audio(c),
+        audio: odm_tools::resolve::is_audio(c),
         height: c.height,
         fps: c.fps,
         kbps: c.kbps,
-        original: mdm_tools::resolve::original_sound(&c.selector),
+        original: odm_tools::resolve::original_sound(&c.selector),
         codec: c.codec.clone(),
         range: c.range.clone(),
         approx: c.approx && c.size.is_some(),
-        compatible: mdm_tools::resolve::is_compatible(c),
+        compatible: odm_tools::resolve::is_compatible(c),
     }
 }
 
 /// What the menu says with video `v`'s choices, as the Download video window says it (#852:
-/// YouTube looked up without a JavaScript runtime), with its help page in MDM's language.
+/// YouTube looked up without a JavaScript runtime), with its help page in ODM's language.
 fn notice(v: &Video) -> Option<VideoNotice> {
     v.needs_js_runtime.then(|| VideoNotice {
         text: crate::videodlg::js_runtime_note().to_owned(),
@@ -613,7 +613,7 @@ fn notice(v: &Video) -> Option<VideoNotice> {
     })
 }
 
-/// The answer for look-up `token` as it stands: the choices labelled in MDM's language, an
+/// The answer for look-up `token` as it stands: the choices labelled in ODM's language, an
 /// error in its words (as the Download video window says them).
 fn answer(token: &str, s: &Search) -> VideoLookupAnswer {
     match &*lock(&s.found) {
@@ -660,11 +660,11 @@ fn choices_for<'a>(
 
 /// The download choice `p` adds, into `folder` (the Video category's), or `music` (the Music
 /// category's, None when the user deleted it) for a sound-only choice, listed under that category
-/// as the Download video window does (#611): MDM's own selector for it, the file named as the
+/// as the Download video window does (#611): ODM's own selector for it, the file named as the
 /// Download video window names it, the subtitles that window would preselect from `pref`
 /// (settings.video_subs, not changed by it), started now unless `start_now` is false (Options:
 /// only add to the queue), from the look-up's own yt-dlp answer (its first run). None for an
-/// address MDM can't take.
+/// address ODM can't take.
 pub fn video_add(
     p: Picked,
     folder: &Path,
@@ -675,33 +675,33 @@ pub fn video_add(
     let page = url::Url::parse(&p.address)
         .ok()
         .filter(|u| matches!(u.scheme(), "http" | "https"))?;
-    let preferences = mdm_tools::preferences::Preferences::read();
+    let preferences = odm_tools::preferences::Preferences::read();
     let profile = p
         .settings
         .as_ref()
         .map(|s| s.profile.clone())
         .or_else(|| preferences.profile(false).ok());
-    let name = mdm_tools::preferences::filename(
+    let name = odm_tools::preferences::filename(
         profile
             .as_ref()
             .map_or(&preferences.filename_template, |p| &p.name_template),
         title_of(&p.video, &p.address, &p.context),
         &p.video.naming,
-        if p.settings.is_some() || mdm_tools::resolve::is_audio(&p.choice) {
+        if p.settings.is_some() || odm_tools::resolve::is_audio(&p.choice) {
             &p.choice.ext
         } else {
             &preferences.container
         },
     );
     let (category, folder) = match music {
-        Some(m) if mdm_tools::resolve::is_audio(&p.choice) => (crate::model::Category::Music, m),
+        Some(m) if odm_tools::resolve::is_audio(&p.choice) => (crate::model::Category::Music, m),
         _ => (crate::model::Category::Video, folder),
     };
     Some(VideoAdd {
         ytdlp: profile,
         page,
         selector: p.choice.selector.clone(),
-        dest: folder.join(mdm_engine::naming::sanitize(name.trim())),
+        dest: folder.join(odm_engine::naming::sanitize(name.trim())),
         category,
         size: p.choice.size,
         start_now,
@@ -733,7 +733,7 @@ impl Drop for Ended {
         if matches!(*found, Found::Looking) {
             // yt-dlp's words for an end without an answer.
             *found = Found::Failed(
-                mdm_tools::proc::ProcError::Failed {
+                odm_tools::proc::ProcError::Failed {
                     tool: "yt-dlp".into(),
                     message: "it stopped without saying why".into(),
                 }
@@ -746,14 +746,14 @@ impl Drop for Ended {
 
 /// yt-dlp's look-up as `videodlg::look_up_kept` makes it: what it found, and its answer as it
 /// gave it.
-type Kept = (Result<Looked, String>, Option<mdm_tools::proc::LookedUp>);
+type Kept = (Result<Looked, String>, Option<odm_tools::proc::LookedUp>);
 
-/// A look-up's two readings at once, the first answer taking the menu: MDM's own of a stream's
+/// A look-up's two readings at once, the first answer taking the menu: ODM's own of a stream's
 /// playlists (`fast`, on the runtime `rt`, 5 s at most; preferred, and much the quicker), and
 /// yt-dlp's (`slow`, on this thread), started at once whatever the other does (a slow playlist
 /// server never holds it up) and kept for the download either way (`info`). An answer once
 /// written stays (the browser may be showing its choices, and picks by place in them); a
-/// failure of yt-dlp's waits for MDM's reading, which may still bring the video.
+/// failure of yt-dlp's waits for ODM's reading, which may still bring the video.
 fn settle(
     found: &Shared,
     info: &InfoSlot,
@@ -788,12 +788,12 @@ fn settle(
 /// Run `job` with yt-dlp `exe` on a thread of its own, as the Download video window looks a
 /// video up (`rt`: a plain file's size from its server, and an HLS stream's playlists): its
 /// state written when yt-dlp answers (within its 90 s, twice that without the cookies), or
-/// sooner when MDM reads the stream itself ([`settle`]), its place given back as the thread
+/// sooner when ODM reads the stream itself ([`settle`]), its place given back as the thread
 /// ends. A look-up forgotten meanwhile (10 minutes, or 20 newer ones) ends all the same, with
 /// nothing to read it.
 pub fn run(job: Job, exe: PathBuf, rt: tokio::runtime::Handle) -> std::io::Result<()> {
     std::thread::Builder::new()
-        .name("mdm-video-lookup".into())
+        .name("odm-video-lookup".into())
         .spawn(move || {
             let Job {
                 address,
@@ -809,7 +809,7 @@ pub fn run(job: Job, exe: PathBuf, rt: tokio::runtime::Handle) -> std::io::Resul
                 found: found.clone(),
                 info: info.clone(),
             };
-            // A stream's playlist MDM reads exactly as yt-dlp would (as Options' proxy and the
+            // A stream's playlist ODM reads exactly as yt-dlp would (as Options' proxy and the
             // browser's request for it); none for anything else.
             let fast = {
                 let (address, browser) = (address.clone(), browser.clone());
@@ -819,26 +819,26 @@ pub fn run(job: Job, exe: PathBuf, rt: tokio::runtime::Handle) -> std::io::Resul
                     if uses_config {
                         None
                     } else {
-                        mdm_tools::manifest::fetch(&address, &browser, &opts).await
+                        odm_tools::manifest::fetch(&address, &browser, &opts).await
                     }
                 }
             };
             // yt-dlp's look-up all the same (the click asked for the video): kept for the
-            // download, and the menu's answer when MDM can't read the stream.
+            // download, and the menu's answer when ODM can't read the stream.
             settle(&found, &info, merge, &rt, fast, || {
                 let lookup = || crate::videodlg::look_up_kept(&exe, &address, &browser, &rt);
                 let Some(profile) = profile else {
                     return lookup();
                 };
-                let result = mdm_tools::config::with_profile(profile.clone(), lookup);
+                let result = odm_tools::config::with_profile(profile.clone(), lookup);
                 if profile.file.is_some()
                     && result
                         .0
                         .as_ref()
-                        .is_err_and(|error| mdm_tools::servers::format_unavailable(error))
+                        .is_err_and(|error| odm_tools::servers::format_unavailable(error))
                 {
                     let mut result =
-                        mdm_tools::config::with_profile(profile.for_quality_lookup(), lookup);
+                        odm_tools::config::with_profile(profile.for_quality_lookup(), lookup);
                     if let Ok(Looked::Video(video)) = &mut result.0 {
                         video.selected_format = None;
                     }
@@ -855,7 +855,7 @@ pub fn run(job: Job, exe: PathBuf, rt: tokio::runtime::Handle) -> std::io::Resul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mdm_ipc::{Command, VideoLookup, VideoPick};
+    use odm_ipc::{Command, VideoLookup, VideoPick};
 
     /// A stream's manifest as yt-dlp sees it (named after its address) with two variants and
     /// German subtitles.
@@ -897,7 +897,7 @@ mod tests {
 
     /// The look-up's thread, as yt-dlp answers it.
     fn answered(job: &Job, json: &str) {
-        let v = mdm_tools::resolve::parse_looked(json.as_bytes()).unwrap();
+        let v = odm_tools::resolve::parse_looked(json.as_bytes()).unwrap();
         *lock(&job.found) = Found::of(Ok(v), false);
     }
 
@@ -953,7 +953,7 @@ mod tests {
         assert!(ready.choices.iter().all(|c| !c.audio), "videos");
         assert_eq!(ready.notice, None, "nothing lacked");
         assert_eq!(l.poll(&b.token, now).state, lookup::PENDING, "its own");
-        // The choice takes the look-up's context and MDM's selector for that place.
+        // The choice takes the look-up's context and ODM's selector for that place.
         let p = l
             .pick(&pick(&a.token, 1, Some("firefox-container-1")), false, now)
             .unwrap();
@@ -1087,7 +1087,7 @@ mod tests {
         let now = Instant::now();
         let base = || {
             let mut cmd = sent(false, "a=1");
-            cmd.cookie_jar = vec![mdm_ipc::BrowserCookie {
+            cmd.cookie_jar = vec![odm_ipc::BrowserCookie {
                 name: "sid".into(),
                 value: "1".into(),
                 domain: ".cdn.test".into(),
@@ -1246,14 +1246,14 @@ mod tests {
         assert!(!info.pending());
     }
 
-    /// MDM's reading of a stream and yt-dlp's run at once: yt-dlp starts at once however slow
-    /// the stream's server, the first answer takes the menu and stays, MDM's reading wins
+    /// ODM's reading of a stream and yt-dlp's run at once: yt-dlp starts at once however slow
+    /// the stream's server, the first answer takes the menu and stays, ODM's reading wins
     /// against a yt-dlp that failed; yt-dlp's answer is kept for the download either way.
     #[test]
     fn the_two_readings_run_at_once() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let video = |title: &str| {
-            mdm_tools::resolve::parse(
+            odm_tools::resolve::parse(
                 STREAM
                     .replace("\"master\"", &format!("{title:?}"))
                     .as_bytes(),
@@ -1263,7 +1263,7 @@ mod tests {
         let ytdlp = |title: &str| -> Kept {
             (
                 Ok(Looked::Video(video(title))),
-                Some(mdm_tools::proc::LookedUp {
+                Some(odm_tools::proc::LookedUp {
                     json: STREAM.as_bytes().to_vec(),
                     without_cookies: false,
                     warnings: Vec::new(),
@@ -1285,7 +1285,7 @@ mod tests {
         };
         let fresh = || (Shared::default(), InfoSlot::new(Instant::now()));
 
-        // MDM's reading first: the menu's; yt-dlp's kept for the download.
+        // ODM's reading first: the menu's; yt-dlp's kept for the download.
         let (found, info) = fresh();
         settle(
             &found,
@@ -1301,7 +1301,7 @@ mod tests {
         assert_eq!(title(&found), "mine");
         assert!(!info.pending());
 
-        // yt-dlp first: its answer, which MDM's later reading doesn't replace.
+        // yt-dlp first: its answer, which ODM's later reading doesn't replace.
         let (found, info) = fresh();
         settle(
             &found,
@@ -1316,7 +1316,7 @@ mod tests {
         assert_eq!(title(&found), "yt-dlp's", "stays");
         drop(info);
 
-        // yt-dlp failed first: MDM's reading still brings the video.
+        // yt-dlp failed first: ODM's reading still brings the video.
         let (found, info) = fresh();
         settle(
             &found,
@@ -1476,7 +1476,7 @@ mod tests {
     }
 
     /// What isn't a video to choose from is said: a list, nothing to download, yt-dlp's error
-    /// (in MDM's words when it has some).
+    /// (in ODM's words when it has some).
     #[test]
     fn lists_and_failures_are_said() {
         let mut l = Lookups::default();
@@ -1515,7 +1515,7 @@ mod tests {
         assert!(matches!(Found::of(Err("e".into()), true), Found::Failed(_)));
     }
 
-    /// The choice is added with MDM's selector for it, named after the page that played it,
+    /// The choice is added with ODM's selector for it, named after the page that played it,
     /// with the subtitles the window would preselect; started, or queued when Options say so.
     #[test]
     fn the_choice_is_added_as_the_window_would() {
@@ -1542,7 +1542,7 @@ mod tests {
         assert_eq!(add.page.as_str(), SRC);
         assert_eq!(
             add.selector, "hls-2500/b[height=720]",
-            "MDM's own, never the browser's"
+            "ODM's own, never the browser's"
         );
         assert_eq!(add.dest, folder.join("A talk_ in Lisbon.mkv"));
         assert_eq!(add.size, Some(60 * 2500 * 125));
@@ -1619,8 +1619,8 @@ mod tests {
             {"format_id": "701", "ext": "mp4", "height": 1080, "fps": 60, "vcodec": "av01.0.09M.10", "acodec": "none", "dynamic_range": "HDR10", "filesize": 9000},
             {"format_id": "299", "ext": "mp4", "height": 1080, "fps": 60, "vcodec": "avc1", "acodec": "none", "dynamic_range": "SDR", "filesize": 8000},
             {"format_id": "136", "ext": "mp4", "height": 720, "fps": 30, "vcodec": "avc1", "acodec": "none", "filesize_approx": 7000}]}"#;
-        let v = mdm_tools::resolve::parse(V.as_bytes()).unwrap();
-        let a: Vec<VideoChoice> = mdm_tools::resolve::choices(&v, true)
+        let v = odm_tools::resolve::parse(V.as_bytes()).unwrap();
+        let a: Vec<VideoChoice> = odm_tools::resolve::choices(&v, true)
             .iter()
             .map(menu_choice)
             .collect();
@@ -1694,7 +1694,7 @@ mod tests {
         let a = l
             .begin(&look(PAGE, None, None), &sent(false, "a=1"), false, now)
             .unwrap();
-        let mut v = match mdm_tools::resolve::parse_looked(STREAM.as_bytes()).unwrap() {
+        let mut v = match odm_tools::resolve::parse_looked(STREAM.as_bytes()).unwrap() {
             Looked::Video(v) => v,
             Looked::List(_) => unreachable!(),
         };

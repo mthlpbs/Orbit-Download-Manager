@@ -6,7 +6,7 @@
 //! plugin, which either calls a local HTTP server on `127.0.0.1:4416` or a standalone CLI binary
 //! (`bgutil-pot` or `bgutil`).
 //!
-//! MDM only reports what is already here — a running provider server, a `bgutil-pot` binary on
+//! ODM only reports what is already here — a running provider server, a `bgutil-pot` binary on
 //! the system, or an installed yt-dlp plugin. It never downloads or starts one itself: unlike
 //! yt-dlp (verified against its developers' signing key) and ffmpeg (against its published
 //! checksums), a third-party provider has nothing to verify it against.

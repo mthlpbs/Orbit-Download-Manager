@@ -20,7 +20,7 @@ const COUNTRY_SECOND_LEVEL: [&str; 13] = [
     "co", "com", "net", "org", "gov", "edu", "ac", "or", "ne", "go", "gob", "nic", "mil",
 ];
 
-/// The site `url` is of, as near as MDM tells without the public suffix list: its host's
+/// The site `url` is of, as near as ODM tells without the public suffix list: its host's
 /// registrable domain (`s118.rapidgator.net` and `rapidgator.net` are `rapidgator.net`'s,
 /// `dl.example.co.uk` is `example.co.uk`'s); an address by number as it is.
 pub fn site(url: &Url) -> Option<String> {

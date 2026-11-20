@@ -1,4 +1,4 @@
-//! A downloaded archive extracted in process (`mdm_extract::extract`: zip, tar, tar.gz, tar.xz,
+//! A downloaded archive extracted in process (`odm_extract::extract`: zip, tar, tar.gz, tar.xz,
 //! a single .gz or .xz), within small limits, into a folder of its own: nothing may land outside
 //! the destination, and no link may come out of it.
 //!
@@ -11,13 +11,13 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
-use mdm_extract::{Limits, Policy, Subfolder};
+use odm_extract::{Limits, Policy, Subfolder};
 
 /// One folder for the whole run, emptied after each input.
 fn root() -> &'static Path {
     static ROOT: OnceLock<PathBuf> = OnceLock::new();
     ROOT.get_or_init(|| {
-        let dir = std::env::temp_dir().join(format!("mdm-fuzz-archive-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("odm-fuzz-archive-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -68,7 +68,7 @@ fuzz_target!(|data: &[u8]| {
         on_file: &mut on_file,
         cancel: None,
     };
-    let result = mdm_extract::extract(&archive, &mut policy);
+    let result = odm_extract::extract(&archive, &mut policy);
 
     // Only the archive and the destination in the box, and only the box in the root.
     let mut top: Vec<_> = fs::read_dir(root)
@@ -87,9 +87,9 @@ fuzz_target!(|data: &[u8]| {
     if dest.exists() {
         let mut all = Vec::new();
         walk(&dest, &mut all);
-        // The staging folder (`dest/.mdm-extract-<pid>-<n>`) is gone; an entry of such a name
+        // The staging folder (`dest/.odm-extract-<pid>-<n>`) is gone; an entry of such a name
         // deeper down is the archive's own.
-        let staging = format!(".mdm-extract-{}-", std::process::id());
+        let staging = format!(".odm-extract-{}-", std::process::id());
         for p in all.iter().filter(|p| p.parent() == Some(dest.as_path())) {
             let name = p.file_name().unwrap().to_string_lossy();
             assert!(

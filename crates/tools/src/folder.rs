@@ -1,4 +1,4 @@
-//! yt-dlp's folder build on Windows and macOS, unpacked once by MDM.
+//! yt-dlp's folder build on Windows and macOS, unpacked once by ODM.
 //!
 //! yt-dlp publishes each of these systems' programs twice. The one-file builds (`yt-dlp.exe`,
 //! `yt-dlp_macos`) unpack their Python into a new temporary folder at every start:
@@ -7,16 +7,16 @@
 //!   browser's video button;
 //! - on macOS (#330, #339), an app still marked as downloaded by the browser passes that mark to
 //!   what it and its children create, so the Python just unpacked carries it, and macOS refuses to
-//!   load the library ("Python.framework is damaged", PYI-…): every look-up failed. MDM has no
+//!   load the library ("Python.framework is damaged", PYI-…): every look-up failed. ODM has no
 //!   hand in that temporary folder.
 //!
-//! The folder builds (`yt-dlp_win.zip`, `yt-dlp_macos.zip`) unpack nothing when they run: MDM
+//! The folder builds (`yt-dlp_win.zip`, `yt-dlp_macos.zip`) unpack nothing when they run: ODM
 //! unpacks one once, after checking the archive against yt-dlp's signed checksum list, into its
 //! own tools folder. On macOS the mark is taken off those files and no others: never the app,
 //! never a download (they are marked on purpose: `mark_downloaded`), never a program the person
 //! chose; on Windows the program is marked as downloaded, as the one-file build was. Linux keeps
 //! the single program for now (its start there wasn't measured for #1053, and a system's own
-//! yt-dlp, unpacked by its package manager, is used there when MDM has none) and doesn't compile
+//! yt-dlp, unpacked by its package manager, is used there when ODM has none) and doesn't compile
 //! the install (`#[cfg]` below); the unpacking is portable and tested everywhere.
 
 use std::path::{Component, Path};
@@ -43,8 +43,8 @@ fn bad(e: impl std::fmt::Display) -> Error {
     Error::BadRelease(e.to_string())
 }
 
-/// Whether `exe` is the one-file build, which earlier versions of MDM installed: nothing beside
-/// it. MDM gets the folder build in its place, the same release too (`install_latest`); on
+/// Whether `exe` is the one-file build, which earlier versions of ODM installed: nothing beside
+/// it. ODM gets the folder build in its place, the same release too (`install_latest`); on
 /// macOS, where it can't run, it is treated as not installed meanwhile.
 pub(crate) fn one_file_build(exe: &Path) -> bool {
     !exe.with_file_name(INTERNAL).is_dir()
@@ -249,7 +249,7 @@ mod tests {
     #[test]
     fn the_same_version_replaces_the_one_file_build() {
         let dir = tempfile::tempdir().unwrap();
-        // Earlier versions of MDM: a single program, nothing beside it.
+        // Earlier versions of ODM: a single program, nothing beside it.
         let old = crate::put(
             dir.path(),
             "yt-dlp",

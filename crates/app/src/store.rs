@@ -45,7 +45,7 @@ pub struct Loaded {
 }
 
 pub fn path() -> Option<PathBuf> {
-    mdm_ipc::data_dir().map(|d| d.join("downloads.json"))
+    odm_ipc::data_dir().map(|d| d.join("downloads.json"))
 }
 
 /// Load the list; a missing file gives an empty list, a damaged one is kept aside.
@@ -142,7 +142,7 @@ fn load_from(p: &Path, empty: Loaded) -> Loaded {
             settings.list_known_browsers();
             // An earlier version's default File types, untouched, become today's (#208); a list
             // the user edited stays as it is.
-            if let Some(types) = mdm_ipc::capture::upgraded_types(&settings.auto_types) {
+            if let Some(types) = odm_ipc::capture::upgraded_types(&settings.auto_types) {
                 settings.auto_types = types.into();
             }
             Loaded {
@@ -281,18 +281,18 @@ fn encode(
 /// flushed to the disk: slow while a big download writes, hence [`Saver`]).
 fn write(p: &Path, json: &[u8]) -> std::io::Result<()> {
     if let Some(dir) = p.parent() {
-        mdm_ipc::private_dir(dir)?;
+        odm_ipc::private_dir(dir)?;
     }
     keep_generations(p);
     // The list holds the saved logins: its owner's only (the folder too).
-    mdm_ipc::private_write(p, json)?;
+    odm_ipc::private_write(p, json)?;
     // On the disk now: keychain entries it no longer names can go.
     crate::secrets::vault().after_write();
     Ok(())
 }
 
 /// Saves the list on a thread of its own. The write ends with a flush to the disk, which waited
-/// for every byte a big download had written meanwhile: on the window's thread it froze MDM for
+/// for every byte a big download had written meanwhile: on the window's thread it froze ODM for
 /// seconds (a crash report caught it: "freeze in store::save"). The newest list waiting replaces
 /// an older one not yet written. Any file the window keeps saving goes the same way
 /// ([`Saver::writing`]): Windows holding every write on C: for a shadow copy held the window
@@ -378,7 +378,7 @@ impl Saver {
             .take()
     }
 
-    /// Wait until nothing is waiting or being written (MDM closing), or until `deadline` (the
+    /// Wait until nothing is waiting or being written (ODM closing), or until `deadline` (the
     /// session ending, which can't wait for a disk that holds its writes). True when all of it
     /// was written.
     pub fn flush_until(&self, deadline: Option<std::time::Instant>) -> bool {
@@ -405,7 +405,7 @@ impl Saver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mdm_engine::state::{ResumeState, state_path};
+    use odm_engine::state::{ResumeState, state_path};
 
     fn empty() -> Loaded {
         Loaded {
@@ -672,10 +672,10 @@ mod tests {
         };
         std::fs::write(&p, list(old)).unwrap();
         let s = load_from(&p, empty()).settings;
-        assert_eq!(s.auto_types, mdm_ipc::capture::DEFAULT_AUTO_TYPES);
+        assert_eq!(s.auto_types, odm_ipc::capture::DEFAULT_AUTO_TYPES);
         assert!(
-            mdm_ipc::capture::type_listed(&s.auto_types, "MDM-0.3.0.dmg")
-                && mdm_ipc::capture::type_listed(&s.auto_types, "mdm_0.3.0_amd64.deb")
+            odm_ipc::capture::type_listed(&s.auto_types, "ODM-0.3.0.dmg")
+                && odm_ipc::capture::type_listed(&s.auto_types, "odm_0.3.0_amd64.deb")
         );
         let edited = format!("{old} NZB");
         std::fs::write(&p, list(&edited)).unwrap();

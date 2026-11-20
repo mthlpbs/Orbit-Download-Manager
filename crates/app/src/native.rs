@@ -56,17 +56,17 @@ pub fn accent_palette_bytes(b: &[u8; 32]) -> [[u8; 3]; 7] {
 
 /// What the system says (what the watcher of Windows' registry or the portal's thread last
 /// heard: never read on the window's thread, #719).
-/// For tests and screenshots, `MDM_NATIVE_ACCENT=#rrggbb` stands for the system's accent and
-/// `MDM_NATIVE_CONTRAST=1` for its high contrast, so no system setting is touched.
+/// For tests and screenshots, `ODM_NATIVE_ACCENT=#rrggbb` stands for the system's accent and
+/// `ODM_NATIVE_CONTRAST=1` for its high contrast, so no system setting is touched.
 pub fn system(ctx: &egui::Context) -> System {
     let mut sys = system_says(ctx);
-    if let Some(c) = std::env::var("MDM_NATIVE_ACCENT")
+    if let Some(c) = odm_ipc::env_var("ODM_NATIVE_ACCENT")
         .ok()
         .and_then(|v| crate::palette::parse_hex(&v))
     {
         sys.accent = Some(Accent::from_color(c));
     }
-    if std::env::var_os("MDM_NATIVE_CONTRAST").is_some_and(|v| v == "1") {
+    if odm_ipc::env_var_os("ODM_NATIVE_CONTRAST").is_some_and(|v| v == "1") {
         sys.more_contrast = true;
     }
     sys

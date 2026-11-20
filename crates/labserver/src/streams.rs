@@ -446,7 +446,7 @@ pub(crate) async fn hlsg_file(
 }
 
 /// The encrypted pieces' key (`/hls/{track}/key.bin`), their playlist's first sequence number.
-const ENC_KEY: [u8; 16] = *b"mdm-lab-key-0769";
+const ENC_KEY: [u8; 16] = *b"odm-lab-key-0769";
 const ENC_SEQUENCE: u64 = 100;
 
 /// An IV of `n`, right-aligned in 16 bytes (as a playlist's `IV=0x…`, and a piece's sequence

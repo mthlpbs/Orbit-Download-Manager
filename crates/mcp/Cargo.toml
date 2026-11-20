@@ -1,5 +1,5 @@
 [package]
-name = "mdm-mcp"
+name = "odm-mcp"
 description = "MCP server: lets AI assistants list, add and control the running app's downloads"
 version.workspace = true
 edition.workspace = true
@@ -14,7 +14,7 @@ name = "orbitdownloadmanager-mcp"
 path = "src/main.rs"
 
 [dependencies]
-mdm-ipc.workspace = true
+odm-ipc.workspace = true
 rmcp.workspace = true
 schemars.workspace = true
 serde.workspace = true

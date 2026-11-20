@@ -7,8 +7,8 @@ use std::time::{Duration, Instant};
 
 use base64::Engine as _;
 use egui::{Pos2, Ui, pos2};
-use mdm_engine::state::state_path;
-use mdm_engine::{Destination, Download, Options, Request};
+use odm_engine::state::state_path;
+use odm_engine::{Destination, Download, Options, Request};
 use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 
 use crate::chrome::{
@@ -24,7 +24,7 @@ use crate::queue::{self, Member, Queue};
 use crate::settings::Settings;
 use crate::store;
 use crate::winui;
-use mdm_ipc as ipc;
+use odm_ipc as ipc;
 
 /// A node of the Categories tree, what the list shows (saved: the last one comes back).
 #[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
@@ -293,10 +293,10 @@ fn answered(dup: u64, there: bool, choice: usize, pending: Pending) -> Answer {
 /// only while fresh ([`crate::videolookup::TTL`], as at its start): a question answered long
 /// after, or a download queued, looks the page up afresh.
 fn kept_lookup(
-    preloaded: Option<mdm_tools::video::Preloaded>,
+    preloaded: Option<odm_tools::video::Preloaded>,
     goes: VideoGoes,
     now: Instant,
-) -> Option<mdm_tools::video::Preloaded> {
+) -> Option<odm_tools::video::Preloaded> {
     preloaded.filter(|p| {
         goes == VideoGoes::Start
             && now.saturating_duration_since(p.slot.born()) < crate::videolookup::TTL
@@ -306,7 +306,7 @@ fn kept_lookup(
 /// What replacing download `id` takes from the disk; None when it isn't in `items` or runs (it
 /// is left alone, the new copy then gets a numbered name). Its finished file, state and part
 /// file, as for any download; with `yt_dlp` (Options' overwrite, chosen: never #342's automatic
-/// one), for a video also what yt-dlp left for it (`mdm_tools::video::own_files`). Never a file
+/// one), for a video also what yt-dlp left for it (`odm_tools::video::own_files`). Never a file
 /// another download may own: its file, or one named after its name or stem and a dot (its part
 /// files, running or paused) in that folder, letter case aside.
 ///
@@ -321,13 +321,13 @@ fn replaced(items: &[Item], id: u64, yt_dlp: bool) -> Option<crate::deleter::Doo
         .then(|| LeftoverSearch::of(items, id, true))
         .flatten()
         .map(|s| Box::new(move || s.find()) as crate::deleter::Later);
-    let later = if mdm_engine::mega::is_mega(&item.url) {
-        let cache = mdm_ipc::data_dir().map(|d| d.join("cache/downloads"));
-        let base = mdm_engine::mega::cache_base(&item.url, &item.dest, cache.as_deref());
+    let later = if odm_engine::mega::is_mega(&item.url) {
+        let cache = odm_ipc::data_dir().map(|d| d.join("cache/downloads"));
+        let base = odm_engine::mega::cache_base(&item.url, &item.dest, cache.as_deref());
         Some(Box::new(move || {
             vec![
-                mdm_engine::state::state_path(&base),
-                mdm_engine::naming::part_path(&base),
+                odm_engine::state::state_path(&base),
+                odm_engine::naming::part_path(&base),
             ]
         }) as crate::deleter::Later)
     } else {
@@ -355,7 +355,7 @@ fn replaced_files(items: &[Item], id: u64, yt_dlp: bool) -> Option<Vec<PathBuf>>
     replaced(items, id, yt_dlp).map(crate::deleter::Doomed::all_files)
 }
 
-/// What yt-dlp left beside video download `id`'s file (`mdm_tools::video::own_files`): the
+/// What yt-dlp left beside video download `id`'s file (`odm_tools::video::own_files`): the
 /// streams of an unfinished run or a failed merge, their part files, the merge's file; with
 /// `outputs`, also the finished file and its subtitles. Never a file another download in that
 /// folder may own: one named after its name or stem and a dot, letter case aside. Nothing for a
@@ -423,7 +423,7 @@ impl LeftoverSearch {
     /// The look in the folder (the disk).
     fn find(self) -> Vec<PathBuf> {
         let low = |p: &std::path::Path| p.to_string_lossy().to_lowercase();
-        let mut found = mdm_tools::video::own_files(&self.dir, &self.stem, self.outputs);
+        let mut found = odm_tools::video::own_files(&self.dir, &self.stem, self.outputs);
         for p in self.kept {
             if p.is_file() && !found.iter().any(|f| low(f) == low(&p)) {
                 found.push(p);
@@ -444,8 +444,8 @@ impl LeftoverSearch {
 }
 
 /// The quality menu's answer for its choice after the duplicate check: a new download started or
-/// queued; else `sent` (the one already there was opened or resumed, or MDM asks what to do in its
-/// Duplicate window), which the extension shows as sent to MDM.
+/// queued; else `sent` (the one already there was opened or resumed, or ODM asks what to do in its
+/// Duplicate window), which the extension shows as sent to ODM.
 fn menu_answer(step: DupStep, start_now: bool) -> &'static str {
     use ipc::api::lookup;
     match step {
@@ -557,7 +557,7 @@ enum Cmd {
     /// Tasks → Add batch download from clipboard (#709): the copied text's links in Link
     /// grabber, or a copied numbered address in Batch download.
     BatchClipboard,
-    /// Tasks → Download video from a page… (yt-dlp, M9).
+    /// Tasks → Add video download (yt-dlp, M9).
     VideoPage,
     /// Add torrent → Add magnet link… (M15): the Add torrent dialog, empty or with the
     /// clipboard's magnet.
@@ -611,7 +611,7 @@ enum RssEvent {
         rule: u64,
         feed: u64,
         title: String,
-        res: Result<mdm_torrent::Meta, String>,
+        res: Result<odm_torrent::Meta, String>,
     },
 }
 
@@ -685,19 +685,19 @@ fn place_in(
         Some(i) if i > 0 => (&name[..i], &name[i..]),
         _ => (name, ""),
     };
-    let mut at = mdm_engine::naming::destination(dir, name);
+    let mut at = odm_engine::naming::destination(dir, name);
     let mut n = 1u32;
     while !taken.insert(at.clone()) {
-        at = mdm_engine::naming::destination(dir, &format!("{stem} ({n}){ext}"));
+        at = odm_engine::naming::destination(dir, &format!("{stem} ({n}){ext}"));
         n += 1;
     }
     at
 }
 
 /// What a drag of the list's selected rows carries out (#1210): the files of the finished
-/// downloads among them, in the list's order (`rows`), as they are where MDM put them. A row not
+/// downloads among them, in the list's order (`rows`), as they are where ODM put them. A row not
 /// finished has no file to give yet and stays out (a drag of only those carries nothing, so none
-/// starts), and so does a file a drop took where MDM couldn't follow (#869: it isn't at its
+/// starts), and so does a file a drop took where ODM couldn't follow (#869: it isn't at its
 /// path). Whether each file is still there is the drag's to see, off the window's thread (#743).
 #[cfg_attr(not(windows), allow(dead_code))]
 fn drag_carries(
@@ -873,7 +873,7 @@ fn folder_has_untracked_item_files(item: &Item) -> bool {
     {
         let manifest = crate::torrents::torrent_file(&spec.hash)
             .and_then(|f| std::fs::read(f).ok())
-            .and_then(|b| mdm_torrent::files_from_bytes(&b).ok());
+            .and_then(|b| odm_torrent::files_from_bytes(&b).ok());
         if let Some(entries) = manifest {
             let allowed: Vec<PathBuf> = entries
                 .into_iter()
@@ -955,16 +955,16 @@ fn place_to_take(item: &Item, items: &[Item]) -> Option<PathBuf> {
             && !item
                 .dest
                 .file_stem()
-                .is_some_and(|s| mdm_engine::naming::stem_fits(dir, &s.to_string_lossy()));
+                .is_some_and(|s| odm_engine::naming::stem_fits(dir, &s.to_string_lossy()));
         let in_use = |s: &str| {
             let s = s.to_lowercase();
             others().any(|o| stem(o).as_ref() == Some(&s) && o.holds_place())
         };
         (too_long || others().any(|o| stem(o) == stem(item) && o.holds_place())).then(|| {
             if video.named {
-                mdm_engine::naming::typed_stem_destination(dir, &item.file_name, in_use)
+                odm_engine::naming::typed_stem_destination(dir, &item.file_name, in_use)
             } else {
-                mdm_engine::naming::stem_destination(dir, &item.file_name, in_use)
+                odm_engine::naming::stem_destination(dir, &item.file_name, in_use)
             }
         })
     } else {
@@ -995,7 +995,7 @@ fn video_place(item: &Item, items: &[Item]) -> Option<PathBuf> {
     // the old files being deleted there for a new start are gone (a duplicate overwritten: the
     // new copy takes its name, `naming::clear`).
     if let Some(dir) = item.dest.parent().filter(|d| !d.as_os_str().is_empty()) {
-        mdm_engine::naming::wait_cleared(dir);
+        odm_engine::naming::wait_cleared(dir);
         if item.video.is_some() {
             let _ = std::fs::create_dir_all(dir);
         }
@@ -1016,9 +1016,9 @@ fn video_place(item: &Item, items: &[Item]) -> Option<PathBuf> {
         })
     };
     Some(if item.video.as_ref().is_some_and(|v| v.named) {
-        mdm_engine::naming::typed_stem_destination(dir, &item.file_name, in_use)
+        odm_engine::naming::typed_stem_destination(dir, &item.file_name, in_use)
     } else {
-        mdm_engine::naming::stem_destination(dir, &item.file_name, in_use)
+        odm_engine::naming::stem_destination(dir, &item.file_name, in_use)
     })
 }
 
@@ -1030,7 +1030,7 @@ fn video_place(item: &Item, items: &[Item]) -> Option<PathBuf> {
 struct RenameCheck {
     disabled: Option<&'static str>,
     is_dir: bool,
-    target: Option<(PathBuf, Option<mdm_engine::naming::Reservation>)>,
+    target: Option<(PathBuf, Option<odm_engine::naming::Reservation>)>,
 }
 
 impl RenameCheck {
@@ -1112,10 +1112,10 @@ fn next_trim(done: u32) -> Duration {
 }
 
 /// Started with the session (#226), the window waits hidden until the notification area is
-/// known: MDM's own tray icon created and a tray there to show it. A desktop's tray can come
-/// after MDM (GNOME's AppIndicator extension at sign-in answered 11.5 s after MDM's icon, on
-/// the lab's VM), and MDM's icon after its own first look: this long they are waited for,
-/// counted from MDM's icon (from the start while it has none), the window still hidden,
+/// known: ODM's own tray icon created and a tray there to show it. A desktop's tray can come
+/// after ODM (GNOME's AppIndicator extension at sign-in answered 11.5 s after ODM's icon, on
+/// the lab's VM), and ODM's icon after its own first look: this long they are waited for,
+/// counted from ODM's icon (from the start while it has none), the window still hidden,
 /// before it shows minimized.
 const TRAY_GRACE: Duration = Duration::from_secs(30);
 
@@ -1149,15 +1149,15 @@ fn tray_toggle_hide(
 enum AtLogin {
     /// Not known yet: hidden, looked at again in a second.
     Wait,
-    /// MDM's icon is in a notification area: the window stays hidden there.
+    /// ODM's icon is in a notification area: the window stays hidden there.
     Tray,
     /// No notification area within [`TRAY_GRACE`]: shown, minimized.
     Minimize,
 }
 
-/// `since` the start, and since MDM's tray `icon` was created (None: not yet): whether a tray
+/// `since` the start, and since ODM's tray `icon` was created (None: not yet): whether a tray
 /// `host` shows it (Windows, macOS: always one; Linux: a StatusNotifierWatcher, #59). The
-/// grace counts from the icon, so a slow start of MDM's own doesn't eat the desktop's time.
+/// grace counts from the icon, so a slow start of ODM's own doesn't eat the desktop's time.
 fn at_login(since: Duration, icon: Option<Duration>, host: bool) -> AtLogin {
     if icon.is_some() && host {
         AtLogin::Tray
@@ -1279,7 +1279,7 @@ pub struct App {
     file_info_waiting: std::collections::VecDeque<(dialogs::NewUrl, ipc::Command)>,
     /// Download File Info's open answers, for the download each was given to (by id) to start
     /// from (#28: a one-time link refuses a second request).
-    kept_answers: std::collections::HashMap<u64, mdm_engine::KeptAnswer>,
+    kept_answers: std::collections::HashMap<u64, odm_engine::KeptAnswer>,
     /// Help menu windows.
     about: Option<crate::help::About>,
     updates: Option<crate::help::Updates>,
@@ -1300,7 +1300,7 @@ pub struct App {
     /// Options was asked for from outside (the extension's Button settings..., `/show`): it comes
     /// to the front once shown, or it would open behind the browser (#77).
     raise_options: bool,
-    /// When MDM started (the update check waits a few seconds after it).
+    /// When ODM started (the update check waits a few seconds after it).
     started: Instant,
     /// When this run last checked for updates by itself (seconds since the epoch).
     update_checked_this_run: Option<i64>,
@@ -1420,7 +1420,7 @@ pub struct App {
     /// The torrent session, started on first use (D-014).
     torrent_host: crate::torrents::Host,
     /// The remote control (#141): paired phones and computers on the local network.
-    pub remote: Option<mdm_remote::Remote>,
+    pub remote: Option<odm_remote::Remote>,
     /// Torrents a paired device sent, their files being looked up (`remote::poll_torrents`).
     pub remote_torrents: Vec<crate::remote::Lookup>,
     /// Click'n'Load (#37): what pages post waits here, for its site's answer and Link grabber.
@@ -1432,9 +1432,9 @@ pub struct App {
     netwatch: crate::netwatch::NetWatch,
     /// Options → Accounts (#44): the debrid accounts downloads go through, and what they were
     /// set up from (so they are set up again only when that changes).
-    debrid: mdm_debrid::Debrid,
+    debrid: odm_debrid::Debrid,
     debrid_from: u64,
-    route: mdm_engine::Route,
+    route: odm_engine::Route,
     adapter_paused: Vec<u64>,
     /// Videos and galleries (#708): yt-dlp and gallery-dl take a speed limit only as they start
     /// (`--limit-rate`). The limits each running one was started under (`helper_limits`), the limit
@@ -1475,9 +1475,9 @@ pub struct App {
     /// A finished queue asked to turn the computer off: the countdown, cancellable.
     turn_off: Option<dialogs::TurnOffCountdown>,
     /// The global speed cap shared by every download (Speed Limiter settings).
-    global: std::sync::Arc<mdm_engine::limiter::Limiter>,
+    global: std::sync::Arc<odm_engine::limiter::Limiter>,
     /// Connection caps learned per host, shared by every download.
-    host_limits: std::sync::Arc<mdm_engine::hosts::HostLimits>,
+    host_limits: std::sync::Arc<odm_engine::hosts::HostLimits>,
     /// Scheduler → Download limits: traffic in the window, and what the limit holds back.
     quota: crate::quota::Quota,
     /// "Show warning before stopping downloads": the notice, while open.
@@ -1502,7 +1502,7 @@ pub struct App {
     trim_when_hidden: Option<Instant>,
     trims_since_hidden: u32,
     /// Started with the session, the window hidden until the notification area is known
-    /// (#226, [`at_login`]): when, when MDM's tray icon was first seen, and when it was last
+    /// (#226, [`at_login`]): when, when ODM's tray icon was first seen, and when it was last
     /// looked at.
     at_login: Option<Instant>,
     at_login_icon: Option<Instant>,
@@ -1645,10 +1645,10 @@ fn page_data_for(link: &str, page: Option<&str>, data: Option<&str>) -> Option<S
 /// gallery's jobs show their saved files to, on their own threads before they say they are done
 /// (#1103): never on the window's thread, where a disk slow to take the mark froze the window
 /// (#510), and always before the file can be opened or renamed (a rename keeps the mark).
-pub(crate) fn mark_hook(url: &url::Url, referrer: Option<&str>) -> mdm_engine::FileHook {
+pub(crate) fn mark_hook(url: &url::Url, referrer: Option<&str>) -> odm_engine::FileHook {
     let web = matches!(url.scheme(), "http" | "https");
     let (url, referrer) = (url.to_string(), referrer.map(str::to_owned));
-    mdm_engine::FileHook::new(move |path: &std::path::Path| {
+    odm_engine::FileHook::new(move |path: &std::path::Path| {
         if web {
             crate::webmark::mark(path, &url, referrer.as_deref());
         }
@@ -1659,7 +1659,7 @@ pub(crate) fn mark_hook(url: &url::Url, referrer: Option<&str>) -> mdm_engine::F
 /// page itself when it is a Drive file's (`video_page`), or, when the button sent the player's
 /// own stream (on Google's hosts), the page it came from (`referer`). None for any other video.
 fn drive_file_behind_player(cmd: &ipc::Command) -> Option<String> {
-    use mdm_engine::sites::gdrive;
+    use odm_engine::sites::gdrive;
     let drive_file = |s: &str| {
         url::Url::parse(s)
             .ok()
@@ -1694,10 +1694,10 @@ fn drive_file_behind_player(cmd: &ipc::Command) -> Option<String> {
 /// being dropped. The one place that reads it.
 fn add_checksum(
     cmd: &ipc::Command,
-) -> Result<Option<mdm_engine::verify::Hash>, (&'static str, &'static str)> {
+) -> Result<Option<odm_engine::verify::Hash>, (&'static str, &'static str)> {
     match cmd.checksum.as_deref() {
         None => Ok(None),
-        Some(text) => mdm_engine::verify::Hash::parse(text).map(Some).ok_or((
+        Some(text) => odm_engine::verify::Hash::parse(text).map(Some).ok_or((
             "bad-request",
             "not a readable checksum (hex MD5, SHA-1, SHA-256, SHA-512 or CRC32, optionally \
              named \"sha256:…\")",
@@ -1735,7 +1735,7 @@ enum VideoGoes {
 
 /// Where a video added goes: Download Now (`start_now`) starts it; Later asks which queue when
 /// Options say so (`queue_panel`). A choice made in the browser's quality menu (`from_menu`,
-/// with Options' "only add to the queue") asks nothing in MDM's window, which the browser's
+/// with Options' "only add to the queue") asks nothing in ODM's window, which the browser's
 /// choice doesn't open: it goes into the main queue, as the browser's own downloads do then
 /// (`open_url`'s silent path). Never in no queue at all, which a cancelled panel would leave it.
 fn video_goes(start_now: bool, from_menu: bool, queue_panel: bool) -> VideoGoes {
@@ -1770,7 +1770,6 @@ fn file_icon(name: &str) -> IconKey {
 /// Sort key for list column col: numbers where IDM sorts numerically, else text.
 /// `queued`: the download is in a queue (the Q column's mark).
 fn sort_key(it: &Item, col: usize, queued: bool) -> (f64, String) {
-    let frac = it.fraction().unwrap_or(0.0);
     match col {
         0 => (0.0, it.file_name.to_lowercase()),
         // As the column shows it: in a queue or not.
@@ -1780,7 +1779,7 @@ fn sort_key(it: &Item, col: usize, queued: bool) -> (f64, String) {
             if it.status == Status::Complete {
                 2.0
             } else {
-                frac
+                it.fraction().unwrap_or(0.0)
             },
             String::new(),
         ),
@@ -1803,7 +1802,7 @@ fn sort_key(it: &Item, col: usize, queued: bool) -> (f64, String) {
         ),
         // Added: the order of addition itself (ids only grow), exact even without a time.
         list::ADDED => (it.id as f64, String::new()),
-        list::SOURCE => (f64::from(u8::from(it.torrent.is_some())), String::new()),
+        list::SOURCE => (f64::from(u8::from(torrent_source(it))), String::new()),
         // A torrent's upload, its peers, and its share ratio (not the text: "10" would come
         // before "9"). Anything but a torrent, and a torrent that has taken nothing, sorts as
         // zero.
@@ -1823,6 +1822,24 @@ fn sort_key(it: &Item, col: usize, queued: bool) -> (f64, String) {
         ),
         _ => (0.0, it.description.to_lowercase()),
     }
+}
+
+fn torrent_source(it: &Item) -> bool {
+    it.torrent.is_some() || it.remote.is_some()
+}
+
+#[cfg(test)]
+#[test]
+fn source_sort_groups_debrid_torrents_with_other_torrents() {
+    let mut item = Item::new(
+        1,
+        "https://example.com/file".parse().unwrap(),
+        PathBuf::from("file"),
+        Category::General,
+    );
+    assert_eq!(sort_key(&item, list::SOURCE, false).0, 0.0);
+    item.remote = Some(model::RemoteSpec::default());
+    assert_eq!(sort_key(&item, list::SOURCE, false).0, 1.0);
 }
 
 /// Silk icons standing in for IDM's XP-era category icons.
@@ -1859,7 +1876,7 @@ impl App {
         self.exiting
     }
 
-    /// Every way MDM is asked to quit comes here: File → Exit, the tray's Exit, `/exit` (the
+    /// Every way ODM is asked to quit comes here: File → Exit, the tray's Exit, `/exit` (the
     /// command line, a second launch), Update now, and a queue's or a download's "Exit when done".
     /// The close that follows quits whatever Options' "Keep running when closing the window" says
     /// (`tray::on_close`); only closing the window itself follows that setting. As the app goes
@@ -1897,21 +1914,21 @@ impl App {
         }
         // "Launch on startup" is whatever the Run key says (the installer may have set it); on
         // Linux and macOS, the autostart entry / LaunchAgent.
-        // An entry written before #226 (by versions before 0.5.0, or by their installer) starts MDM
+        // An entry written before #226 (by versions before 0.5.0, or by their installer) starts ODM
         // with its window in front: written again, with the argument that starts it in the
         // notification area. Only an entry for this very program (not one a copy elsewhere
         // wrote), and never by a portable copy, which writes nothing outside its folder.
         #[cfg(windows)]
         {
             settings.launch_on_startup = crate::win32::run_at_startup();
-            if settings.launch_on_startup && mdm_ipc::portable_dir().is_none() {
+            if settings.launch_on_startup && odm_ipc::portable_dir().is_none() {
                 crate::win32::update_run_at_startup();
             }
         }
         #[cfg(unix)]
         {
             settings.launch_on_startup = crate::unix::run_at_startup();
-            if settings.launch_on_startup && mdm_ipc::portable_dir().is_none() {
+            if settings.launch_on_startup && odm_ipc::portable_dir().is_none() {
                 crate::unix::update_run_at_startup();
             }
         }
@@ -2120,7 +2137,7 @@ impl App {
             netwatch: Default::default(),
             debrid: Default::default(),
             debrid_from: 0,
-            route: mdm_engine::Route::Any,
+            route: odm_engine::Route::Any,
             adapter_paused: Vec::new(),
             helper_rates: HashMap::new(),
             helper_started: HashMap::new(),
@@ -2136,7 +2153,7 @@ impl App {
             rename_checks: Vec::new(),
             deferred_torrent_queue,
             turn_off: None,
-            global: std::sync::Arc::new(mdm_engine::limiter::Limiter::new(None)),
+            global: std::sync::Arc::new(odm_engine::limiter::Limiter::new(None)),
             host_limits: Default::default(),
             quota: Default::default(),
             limit_notice: None,
@@ -2369,18 +2386,21 @@ impl App {
 
     /// "2 downloading, 1.25 MB/sec" while downloads run (the status strip, the tray's tip).
     fn activity(&self) -> Option<String> {
-        let running: Vec<&Item> = self.items.iter().filter(|i| i.live.is_some()).collect();
-        if running.is_empty() {
+        let (running, speed) = self
+            .items
+            .iter()
+            .filter(|i| i.live.is_some())
+            .fold((0, 0.0), |(n, rate), i| (n + 1, rate + i.rate()));
+        if running == 0 {
             return None;
         }
-        let speed: f64 = running.iter().map(|i| i.rate()).sum();
         Some(crate::i18n::fmt(
             // i18n: {count} = "2 downloading"; {speed} = all of them together, like "1.25 MB/sec"
             crate::i18n::t("{count}, {speed}"),
             &[
                 (
                     "count",
-                    &crate::i18n::tn(running.len() as u64, "{n} downloading", "{n} downloading"),
+                    &crate::i18n::tn(running, "{n} downloading", "{n} downloading"),
                 ),
                 ("speed", &model::rate(speed)),
             ],
@@ -2404,7 +2424,7 @@ impl App {
             .flat_map(|q| q.items.iter().copied())
             .collect();
         let running = self.running();
-        self.view_items()
+        self.view_items(Some(&queued))
             .into_iter()
             .map(|it| (it.id, self.row(it, &queued, running)))
             .filter(|(_, r)| list::matches(&self.list, r))
@@ -2453,7 +2473,7 @@ impl App {
                 it.error.clone().unwrap_or_else(|| it.description.clone()),
                 it.added.as_deref().map_or(String::new(), model::date_text),
                 // A torrent through a debrid account is a torrent too (#44).
-                if it.torrent.is_some() || it.remote.is_some() {
+                if torrent_source(it) {
                     // i18n: where a download comes from: BitTorrent (shown on a small colored label)
                     "Torrent".into()
                 } else {
@@ -2513,23 +2533,51 @@ impl App {
 
     /// The view's downloads in the list's order, before the column filters.
     fn view_ids(&self) -> Vec<u64> {
-        self.view_items().iter().map(|i| i.id).collect()
+        self.view_items(None).iter().map(|i| i.id).collect()
     }
 
     /// [`Self::view_ids`]'s downloads themselves (each sort key worked out once, not at
     /// every comparison).
-    fn view_items(&self) -> Vec<&Item> {
-        let shown = self.items.iter().filter(|i| self.in_view(self.view, i));
+    fn view_items(&self, queued: Option<&std::collections::HashSet<u64>>) -> Vec<&Item> {
+        let members: Option<std::collections::HashSet<_>> = match self.view {
+            View::Queue(q) => Some(
+                self.queues
+                    .get(q)
+                    .into_iter()
+                    .flat_map(|q| q.items.iter().copied())
+                    .collect(),
+            ),
+            _ => None,
+        };
+        let shown = self.items.iter().filter(|i| match &members {
+            Some(ids) => ids.contains(&i.id),
+            None => self.in_view(self.view, i),
+        });
         let Some((col, asc)) = self.list.sort else {
             return shown.collect();
         };
-        let queued: std::collections::HashSet<u64> = self
-            .queues
-            .iter()
-            .flat_map(|q| q.items.iter().copied())
-            .collect();
+        let queued_by_sort;
+        let queued = if col == 1 && queued.is_none() {
+            queued_by_sort = self
+                .queues
+                .iter()
+                .flat_map(|q| q.items.iter().copied())
+                .collect();
+            Some(&queued_by_sort)
+        } else {
+            queued
+        };
         let mut keyed: Vec<((f64, String), &Item)> = shown
-            .map(|i| (sort_key(i, col, queued.contains(&i.id)), i))
+            .map(|i| {
+                (
+                    sort_key(
+                        i,
+                        col,
+                        col == 1 && queued.is_some_and(|q| q.contains(&i.id)),
+                    ),
+                    i,
+                )
+            })
             .collect();
         keyed.sort_by(|(ka, _), (kb, _)| {
             let ord = ka.0.total_cmp(&kb.0).then_with(|| ka.1.cmp(&kb.1));
@@ -2834,7 +2882,7 @@ impl App {
     /// everything running stops (its connections were held to the route before, or to none;
     /// sockets that are bound can't leak, this is so they don't wait for a timeout) and the
     /// torrent session with it; what was stopped so starts again once the route lets it.
-    /// Each frame (#44): the debrid accounts set up again when they, or MDM's network settings
+    /// Each frame (#44): the debrid accounts set up again when they, or ODM's network settings
     /// (the API calls take the same proxy, DNS and adapter), changed; then the services' host
     /// lists read, off the window's thread. No account: no request at all.
     fn debrid_tick(&mut self) {
@@ -2851,7 +2899,7 @@ impl App {
             return;
         }
         self.debrid_from = from;
-        let accounts: Vec<mdm_debrid::Account> = self
+        let accounts: Vec<odm_debrid::Account> = self
             .settings
             .debrid_accounts
             .iter()
@@ -2885,7 +2933,7 @@ impl App {
             let before = std::mem::replace(&mut self.route, route.clone());
             self.route_changed(&before);
         }
-        if matches!(self.route, mdm_engine::Route::Down { .. }) || self.adapter_paused.is_empty() {
+        if matches!(self.route, odm_engine::Route::Down { .. }) || self.adapter_paused.is_empty() {
             return;
         }
         // Started again once their jobs have ended.
@@ -2902,9 +2950,9 @@ impl App {
         }
     }
 
-    fn route_changed(&mut self, before: &mdm_engine::Route) {
+    fn route_changed(&mut self, before: &odm_engine::Route) {
         let note = match &self.route {
-            mdm_engine::Route::Down { label } => crate::i18n::fmt(
+            odm_engine::Route::Down { label } => crate::i18n::fmt(
                 // i18n: event log entry: the download stopped because the chosen network adapter (a VPN's, usually) went away; {adapter} its name
                 crate::i18n::t("Stopped: {adapter} is not connected; it goes on when it is back"),
                 &[("adapter", label)],
@@ -2972,7 +3020,7 @@ impl App {
             };
             // Keep the session's in-memory checking progress visible for stopped/complete
             // torrents too; normal download progress is restored when initialization ends.
-            i.torrent_check = (st.phase == mdm_torrent::Phase::Checking)
+            i.torrent_check = (st.phase == odm_torrent::Phase::Checking)
                 .then_some((st.checked.unwrap_or(st.done), st.total));
             let sent = self.accountant.sent(&spec.hash, st.uploaded);
             if sent > 0 {
@@ -2983,14 +3031,14 @@ impl App {
             // it changes as peers come and go, and the next tick brings the list up to date.
             spec.peers = st.peers_live;
             spec.up_speed = st.up_speed;
-            if st.phase == mdm_torrent::Phase::Finished && dt > 0 {
+            if st.phase == odm_torrent::Phase::Finished && dt > 0 {
                 spec.seeded_secs += dt;
                 changed = true;
             }
             // Torrent settings' seeding limits: a finished torrent over one stops being shared
             // (paused; it stays so after a restart, `complete_torrents`), with or without a Run.
             let mut stopped = None;
-            if st.phase == mdm_torrent::Phase::Finished
+            if st.phase == odm_torrent::Phase::Finished
                 && let Some(why) = crate::torrents::sharing_limit_reached(spec, st.done, limits)
             {
                 let (t2, hash) = (t.clone(), spec.hash.clone());
@@ -3013,7 +3061,7 @@ impl App {
             // checked it: the list's numbers are the session's. One not running in the list
             // takes its standing from them; one no longer complete is held paused (shared, it
             // would fetch what is missing out of sight).
-            if st.phase != mdm_torrent::Phase::Checking
+            if st.phase != odm_torrent::Phase::Checking
                 && !self.torrent_host.busy(&hash)
                 && let Some(report) = self.torrent_resync.remove(&hash)
             {
@@ -3105,10 +3153,10 @@ impl App {
         }
     }
 
-    /// `/show <window>` (mdm_ipc::Command::show): open one of the windows by name, as its menu
+    /// `/show <window>` (odm_ipc::Command::show): open one of the windows by name, as its menu
     /// command does. Unknown names do nothing.
     fn show_named(&mut self, name: &str, ctx: &egui::Context) {
-        // MDM_CRASH_TEST=1 only (crash.rs): a stall in a later tick of the window hidden in the
+        // ODM_CRASH_TEST=1 only (crash.rs): a stall in a later tick of the window hidden in the
         // notification area (#1126), which this hides rather than shows.
         if crate::crash::testing()
             && let Some(test) = name.strip_prefix("crash-test:")
@@ -3124,17 +3172,17 @@ impl App {
         let (window, tab) = name.split_once(':').unwrap_or((name, ""));
         match window {
             "addurl" => self.run(Cmd::AddUrl, None, ctx),
-            // MDM_CRASH_TEST=1 only (crash.rs): the crash reports' own check.
+            // ODM_CRASH_TEST=1 only (crash.rs): the crash reports' own check.
             "crash-test" => crate::crash::test(tab),
             "batch" => self.run(Cmd::Batch, None, ctx),
             // Tasks → Add batch download from clipboard (#709's checks: off-screen, the
-            // clipboard is MDM_TEST_CLIPBOARD's file).
+            // clipboard is ODM_TEST_CLIPBOARD's file).
             "batch-clipboard" => self.run(Cmd::BatchClipboard, None, ctx),
             "find" => self.run(Cmd::Find, None, ctx),
             "scheduler" => self.run(Cmd::Scheduler, None, ctx),
             "about" => self.run(Cmd::About, None, ctx),
             // Update now's end-to-end tests (feature `test-update`, never in a release): Update
-            // now pressed in the window `/show updates` opened (against MDM_UPDATE_FEED).
+            // now pressed in the window `/show updates` opened (against ODM_UPDATE_FEED).
             #[cfg(feature = "test-update")]
             "update-now" => {
                 if let Some(u) = &mut self.updates {
@@ -3161,7 +3209,7 @@ impl App {
                     ctx.set_zoom_factor(z);
                 }
             }
-            // The system's graphics API's device lost on purpose (Direct3D, Vulkan, Metal); MDM
+            // The system's graphics API's device lost on purpose (Direct3D, Vulkan, Metal); ODM
             // starts again (renderer.rs).
             #[cfg(gpu)]
             "renderer-lost" if crate::offscreen() => crate::renderer::test_device_lost(),
@@ -3198,7 +3246,7 @@ impl App {
             "category" | "category-delete" | "category-remove" => {
                 if let Some(c) = Category::all()
                     .into_iter()
-                    // `/show` arrives in lower case (mdm_ipc::parse_args).
+                    // `/show` arrives in lower case (odm_ipc::parse_args).
                     .find(|c| c.key().eq_ignore_ascii_case(tab) || c.shown().to_lowercase() == tab)
                 {
                     let cmd = if window == "category" {
@@ -3383,7 +3431,7 @@ impl App {
                     .find(|i| {
                         i.status == Status::Complete
                             && crate::extractq::archive_name(&i.file_name)
-                            && mdm_extract::volume_key(&i.file_name).is_none_or(|v| v.is_first())
+                            && odm_extract::volume_key(&i.file_name).is_none_or(|v| v.is_first())
                     })
                     .or(self.items.last())
                     .map(|i| i.id);
@@ -3454,7 +3502,7 @@ impl App {
             }
             return;
         }
-        // The startup entry's (#226): this start began in the tray (main.rs), or MDM already
+        // The startup entry's (#226): this start began in the tray (main.rs), or ODM already
         // ran; either way the window stays where it is.
         if cmd.startup {
             return;
@@ -3493,14 +3541,14 @@ impl App {
         // Its menu: never on this site.
         if let Some(host) = cmd.panel_hide_site.as_deref() {
             self.settings.video_panel_sites =
-                mdm_ipc::capture::add_site(&self.settings.video_panel_sites, host);
+                odm_ipc::capture::add_site(&self.settings.video_panel_sites, host);
             self.dirty = true;
             return;
         }
         // Its "Turn on": on this site again.
         if let Some(host) = cmd.panel_show_site.as_deref() {
             self.settings.video_panel_sites =
-                mdm_ipc::capture::remove_site(&self.settings.video_panel_sites, host);
+                odm_ipc::capture::remove_site(&self.settings.video_panel_sites, host);
             self.dirty = true;
             return;
         }
@@ -3549,14 +3597,14 @@ impl App {
         // The browser's toolbar button: this site's downloads stay with the browser.
         if let Some(host) = cmd.exclude_site.as_deref() {
             self.settings.excluded_sites =
-                mdm_ipc::capture::add_site(&self.settings.excluded_sites, host);
+                odm_ipc::capture::add_site(&self.settings.excluded_sites, host);
             self.dirty = true;
             return;
         }
-        // Its Undo (#404): that site's downloads come to MDM again.
+        // Its Undo (#404): that site's downloads come to ODM again.
         if let Some(host) = cmd.include_site.as_deref() {
             self.settings.excluded_sites =
-                mdm_ipc::capture::unlist_site(&self.settings.excluded_sites, host);
+                odm_ipc::capture::unlist_site(&self.settings.excluded_sites, host);
             self.dirty = true;
             return;
         }
@@ -3566,7 +3614,7 @@ impl App {
         // A magnet link or a .torrent file (browser, command line, file association): Add
         // torrent shows what it holds.
         if let Some(m) = cmd.url.as_deref().filter(|u| {
-            mdm_torrent::Source::magnet(u).is_some()
+            odm_torrent::Source::magnet(u).is_some()
                 || (u.to_ascii_lowercase().ends_with(".torrent")
                     && std::path::Path::new(u.trim_matches('"')).is_file())
         }) {
@@ -3579,7 +3627,7 @@ impl App {
             .url
             .as_deref()
             .and_then(|u| url::Url::parse(u.trim()).ok())
-            .filter(mdm_engine::supported);
+            .filter(odm_engine::supported);
         let Some(url) = url else {
             if !cmd.start_queue {
                 // A plain second launch brings the window to the front, as IDM does.
@@ -3623,7 +3671,7 @@ impl App {
                 .name
                 .clone()
                 .unwrap_or_else(|| crate::model::browser_guess(&url, &cmd));
-            let name = mdm_engine::naming::sanitize(&name);
+            let name = odm_engine::naming::sanitize(&name);
             // The automation API's `category` (by its key) and `queue` (by name), when given.
             let category = cmd
                 .category
@@ -3643,7 +3691,7 @@ impl App {
             // Its name as given, numbered on as it starts if it is taken then (#743): the window
             // doesn't wait for the folder, and a duplicate overwritten just before leaves its name
             // to it once its files are gone (`naming::clear`).
-            let dest = mdm_engine::naming::guess(&dir, &name);
+            let dest = odm_engine::naming::guess(&dir, &name);
             let later = cmd.later || (skip_dialog && self.settings.only_add_to_queue);
             let source = if cmd.referer.is_some() || cmd.cookies.is_some() {
                 crate::i18n::mark("from the browser")
@@ -3679,7 +3727,7 @@ impl App {
         direct: bool,
     ) -> RequestParts {
         let site_login = self.settings.site_login(url);
-        let url_login = mdm_engine::ftp::is_ftp(url)
+        let url_login = odm_engine::ftp::is_ftp(url)
             .then(|| url_login(url))
             .flatten();
         let mut headers = auth_headers(login.or(site_login.as_ref()).or(url_login.as_ref()));
@@ -3704,7 +3752,7 @@ impl App {
         let own = self.settings.own_user_agent();
         let given = context.user_agent.as_deref().or(own);
         let opts = Options {
-            mega_cache: mdm_ipc::data_dir().map(|d| d.join("cache/downloads")),
+            mega_cache: odm_ipc::data_dir().map(|d| d.join("cache/downloads")),
             max_connections: self.settings.connections_for(url),
             proxy: self.settings.proxy_for(context),
             dns: self.settings.dns(),
@@ -3716,24 +3764,24 @@ impl App {
             ignore_mtime: self.settings.ignore_mtime,
             server_time: self.settings.set_creation_date,
             ftp_passive: self.settings.ftp_passive,
-            user_agent: given.map_or_else(mdm_engine::agent::automatic, str::to_owned),
+            user_agent: given.map_or_else(odm_engine::agent::automatic, str::to_owned),
             automatic_agent: given.is_none(),
             // A browser's User-Agent (handed over, or the automatic one) may be refused on this
-            // connection (#372): the one set in Options, else MDM's former one (Internet
+            // connection (#372): the one set in Options, else ODM's former one (Internet
             // Explorer 11's, which such bot checks let through), is tried once then. One the
             // user set is the user's choice: no other.
             agent_fallback: match (context.user_agent.is_some(), own) {
                 (true, Some(own)) => Some(own.to_owned()),
-                (_, None) => Some(mdm_engine::agent::IE11_USER_AGENT.to_owned()),
+                (_, None) => Some(odm_engine::agent::IE11_USER_AGENT.to_owned()),
                 (false, Some(_)) => None,
             },
             // A site whose bot check refuses the browser's User-Agent and the browser-like
-            // connection too (#1422, SourceForge's): asked once more under MDM's own name, or
+            // connection too (#1422, SourceForge's): asked once more under ODM's own name, or
             // the one set in Options when a browser handed the download over. Again, one the
             // user set for every download is the user's choice: no other.
             own_agent: match (context.user_agent.is_some(), own) {
                 (true, Some(own)) => Some(own.to_owned()),
-                (_, None) => Some(mdm_engine::agent::OWN_USER_AGENT.to_owned()),
+                (_, None) => Some(odm_engine::agent::OWN_USER_AGENT.to_owned()),
                 (false, Some(_)) => None,
             },
             // Where the browser's own download of it ended: asked when the link itself is
@@ -3742,7 +3790,7 @@ impl App {
                 .final_url
                 .as_deref()
                 .and_then(|u| url::Url::parse(u).ok())
-                .filter(|f| f != url && mdm_engine::supported(f)),
+                .filter(|f| f != url && odm_engine::supported(f)),
             post: context.post.clone().map(|body| body.into_bytes().into()),
             on_file_created: Some(mark_hook(url, context.referer.as_deref())),
             // The browser's own download's type: a web page instead is an error (#533).
@@ -3754,7 +3802,7 @@ impl App {
             // (a script, a bare id) is named by its title when the engine names it.
             page_title: context.video_title.clone(),
             // The page it was started from (#607): a site whose links expire gives a fresh one
-            // there (Rapidgator's file page, `mdm_engine` `sites::origin`).
+            // there (Rapidgator's file page, `odm_engine` `sites::origin`).
             page: context
                 .page_url
                 .as_deref()
@@ -3806,15 +3854,15 @@ impl App {
         load: crate::resumeread::Loader,
         wake: impl Fn() + Send + Sync + 'static,
     ) {
-        let cache_root = mdm_ipc::data_dir().map(|d| d.join("cache/downloads"));
+        let cache_root = odm_ipc::data_dir().map(|d| d.join("cache/downloads"));
         let cached: std::collections::HashMap<PathBuf, PathBuf> = self
             .items
             .iter()
-            .filter(|i| mdm_engine::mega::is_mega(&i.url))
+            .filter(|i| odm_engine::mega::is_mega(&i.url))
             .map(|i| {
                 (
                     i.dest.clone(),
-                    mdm_engine::mega::cache_base(&i.url, &i.dest, cache_root.as_deref()),
+                    odm_engine::mega::cache_base(&i.url, &i.dest, cache_root.as_deref()),
                 )
             })
             .collect();
@@ -3822,7 +3870,7 @@ impl App {
             cached
                 .get(dest)
                 .and_then(|base| {
-                    mdm_engine::state::ResumeState::load(&mdm_engine::state::state_path(base)).ok()
+                    odm_engine::state::ResumeState::load(&odm_engine::state::state_path(base)).ok()
                 })
                 .or_else(|| load(dest))
         });
@@ -4365,13 +4413,13 @@ impl App {
             // is said if it can't go (open in a player); the row leaves the list all the same.
             let later = LeftoverSearch::of(&self.items, id, false)
                 .map(|s| Box::new(move || s.find()) as crate::deleter::Later);
-            let later = if mdm_engine::mega::is_mega(&i.url) {
-                let cache = mdm_ipc::data_dir().map(|d| d.join("cache/downloads"));
-                let base = mdm_engine::mega::cache_base(&i.url, &i.dest, cache.as_deref());
+            let later = if odm_engine::mega::is_mega(&i.url) {
+                let cache = odm_ipc::data_dir().map(|d| d.join("cache/downloads"));
+                let base = odm_engine::mega::cache_base(&i.url, &i.dest, cache.as_deref());
                 Some(Box::new(move || {
                     vec![
-                        mdm_engine::state::state_path(&base),
-                        mdm_engine::naming::part_path(&base),
+                        odm_engine::state::state_path(&base),
+                        odm_engine::naming::part_path(&base),
                     ]
                 }) as crate::deleter::Later)
             } else {
@@ -4699,10 +4747,10 @@ impl App {
 
     /// The tray icon: created once, its commands run, and closing the window hides it there.
     fn tray(&mut self, ctx: &egui::Context) {
-        // Off-screen test copies have none, but for MDM_TEST_TRAY=1 (#226's check: a start with
+        // Off-screen test copies have none, but for ODM_TEST_TRAY=1 (#226's check: a start with
         // the session shows the icon, and no window).
         let wanted =
-            !crate::offscreen() || std::env::var_os("MDM_TEST_TRAY").is_some_and(|v| v == "1");
+            !crate::offscreen() || std::env::var_os("ODM_TEST_TRAY").is_some_and(|v| v == "1");
         if self.tray.is_none() && self.tray_limiter.is_none() && wanted {
             // Linux: made beside the window, which never waits for the session bus (#828); until
             // it is, the window behaves as with no tray host.
@@ -4793,14 +4841,14 @@ impl App {
         }
         self.settle_at_login(ctx);
         // Hidden in the notification area, and the shell, running and answering, has said for
-        // some seconds that it has no icon of MDM's (lost, and not added back): the window comes
+        // some seconds that it has no icon of ODM's (lost, and not added back): the window comes
         // back to the taskbar, minimized. Never on no answer, or while Explorer isn't running
         // (it gives the icon back as it starts again).
         #[cfg(windows)]
         if self.hidden && self.at_login.is_none() && self.tray.as_ref().is_some_and(|t| t.rescue())
         {
             tracing::info!(
-                "hidden, and the shell has no tray icon of MDM's: back in the taskbar, minimized"
+                "hidden, and the shell has no tray icon of ODM's: back in the taskbar, minimized"
             );
             self.hidden = false;
             self.trim_when_hidden = None;
@@ -4848,6 +4896,11 @@ impl App {
                 TrayCmd::AddUrl => Cmd::AddUrl,
                 TrayCmd::Batch => Cmd::Batch,
                 TrayCmd::BatchClipboard => Cmd::BatchClipboard,
+                TrayCmd::VideoPage => {
+                    #[cfg(target_os = "macos")]
+                    crate::unix::macos_unhide_app();
+                    Cmd::VideoPage
+                }
                 TrayCmd::LimiterOn => Cmd::LimiterOn,
                 TrayCmd::LimiterOff => Cmd::LimiterOff,
                 TrayCmd::Scheduler => Cmd::Scheduler,
@@ -4869,8 +4922,8 @@ impl App {
         // closing closes, as any window's does: Options' "Keep running when closing the window"
         // off, no tray at all, or Linux with no tray host (#59: a hidden window couldn't come
         // back, and one that merely minimized could never be closed). macOS (#1125): the window
-        // closes into the Dock, as Mac apps' do, and a click on MDM's icon there brings it back.
-        // Asked to quit (`quit`: File → Exit, Cmd+Q, MDM → Quit, Exit when done…), the close quits
+        // closes into the Dock, as Mac apps' do, and a click on ODM's icon there brings it back.
+        // Asked to quit (`quit`: File → Exit, Cmd+Q, ODM → Quit, Exit when done…), the close quits
         // whatever the option.
         if ctx.input(|i| i.viewport().close_requested()) {
             use crate::tray::OnClose;
@@ -4890,7 +4943,7 @@ impl App {
             let taskbar = cfg!(not(target_os = "linux"));
             match crate::tray::on_close(quitting, keep, tray, icon, taskbar, dock) {
                 OnClose::Hide if dock => {
-                    tracing::info!("close: hidden; MDM's icon in the Dock brings it back");
+                    tracing::info!("close: hidden; ODM's icon in the Dock brings it back");
                     ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
                     self.hide_to_tray(ctx);
                 }
@@ -4986,7 +5039,7 @@ impl App {
     fn watch_clipboard(&mut self, ctx: &egui::Context) {
         // Looked at off the window's thread (clipboard.rs): the program that owns the clipboard
         // may hang, and a read that waits for it took the window with it (#418). The watch wakes
-        // the window only for a newly copied text: an idle MDM draws no frame for it (#847).
+        // the window only for a newly copied text: an idle ODM draws no frame for it (#847).
         let on = self.settings.clipboard_autostart;
         crate::clipboard::watch(on);
         let Some(text) = crate::clipboard::copied().filter(|_| on) else {
@@ -5001,8 +5054,8 @@ impl App {
         let Ok(url) = url::Url::parse(&text) else {
             return;
         };
-        let name = mdm_engine::naming::file_name(None, &url);
-        if mdm_engine::supported(&url) && self.settings.clipboard_type(&name) {
+        let name = odm_engine::naming::file_name(None, &url);
+        if odm_engine::supported(&url) && self.settings.clipboard_type(&name) {
             // Where a Download File Info came from, without the address (#1157).
             tracing::info!("clipboard: a newly copied link, offered for download");
             let cmd = ipc::Command {
@@ -5068,7 +5121,7 @@ impl App {
         let move_to = c
             .move_to
             .filter(|dir| item.dest.parent() != Some(dir.as_path()))
-            .map(|dir| mdm_engine::naming::destination(&dir, &item.file_name));
+            .map(|dir| odm_engine::naming::destination(&dir, &item.file_name));
         if rerouted || readdressed.is_some() {
             self.rewrite_state(c.id, rerouted, readdressed);
         }
@@ -5092,22 +5145,22 @@ impl App {
         else {
             return;
         };
-        let cache_root = mdm_ipc::data_dir().map(|d| d.join("cache/downloads"));
+        let cache_root = odm_ipc::data_dir().map(|d| d.join("cache/downloads"));
         let state = self
             .items
             .iter()
-            .find(|i| i.id == id && mdm_engine::mega::is_mega(&i.url))
+            .find(|i| i.id == id && odm_engine::mega::is_mega(&i.url))
             .map(|i| {
-                mdm_engine::state::state_path(&mdm_engine::mega::cache_base(
+                odm_engine::state::state_path(&odm_engine::mega::cache_base(
                     &i.url,
                     &place,
                     cache_root.as_deref(),
                 ))
             })
-            .unwrap_or_else(|| mdm_engine::state::state_path(&place));
+            .unwrap_or_else(|| odm_engine::state::state_path(&place));
 
         self.deleter.rewrite(&place, move || {
-            if let Ok(mut saved) = mdm_engine::state::ResumeState::load(&state) {
+            if let Ok(mut saved) = odm_engine::state::ResumeState::load(&state) {
                 if rerouted {
                     saved.final_url = saved.url.clone();
                 }
@@ -5130,7 +5183,7 @@ impl App {
     /// download (nor a private row's: its cookies stay its own), a form's, or a paired device's.
     fn take_fresh_address(&mut self, url: &url::Url, cmd: &ipc::Command) -> bool {
         // The browser's own hand-off (the native host's command), not what a command carries: a
-        // script's add (`mdm add --cookie`, MCP `add_download`) is a download of its own.
+        // script's add (`odm add --cookie`, MCP `add_download`) is a download of its own.
         let from_browser = cmd.browser_handoff && !cmd.remote && !cmd.private && cmd.post.is_none();
         if !from_browser {
             return false;
@@ -5139,7 +5192,7 @@ impl App {
             .name
             .clone()
             .unwrap_or_else(|| crate::model::browser_guess(url, cmd));
-        let name = mdm_engine::naming::sanitize(&name);
+        let name = odm_engine::naming::sanitize(&name);
         let page = cmd.page_url.as_deref().filter(|p| !p.is_empty());
         let offer = crate::freshlink::Offer {
             url,
@@ -5374,7 +5427,7 @@ impl App {
             return false;
         }
         let Some(spec) = torrent_spec else {
-            // A file or a folder of MDM's own: renamed on a thread of its own (#1103), as a disk
+            // A file or a folder of ODM's own: renamed on a thread of its own (#1103), as a disk
             // slow to answer would hold the window meanwhile; `poll_deferred_torrent_renames`
             // takes the answer. Cleared now, as for a torrent below.
             let side = self.item(id).map(|i| {
@@ -5423,7 +5476,7 @@ impl App {
             Err(hold) => {
                 drop(hold);
                 // Keep `item.rename_on_complete` persisted in `downloads.json` while waiting
-                // for `torrent_host` so quitting MDM before it starts does not lose it.
+                // for `torrent_host` so quitting ODM before it starts does not lose it.
                 if !self.deferred_torrent_queue.contains(&id) {
                     self.deferred_torrent_queue.push(id);
                 }
@@ -5435,7 +5488,7 @@ impl App {
 
     /// A finished download's rename on completion (a file's or a torrent's, each on a thread of
     /// its own) is done: the row follows the new name, then its archive is extracted
-    /// (`notify_ui`; not while MDM exits).
+    /// (`notify_ui`; not while ODM exits).
     fn apply_finished_rename(
         &mut self,
         id: u64,
@@ -5580,7 +5633,7 @@ impl App {
         &mut self,
         page: String,
         context: ipc::Command,
-        profile: mdm_tools::config::Profile,
+        profile: odm_tools::config::Profile,
         start_now: bool,
         ctx: &egui::Context,
     ) {
@@ -5595,39 +5648,39 @@ impl App {
         let net = crate::settings::own_net();
         self.rt.spawn(async move {
             let result = async {
-                let tools = mdm_tools::tools_dir().ok_or("Orbit's tool folder is unavailable")?;
-                let tool = match mdm_tools::installed(&tools) {
+                let tools = odm_tools::tools_dir().ok_or("Orbit's tool folder is unavailable")?;
+                let tool = match odm_tools::installed(&tools) {
                     Some(t) => t,
-                    None => mdm_tools::install_latest(&tools, &net, None)
+                    None => odm_tools::install_latest(&tools, &net, None)
                         .await
                         .map_err(|e| e.to_string())?,
                 };
-                if mdm_tools::ffmpeg::installed(&tools).is_none() {
-                    mdm_tools::ffmpeg::install_latest(&tools, &net, None)
+                if odm_tools::ffmpeg::installed(&tools).is_none() {
+                    odm_tools::ffmpeg::install_latest(&tools, &net, None)
                         .await
                         .map_err(|e| e.to_string())?;
                 }
                 let browser = crate::videodlg::from_browser(&context);
                 let (exe, address) = (tool.exe, page.clone());
                 let lookup_profile = profile.clone();
-                let kept = mdm_tools::video::InfoSlot::new(Instant::now());
+                let kept = odm_tools::video::InfoSlot::new(Instant::now());
                 let looked = tokio::task::spawn_blocking(move || {
-                    mdm_tools::config::with_profile(lookup_profile, || {
+                    odm_tools::config::with_profile(lookup_profile, || {
                         crate::videodlg::look_up_cached(&exe, &address, &browser, &rt)
                     })
                 })
                 .await
                 .map_err(|e| e.to_string())??;
-                let mdm_tools::resolve::Looked::Video(video) = looked.0 else {
+                let odm_tools::resolve::Looked::Video(video) = looked.0 else {
                     return Err(
                         "Use an individual video link for a config-based direct download".into(),
                     );
                 };
                 let selector = profile.selector();
                 let audio =
-                    mdm_tools::resolve::audio_conversion(&selector).is_some() || selector == "ba/b";
+                    odm_tools::resolve::audio_conversion(&selector).is_some() || selector == "ba/b";
                 let ext = profile.value("--merge-output-format").unwrap_or("mkv");
-                let name = mdm_tools::preferences::filename(
+                let name = odm_tools::preferences::filename(
                     &profile.name_template,
                     &video.title,
                     &video.naming,
@@ -5641,7 +5694,7 @@ impl App {
                     None => (page, context),
                 };
                 kept.fill(looked.2.json, looked.2.without_cookies);
-                let preloaded = Some(mdm_tools::video::Preloaded {
+                let preloaded = Some(odm_tools::video::Preloaded {
                     slot: kept,
                     selector: selector.clone(),
                     label: "Configured download".into(),
@@ -5673,7 +5726,7 @@ impl App {
         });
     }
 
-    fn video_dialog(&self, page: Option<(&str, mdm_ipc::Command)>) -> crate::videodlg::VideoDialog {
+    fn video_dialog(&self, page: Option<(&str, odm_ipc::Command)>) -> crate::videodlg::VideoDialog {
         let dir = self.settings.category_dir(Category::Video, &self.downloads);
         let music = (!Category::Music.deleted())
             .then(|| self.settings.category_dir(Category::Music, &self.downloads));
@@ -5703,7 +5756,7 @@ impl App {
         // fit the path limits with the files the video has beside it; a name the user typed is
         // kept as typed (#1102). The folder is read beside the window (`video_place`): the row
         // shows the name as given until then, and a start waits for it.
-        let dest = mdm_engine::naming::stem_guess(&folder, &name, add.named);
+        let dest = odm_engine::naming::stem_guess(&folder, &name, add.named);
         let id = self.push_item(
             add.page,
             dest,
@@ -5746,7 +5799,7 @@ impl App {
     /// selected and scrolled to, in All Downloads when the view shown hides it (the button's
     /// "Show", #703).
     fn select_download_of(&mut self, address: &str) {
-        let looked = mdm_tools::pages::video_address(address.trim());
+        let looked = odm_tools::pages::video_address(address.trim());
         let found = self
             .items
             .iter()
@@ -5765,7 +5818,7 @@ impl App {
 
     /// The browser's quality menu over a video (crates/nmhost, videolookup.rs): a look-up
     /// started (answered at once, yt-dlp on a thread of its own), a question about one, or the
-    /// choice made there, added as Download video's Download Now adds it: MDM's window stays
+    /// choice made there, added as Download video's Download Now adds it: ODM's window stays
     /// where it is, the download's progress window opens (Options' "only add to the queue":
     /// into the main queue instead, with no queue panel either).
     fn quality_menu(&mut self, cmd: &ipc::Command) -> ipc::api::VideoLookupAnswer {
@@ -5776,9 +5829,9 @@ impl App {
         let now = Instant::now();
         if let Some(ask) = &cmd.video_lookup {
             crate::videodlg::refresh_ytdlp(&self.rt);
-            let Some(tool) = mdm_tools::tools_dir()
+            let Some(tool) = odm_tools::tools_dir()
                 .as_deref()
-                .and_then(mdm_tools::installed)
+                .and_then(odm_tools::installed)
             else {
                 return VideoLookupAnswer::failed(lookup::NO_YTDLP, None);
             };
@@ -5835,11 +5888,11 @@ impl App {
             .filter_map(|i| i.dest.file_stem())
             .map(|s| s.to_string_lossy().into_owned())
             .collect::<Vec<_>>();
-        let mut stems = mdm_engine::naming::Stems::listed(&folder, in_use);
+        let mut stems = odm_engine::naming::Stems::listed(&folder, in_use);
         self.items.reserve(add.entries.len());
         let mut ids = Vec::with_capacity(add.entries.len());
         for (page, title) in add.entries {
-            let stem = mdm_engine::naming::sanitize(&title);
+            let stem = odm_engine::naming::sanitize(&title);
             let dest = stems.pick(&format!("{stem}.{}", add.ext));
             let id = self.push_item(
                 page,
@@ -5856,7 +5909,7 @@ impl App {
             if let Some(item) = self.items.last_mut() {
                 item.video = Some(model::VideoSpec {
                     cookie_policy: item.context.video_cookies.clone(),
-                    ytdlp: mdm_tools::preferences::Preferences::read()
+                    ytdlp: odm_tools::preferences::Preferences::read()
                         .profile(false)
                         .ok(),
                     selector: add.selector.clone(),
@@ -5902,7 +5955,7 @@ impl App {
         rate
     }
 
-    /// Start a video item: yt-dlp (installed and verified) finds it, MDM's engine downloads its
+    /// Start a video item: yt-dlp (installed and verified) finds it, ODM's engine downloads its
     /// streams (#769).
     fn start_video(&mut self, id: u64, show: bool) {
         // Its place first, looked at beside the window (`video_place`: its folder is read): the
@@ -5914,9 +5967,9 @@ impl App {
             self.video_places.wait(id, show);
             return;
         }
-        let tools = mdm_tools::tools_dir();
-        let tool = tools.as_deref().and_then(mdm_tools::installed);
-        let ffmpeg = tools.as_deref().and_then(mdm_tools::ffmpeg::installed);
+        let tools = odm_tools::tools_dir();
+        let tool = tools.as_deref().and_then(odm_tools::installed);
+        let ffmpeg = tools.as_deref().and_then(odm_tools::ffmpeg::installed);
         let rate = self.helper_starts(id);
         // The engine downloads the streams with what a file from the page gets (#769): Options'
         // connections, proxy, network adapter and DNS, the limit for all downloads (shared with
@@ -5927,7 +5980,7 @@ impl App {
         let engine = self.items.iter().find(|i| i.id == id).map(|i| {
             let mut opts = self.request_parts(&i.url, None, &i.context, true).opts;
             opts.speed_limit = one_file;
-            mdm_tools::streams::Engine {
+            odm_tools::streams::Engine {
                 handle: self.rt.clone(),
                 opts,
             }
@@ -5939,10 +5992,8 @@ impl App {
         let Some(tool) = tool else {
             item.status = Status::Error;
             item.error = Some(
-                crate::i18n::t(
-                    "yt-dlp is not installed (Tasks → Download video from a page installs it)",
-                )
-                .into(),
+                crate::i18n::t("yt-dlp is not installed (Tasks → Add video download installs it)")
+                    .into(),
             );
             self.dirty = true;
             return;
@@ -5961,12 +6012,12 @@ impl App {
             .take()
             .filter(|p| p.slot.born().elapsed() < crate::videolookup::TTL);
         let profile = spec.ytdlp.clone().unwrap_or_else(|| {
-            mdm_tools::preferences::Preferences::read()
+            odm_tools::preferences::Preferences::read()
                 .profile(false)
                 .unwrap_or_default()
         });
         let profile = if spec.selector == "ba/b"
-            || mdm_tools::resolve::sound_only(
+            || odm_tools::resolve::sound_only(
                 &spec.selector,
                 item.dest.extension().and_then(|e| e.to_str()).unwrap_or(""),
             ) {
@@ -5974,8 +6025,8 @@ impl App {
         } else {
             profile
         };
-        let started = mdm_tools::config::with_profile(profile, || {
-            mdm_tools::video::VideoJob::start_with(
+        let started = odm_tools::config::with_profile(profile, || {
+            odm_tools::video::VideoJob::start_with(
                 &tool.exe,
                 item.url.as_str(),
                 &spec.selector,
@@ -6011,8 +6062,8 @@ impl App {
                 item.error = Some(match e {
                     // Its files would pass the path limits (#1102): said in the interface's
                     // language, with the video's path.
-                    mdm_tools::proc::ProcError::PathTooLong(_) => {
-                        crate::errors::describe(&mdm_engine::Error::PathTooLong(item.dest.clone()))
+                    odm_tools::proc::ProcError::PathTooLong(_) => {
+                        crate::errors::describe(&odm_engine::Error::PathTooLong(item.dest.clone()))
                     }
                     e => e.to_string(),
                 });
@@ -6056,9 +6107,9 @@ impl App {
 
     /// Start (or start again) a gallery: gallery-dl, installed and verified, or the person's.
     fn start_gallery(&mut self, id: u64, show: bool) {
-        let tool = mdm_tools::tools_dir()
+        let tool = odm_tools::tools_dir()
             .as_deref()
-            .and_then(mdm_tools::gallery::installed);
+            .and_then(odm_tools::gallery::installed);
         let rate = self.helper_starts(id);
         // The engine downloads the files gallery-dl lists (#769), as a file from the page would
         // be (Options' connections, proxy, network adapter, DNS, the limit for all downloads),
@@ -6067,7 +6118,7 @@ impl App {
         let engine = self.items.iter().find(|i| i.id == id).map(|i| {
             let mut opts = self.request_parts(&i.url, None, &i.context, true).opts;
             opts.speed_limit = one_file;
-            mdm_tools::streams::Engine {
+            odm_tools::streams::Engine {
                 handle: self.rt.clone(),
                 opts,
             }
@@ -6088,11 +6139,11 @@ impl App {
             self.dirty = true;
             return;
         };
-        let ask = mdm_tools::gallery::Ask {
+        let ask = odm_tools::gallery::Ask {
             limit: spec.limit,
             rate,
         };
-        let started = mdm_tools::gallery::GalleryJob::start(
+        let started = odm_tools::gallery::GalleryJob::start(
             &tool,
             item.url.as_str(),
             &item.dest,
@@ -6139,13 +6190,13 @@ impl App {
 
     /// Torrent settings' switch just turned on (#1091): when Windows still opens magnet links or
     /// .torrent files with another program (a choice in Default apps, which no program may
-    /// change), say which and open Settings at MDM's Default apps page, where the user picks it.
+    /// change), say which and open Settings at ODM's Default apps page, where the user picks it.
     /// An instance off the screens (a test's) never asks this computer: it takes the names in
-    /// MDM_TEST_TORRENT_DEFAULTS (`;` between them), and its log says what would have opened.
+    /// ODM_TEST_TORRENT_DEFAULTS (`;` between them), and its log says what would have opened.
     #[cfg(windows)]
     fn tell_torrent_defaults(&mut self) {
         let others = if crate::offscreen() {
-            std::env::var("MDM_TEST_TORRENT_DEFAULTS")
+            std::env::var("ODM_TEST_TORRENT_DEFAULTS")
                 .unwrap_or_default()
                 .split(';')
                 .map(str::trim)
@@ -6223,10 +6274,10 @@ impl App {
             && self.torrent_account().is_some()
             && let Some(magnet) = source
                 .as_deref()
-                .and_then(mdm_torrent::Source::magnet)
+                .and_then(odm_torrent::Source::magnet)
                 .and_then(|s| match s {
-                    mdm_torrent::Source::Magnet(m) => url::Url::parse(&m).ok(),
-                    mdm_torrent::Source::File(_) => None,
+                    odm_torrent::Source::Magnet(m) => url::Url::parse(&m).ok(),
+                    odm_torrent::Source::File(_) => None,
                 })
         {
             let dir = self
@@ -6265,7 +6316,7 @@ impl App {
 
     /// The debrid account torrents go to (#44): Options → Accounts' "Torrents and magnet links
     /// through the first account", with an account there.
-    fn torrent_account(&self) -> Option<(u64, mdm_debrid::ServiceKind)> {
+    fn torrent_account(&self) -> Option<(u64, odm_debrid::ServiceKind)> {
         (self.settings.debrid_on && self.settings.debrid_torrents)
             .then(|| self.debrid.torrent_account())
             .flatten()
@@ -6286,13 +6337,13 @@ impl App {
         };
         let name = renamed
             .as_deref()
-            .map(mdm_engine::naming::sanitize)
+            .map(odm_engine::naming::sanitize)
             .filter(|n| !n.is_empty())
             .or_else(|| {
                 magnet
                     .query_pairs()
                     .find(|(k, _)| k == "dn")
-                    .map(|(_, v)| mdm_engine::naming::sanitize(&v))
+                    .map(|(_, v)| odm_engine::naming::sanitize(&v))
                     .filter(|n| !n.is_empty())
             })
             .unwrap_or_else(|| "torrent".to_owned());
@@ -6313,7 +6364,7 @@ impl App {
             item.note(crate::i18n::fmt(
                 // i18n: event log: a torrent goes through the user's debrid account, not to peers; {service} its name ("Real-Debrid")
                 crate::i18n::t(
-                    "Through {service}: the service downloads the torrent, then MDM its files",
+                    "Through {service}: the service downloads the torrent, then ODM its files",
                 ),
                 &[("service", service.name())],
             ));
@@ -6350,9 +6401,9 @@ impl App {
         net.speed_limit = own.or(limit);
         let rt = self.rt.clone();
         let _guard = rt.enter();
-        let job = mdm_debrid::torrents::RemoteTorrent::start(
+        let job = odm_debrid::torrents::RemoteTorrent::start(
             &self.debrid,
-            mdm_debrid::torrents::Order {
+            odm_debrid::torrents::Order {
                 account: spec.account,
                 magnet: url,
                 transfer: spec.transfer.clone(),
@@ -6384,7 +6435,7 @@ impl App {
     /// download added, if one was (not when the debrid account takes it).
     fn add_torrent(&mut self, add: crate::torrentdlg::TorrentAdd) -> Option<u64> {
         let meta = &add.meta;
-        // MDM's own files for it (the record of its new name, the .torrent kept): written after
+        // ODM's own files for it (the record of its new name, the .torrent kept): written after
         // the changes under way beside the window (a Delete's, perhaps of this very torrent:
         // `torrents::KeptFiles`), else now as before.
         let after = crate::torrents::kept_files().changing();
@@ -6398,7 +6449,7 @@ impl App {
         }
         if self.torrent_account().is_some()
             && let Some(magnet) =
-                mdm_torrent::magnet_link(&meta.torrent).and_then(|m| url::Url::parse(&m).ok())
+                odm_torrent::magnet_link(&meta.torrent).and_then(|m| url::Url::parse(&m).ok())
         {
             let renamed = crate::torrent_rename::renamed_target(meta);
             self.add_remote_torrent(
@@ -6618,7 +6669,7 @@ impl App {
         }
     }
 
-    /// Fetch feed `id` in the background (once at a time), with MDM's own connection settings.
+    /// Fetch feed `id` in the background (once at a time), with ODM's own connection settings.
     fn rss_fetch(&mut self, id: u64) {
         let Some(feed) = self.rss.feeds.iter().find(|f| f.id == id) else {
             return;
@@ -6640,7 +6691,7 @@ impl App {
                     };
                     match crate::torrents::fetch_small(remote, crate::rss::MAX_FEED).await {
                         Ok(Some(bytes)) => crate::rss::parse(&String::from_utf8_lossy(&bytes)),
-                        // i18n: RSS: a feed bigger than MDM reads (5 MB)
+                        // i18n: RSS: a feed bigger than ODM reads (5 MB)
                         Ok(None) => Err(crate::i18n::t("larger than a feed can be").to_owned()),
                         Err(e) => Err(e),
                     }
@@ -6661,7 +6712,7 @@ impl App {
         );
         self.rt.spawn(async move {
             let res = async {
-                let src = match mdm_torrent::Source::magnet(&article.torrent) {
+                let src = match odm_torrent::Source::magnet(&article.torrent) {
                     Some(m) => m,
                     None => {
                         let url =
@@ -6673,7 +6724,7 @@ impl App {
                                 opts: crate::settings::own_net(),
                             },
                         };
-                        mdm_torrent::Source::File(crate::torrents::fetch_torrent(remote).await?)
+                        odm_torrent::Source::File(crate::torrents::fetch_torrent(remote).await?)
                     }
                 };
                 let t = host.session(known).await?;
@@ -6699,7 +6750,7 @@ impl App {
         rule: u64,
         feed: u64,
         title: &str,
-        res: Result<mdm_torrent::Meta, String>,
+        res: Result<odm_torrent::Meta, String>,
     ) {
         let Some(r) = self.rss.rules.iter().find(|r| r.id == rule).cloned() else {
             return;
@@ -6751,7 +6802,7 @@ impl App {
             self.rss.note(
                 now,
                 crate::i18n::fmt(
-                    // i18n: RSS feeds window, under the rules: not added, because files of its names are already in the folder (MDM never writes into them unasked)
+                    // i18n: RSS feeds window, under the rules: not added, because files of its names are already in the folder (ODM never writes into them unasked)
                     crate::i18n::t(
                         "{title}: not added: files of its names are already in {folder}",
                     ),
@@ -6969,14 +7020,14 @@ impl App {
     fn add_batch(&mut self, added: crate::batch::Added) {
         let mut ids = Vec::new();
         for url in added.urls {
-            let name = mdm_engine::naming::file_name(None, &url);
+            let name = odm_engine::naming::file_name(None, &url);
             let category = Category::of(&name);
             let dir = match &added.folder {
                 Some(folder) => folder.clone(),
                 None => self.settings.category_dir(category, &self.downloads),
             };
             // Numbered on as it starts if the name is taken then (#743): no disk here.
-            let dest = mdm_engine::naming::guess(&dir, &name);
+            let dest = odm_engine::naming::guess(&dir, &name);
             let id = self.push_item(
                 url,
                 dest,
@@ -7160,7 +7211,7 @@ impl App {
         line(&PairAnswer {
             qr: crate::remote::qr_text(&format!("{first}#pair={code}")),
             code,
-            minutes: (mdm_remote::pairing::VALID.as_secs() / 60) as u32,
+            minutes: (odm_remote::pairing::VALID.as_secs() / 60) as u32,
             urls,
         })
     }
@@ -7182,7 +7233,7 @@ impl App {
                     .find(|d| d.is_dir())
                     .map(std::path::Path::to_owned);
                 let free = at
-                    .and_then(|d| mdm_engine::disk::volume_of(&d))
+                    .and_then(|d| odm_engine::disk::volume_of(&d))
                     .map(|v| v.free);
                 slot.lock().unwrap().1 = free;
             });
@@ -7239,8 +7290,8 @@ impl App {
         let queue = cmd.later.then(|| queue.unwrap_or(0));
         let text = cmd.url.clone().unwrap_or_default();
         let torrent = match cmd.torrent_file.take() {
-            Some(bytes) => Some((mdm_torrent::Source::File(bytes), false)),
-            None => mdm_torrent::Source::magnet(text.trim()).map(|m| (m, true)),
+            Some(bytes) => Some((odm_torrent::Source::File(bytes), false)),
+            None => odm_torrent::Source::magnet(text.trim()).map(|m| (m, true)),
         };
         if let Some((source, from_magnet)) = torrent {
             let slot = self.look_up_torrent(source);
@@ -7260,9 +7311,9 @@ impl App {
         }
         let Some(url) = url::Url::parse(text.trim())
             .ok()
-            .filter(mdm_engine::supported)
+            .filter(odm_engine::supported)
         else {
-            return fail("unsupported", "not an address MDM downloads");
+            return fail("unsupported", "not an address ODM downloads");
         };
         // Already in the list: no one at the computer to ask, so Options' choice, with "ask"
         // taken as "add it again" (under a numbered name).
@@ -7278,11 +7329,11 @@ impl App {
                 _ => {}
             }
         }
-        let name = mdm_engine::naming::sanitize(&mdm_engine::naming::file_name(None, &url));
+        let name = odm_engine::naming::sanitize(&odm_engine::naming::file_name(None, &url));
         let category = category.unwrap_or_else(|| Category::of(&name));
         let dir = self.settings.category_dir(category, &self.downloads);
         // Numbered on as it starts if the name is taken then (#743): no disk here.
-        let dest = mdm_engine::naming::guess(&dir, &name);
+        let dest = odm_engine::naming::guess(&dir, &name);
         cmd.remote = false;
         let id = self.push_item(
             url,
@@ -7310,7 +7361,7 @@ impl App {
 
     /// A torrent's files looked up on the runtime (a magnet link asks the swarm); the answer
     /// comes in the slot.
-    fn look_up_torrent(&self, source: mdm_torrent::Source) -> crate::remote::Slot {
+    fn look_up_torrent(&self, source: odm_torrent::Source) -> crate::remote::Slot {
         let slot: crate::remote::Slot = Default::default();
         let (out, host, known) = (
             slot.clone(),
@@ -7473,7 +7524,7 @@ impl App {
         new.publish_categories();
         // Portable mode writes nothing outside its folder (the option is off there).
         if new.launch_on_startup != self.settings.launch_on_startup
-            && mdm_ipc::portable_dir().is_none()
+            && odm_ipc::portable_dir().is_none()
         {
             #[cfg(windows)]
             crate::win32::set_run_at_startup(new.launch_on_startup);
@@ -7753,7 +7804,7 @@ impl App {
 
     /// Files dragged out of Download complete (#869) or the list (#1210) that the drop target
     /// moved: the download follows its file where the shell said it went, or remembers it went
-    /// where MDM couldn't learn. Only while the download still points where the drag took the
+    /// where ODM couldn't learn. Only while the download still points where the drag took the
     /// file from.
     fn poll_dragged_out(&mut self) {
         use dialogs::DraggedFrom;
@@ -7784,15 +7835,15 @@ impl App {
                     item.note(crate::i18n::fmt(note, &[("folder", &folder)]));
                 }
                 dialogs::DraggedOut::MovedAway => {
-                    tracing::info!("drag out: download {id}'s file moved where MDM can't follow");
+                    tracing::info!("drag out: download {id}'s file moved where ODM can't follow");
                     item.moved_away = true;
                     item.note(match dragged_from {
                         DraggedFrom::Complete => crate::i18n::t(
-                            "Dragged out of Download complete and moved to a place MDM couldn't learn",
+                            "Dragged out of Download complete and moved to a place ODM couldn't learn",
                         ),
                         DraggedFrom::List => crate::i18n::t(
-                            // i18n: a download's note: its file was dragged out of the download list and moved somewhere MDM can't tell (a program took it, the Recycle Bin)
-                            "Dragged out of the list and moved to a place MDM couldn't learn",
+                            // i18n: a download's note: its file was dragged out of the download list and moved somewhere ODM can't tell (a program took it, the Recycle Bin)
+                            "Dragged out of the list and moved to a place ODM couldn't learn",
                         ),
                     });
                 }
@@ -7844,7 +7895,7 @@ impl App {
         let dest = target
             .and_then(|id| self.items.iter().find(|i| i.id == id))
             .map(|i| i.dest.clone());
-        // Its file dragged out of Download complete to a place MDM couldn't learn (#869).
+        // Its file dragged out of Download complete to a place ODM couldn't learn (#869).
         let moved_away = target
             .and_then(|id| self.items.iter().find(|i| i.id == id))
             .is_some_and(|i| i.moved_away);
@@ -7946,7 +7997,7 @@ impl App {
             Cmd::AddThemeFile => {
                 // i18n: title of the file dialog of View → Theme → Add a theme file
                 let title = crate::i18n::t("Add a theme file").to_owned();
-                // i18n: the kind of file View → Theme → Add a theme file lists: MDM's themes (TOML, JSON), Base16 schemes (YAML) and pywal's colors.json
+                // i18n: the kind of file View → Theme → Add a theme file lists: ODM's themes (TOML, JSON), Base16 schemes (YAML) and pywal's colors.json
                 let kinds = crate::i18n::t("Themes and colour schemes").to_owned();
                 let all = crate::i18n::t("All files").to_owned();
                 // Where pywal writes its colours, when it has: the first place to look.
@@ -7979,7 +8030,7 @@ impl App {
                 if Some(api) == crate::renderer::GPU {
                     crate::renderer::forget_failure();
                 } else {
-                    // OpenGL chosen again after it couldn't draw MDM (#835, #847): tried and
+                    // OpenGL chosen again after it couldn't draw ODM (#835, #847): tried and
                     // checked again.
                     crate::renderer::forget_gl_failure();
                 }
@@ -8093,6 +8144,8 @@ impl App {
             Cmd::VideoPage => {
                 if self.video_dlg.is_none() {
                     self.video_dlg = Some(self.video_dialog(None));
+                } else {
+                    dialogs::raise(ctx, dialogs::dialog_viewport("video-page"));
                 }
             }
             Cmd::AddMagnet => self.open_torrent_dialog(None, ctx),
@@ -8335,7 +8388,7 @@ impl App {
                 self.dirty = true;
                 match i.status {
                     Status::Complete => {
-                        // Downloaded again: its file is where MDM saved it.
+                        // Downloaded again: its file is where ODM saved it.
                         i.moved_away = false;
                         finished.push(i.id);
                     }
@@ -8632,7 +8685,7 @@ impl App {
                             crate::i18n::mark("Orbit Download Manager"),
                             crate::i18n::fmt(
                                 crate::i18n::t(
-                                    "The download list could not be saved: {error}. Changes are kept while MDM runs.",
+                                    "The download list could not be saved: {error}. Changes are kept while ODM runs.",
                                 ),
                                 &[("error", &e)],
                             ),
@@ -8669,12 +8722,7 @@ impl App {
                     true,
                     false,
                 ),
-                I(
-                    "Download &video from a page...",
-                    Cmd::VideoPage,
-                    true,
-                    false,
-                ),
+                I("Add &video download", Cmd::VideoPage, true, false),
                 // i18n: Tasks menu: open Link grabber (links in packages, to tick before adding)
                 I("&Link grabber...", Cmd::LinkGrabber, true, false),
                 // i18n: Tasks menu: the RSS feeds window (feeds of torrents, and rules that add them)
@@ -8801,7 +8849,7 @@ impl App {
                     true,
                     self.settings.dark_mode_support,
                 ),
-                // MDM's (#60): dark whatever the system says (a desktop that reports nothing).
+                // ODM's (#60): dark whatever the system says (a desktop that reports nothing).
                 I(
                     // i18n: View menu: a check item; dark mode on, whatever the system's setting
                     "Always dark",
@@ -8851,11 +8899,11 @@ impl App {
                 Sep,
                 I("&About Orbit Download Manager", Cmd::About, true, false),
                 I("Tell a &friend", Cmd::TellFriend, true, false),
-                // MDM's, not IDM's: the creator's GitHub Sponsors page, asked for only.
+                // ODM's, not IDM's: the creator's GitHub Sponsors page, asked for only.
                 I("Support &Orbit", Cmd::Support, true, false),
             ],
         };
-        // View → Theme (MDM's, #45), after Always dark; then Draw with (#89, #206), where wgpu is
+        // View → Theme (ODM's, #45), after Always dark; then Draw with (#89, #206), where wgpu is
         // built (Windows, Linux, macOS: renderer.rs).
         if let Some(at) = menu
             .iter()
@@ -8887,7 +8935,7 @@ impl App {
         let mut items = Vec::new();
         let mut files = false;
         let on = |id: &str| chosen == id;
-        // i18n: View → Theme: MDM's own look, the default (IDM's layout, Windows 11's controls)
+        // i18n: View → Theme: ODM's own look, the default (IDM's layout, Windows 11's controls)
         items.push(Radio("Classic", Cmd::Theme("classic"), true, on("classic")));
         // i18n: View → Theme: the system's own colours (its accent colour, its high contrast)
         items.push(Radio("Native", Cmd::Theme("native"), true, on("native")));
@@ -8934,12 +8982,12 @@ impl App {
         items.push(I("Add a theme file…", Cmd::AddThemeFile, true, false));
         // i18n: View → Theme: opens the folder where theme files go (TOML or JSON)
         items.push(I("Open themes folder", Cmd::OpenThemesFolder, true, false));
-        // i18n: View menu: submenu choosing MDM's look (colours, sizes, icons): Classic, Native…
+        // i18n: View menu: submenu choosing ODM's look (colours, sizes, icons): Classic, Native…
         Sub("Theme", true, items)
     }
 
     /// View → Interface size (#262): every window larger, as a browser zooms (Ctrl + / Ctrl − /
-    /// Ctrl 0 too). The size shown is the zoom drawn now, a test run's MDM_ZOOM too.
+    /// Ctrl 0 too). The size shown is the zoom drawn now, a test run's ODM_ZOOM too.
     fn interface_size_menu(&self) -> MenuEntry<Cmd> {
         let now = crate::scale::of_zoom(self.zoom);
         let items = crate::scale::STEPS
@@ -8950,7 +8998,7 @@ impl App {
                 MenuEntry::Radio(label, Cmd::InterfaceSize(p), true, p == now)
             })
             .collect();
-        // i18n: View menu: submenu choosing how large MDM draws its windows and text (100 % to 200 %), as a browser's zoom
+        // i18n: View menu: submenu choosing how large ODM draws its windows and text (100 % to 200 %), as a browser's zoom
         MenuEntry::Sub("&Interface size", true, items)
     }
 
@@ -8971,7 +9019,7 @@ impl App {
     /// View → Draw with (#89, #206): OpenGL or the system's own graphics API (Direct3D on
     /// Windows, Vulkan on Linux, Metal on macOS), used from the next start. Greyed lines say when
     /// what draws now isn't the choice: the system's API failed here (and why), OpenGL can't
-    /// draw MDM here (#835), a software renderer draws, or the choice waits for the next start.
+    /// draw ODM here (#835), a software renderer draws, or the choice waits for the next start.
     #[cfg(gpu)]
     fn draw_with_menu(&self) -> MenuEntry<Cmd> {
         use crate::renderer::{self, Api, Why};
@@ -9028,9 +9076,9 @@ impl App {
         let failed = renderer::gpu_failed().filter(|_| on);
         let active = renderer::active();
         // The system's API on a software renderer (WARP): said, with why below (no card for
-        // it, an OpenGL that can't draw MDM).
+        // it, an OpenGL that can't draw ODM).
         let software = active == Some(gpu) && renderer::software();
-        // OpenGL can't draw MDM here (#835, #847): said, and why, where it changed what draws.
+        // OpenGL can't draw ODM here (#835, #847): said, and why, where it changed what draws.
         let unfit = renderer::gl_failed().filter(|_| active == Some(gpu) && (software || !on));
         // The software renderer draws because no card here has a driver for the system's API:
         // one line says both (Windows, #847).
@@ -9038,7 +9086,7 @@ impl App {
         if active.is_some_and(|a| a != chosen) || software {
             items.push(Sep);
             let mut notes = Vec::new();
-            // Since when, and when MDM tries it again (#1205).
+            // Since when, and when ODM tries it again (#1205).
             let again = |a: Option<renderer::Again>| {
                 a.map(|a| off(crate::chrome::label(&Self::again_text(a))))
             };
@@ -9053,13 +9101,13 @@ impl App {
                     notes.push(match why {
                         // i18n: View → Draw with: a greyed note under "… didn't start here"; why: no graphics card here has a driver for that graphics system ("it")
                         Why::NoAdapter => off("No graphics card here has a driver for it"),
-                        // i18n: View → Draw with: a greyed note under "… didn't start here"; why: the window stayed empty, so MDM started again with OpenGL
+                        // i18n: View → Draw with: a greyed note under "… didn't start here"; why: the window stayed empty, so ODM started again with OpenGL
                         Why::NoFirstFrame => off("Its first frame didn't show within 10 seconds"),
-                        // i18n: View → Draw with: a greyed note under "… didn't start here"; why: MDM crashed or was closed while starting with it
+                        // i18n: View → Draw with: a greyed note under "… didn't start here"; why: ODM crashed or was closed while starting with it
                         Why::EndedEarly => off("Its last start ended before its first frame"),
                         // i18n: View → Draw with: a greyed note under "… didn't start here"; why: the graphics card stopped working twice (a driver update or reset)
                         Why::LostTwice => off("The graphics card was lost twice in 10 minutes"),
-                        // i18n: View → Draw with: a greyed note under "… didn't start here"; why: another error, written in MDM's log
+                        // i18n: View → Draw with: a greyed note under "… didn't start here"; why: another error, written in ODM's log
                         _ => off("It couldn't start: the log says why"),
                     });
                     notes.extend(again(renderer::gpu_again()));
@@ -9067,32 +9115,32 @@ impl App {
                 // A software renderer that draws for want of a card says only that.
                 (None, None) if software => items.push(software_note),
                 (None, None) if unfit.is_some() => {}
-                // i18n: View → Draw with: a greyed note under the choices; the choice takes effect when MDM is started again
-                (None, None) => notes.push(off("Applies the next time MDM starts")),
+                // i18n: View → Draw with: a greyed note under the choices; the choice takes effect when ODM is started again
+                (None, None) => notes.push(off("Applies the next time ODM starts")),
             }
             if let Some(why) = unfit {
                 notes.push(match why {
-                    // i18n: View → Draw with: a greyed note; this computer's OpenGL (its graphics driver) is too old, so MDM doesn't draw with it
-                    Why::TooOld => off("OpenGL here is too old to draw MDM"),
-                    // i18n: View → Draw with: a greyed note; why MDM no longer draws with OpenGL: its window froze inside the graphics card's driver while OpenGL drew
+                    // i18n: View → Draw with: a greyed note; this computer's OpenGL (its graphics driver) is too old, so ODM doesn't draw with it
+                    Why::TooOld => off("OpenGL here is too old to draw ODM"),
+                    // i18n: View → Draw with: a greyed note; why ODM no longer draws with OpenGL: its window froze inside the graphics card's driver while OpenGL drew
                     Why::FrozeInDriver => off("OpenGL froze inside the graphics driver here"),
-                    // i18n: View → Draw with: a greyed note; why MDM no longer draws with OpenGL: its window stayed empty for 10 seconds, so MDM started again another way
+                    // i18n: View → Draw with: a greyed note; why ODM no longer draws with OpenGL: its window stayed empty for 10 seconds, so ODM started again another way
                     Why::NoFirstFrame => off("OpenGL's first frame didn't show within 10 seconds"),
-                    // i18n: View → Draw with: a greyed note; why MDM no longer draws with OpenGL: MDM crashed or was closed while starting with it
+                    // i18n: View → Draw with: a greyed note; why ODM no longer draws with OpenGL: ODM crashed or was closed while starting with it
                     Why::EndedEarly => off("OpenGL's last start ended before its first frame"),
-                    // i18n: View → Draw with: a greyed note; why MDM no longer draws with OpenGL: it couldn't start on this computer
+                    // i18n: View → Draw with: a greyed note; why ODM no longer draws with OpenGL: it couldn't start on this computer
                     _ => off("OpenGL didn't start here"),
                 });
                 notes.extend(again(renderer::gl_again()));
             }
             items.extend(notes);
         }
-        // i18n: View menu: submenu choosing what draws MDM's windows: OpenGL, or Direct3D, Vulkan or Metal (graphics systems)
+        // i18n: View menu: submenu choosing what draws ODM's windows: OpenGL, or Direct3D, Vulkan or Metal (graphics systems)
         Sub("Draw with", true, items)
     }
 
     /// View → Draw with's note under a way that failed here: since when it is passed over, and
-    /// when MDM tries it again (#1205; renderer.rs `verdict`). Dates as the interface writes them.
+    /// when ODM tries it again (#1205; renderer.rs `verdict`). Dates as the interface writes them.
     #[cfg(gpu)]
     fn again_text(a: crate::renderer::Again) -> String {
         use crate::i18n::{fmt, t};
@@ -9106,26 +9154,26 @@ impl App {
                 .unwrap_or_default()
         };
         let template = match (a.next_start, a.at, a.on_update) {
-            // i18n: View → Draw with: a greyed note under why a graphics system ("it": Direct3D, Vulkan, Metal or OpenGL) doesn't draw MDM; {date}: the day that was found; MDM tries that graphics system again when it next starts
-            (true, ..) => t("Since {date}: MDM tries it again at its next start"),
+            // i18n: View → Draw with: a greyed note under why a graphics system ("it": Direct3D, Vulkan, Metal or OpenGL) doesn't draw ODM; {date}: the day that was found; ODM tries that graphics system again when it next starts
+            (true, ..) => t("Since {date}: ODM tries it again at its next start"),
             (false, Some(_), true) => {
-                // i18n: View → Draw with: a greyed note under why a graphics system ("it": Direct3D, Vulkan, Metal or OpenGL) doesn't draw MDM; {date}: the day that was found; {retry}: the day MDM tries it again, unless the graphics driver is updated before
-                t("Since {date}: MDM tries it again on {retry}, or after a driver update")
+                // i18n: View → Draw with: a greyed note under why a graphics system ("it": Direct3D, Vulkan, Metal or OpenGL) doesn't draw ODM; {date}: the day that was found; {retry}: the day ODM tries it again, unless the graphics driver is updated before
+                t("Since {date}: ODM tries it again on {retry}, or after a driver update")
             }
-            // i18n: View → Draw with: a greyed note under why a graphics system ("it": Direct3D, Vulkan, Metal or OpenGL) doesn't draw MDM; {date}: the day that was found; {retry}: the day MDM tries it again
-            (false, Some(_), false) => t("Since {date}: MDM tries it again on {retry}"),
-            // i18n: View → Draw with: a greyed note under why a graphics system ("it": Direct3D, Vulkan, Metal or OpenGL) doesn't draw MDM; {date}: the day that was found; MDM tries it again once the graphics driver is updated
-            (false, None, true) => t("Since {date}: MDM tries it again after a driver update"),
-            // i18n: View → Draw with: a greyed note under why a graphics system doesn't draw MDM; {date}: the day that was found
+            // i18n: View → Draw with: a greyed note under why a graphics system ("it": Direct3D, Vulkan, Metal or OpenGL) doesn't draw ODM; {date}: the day that was found; {retry}: the day ODM tries it again
+            (false, Some(_), false) => t("Since {date}: ODM tries it again on {retry}"),
+            // i18n: View → Draw with: a greyed note under why a graphics system ("it": Direct3D, Vulkan, Metal or OpenGL) doesn't draw ODM; {date}: the day that was found; ODM tries it again once the graphics driver is updated
+            (false, None, true) => t("Since {date}: ODM tries it again after a driver update"),
+            // i18n: View → Draw with: a greyed note under why a graphics system doesn't draw ODM; {date}: the day that was found
             (false, None, false) => t("Since {date}"),
         };
         let retry = a.at.map(date).unwrap_or_default();
         fmt(template, &[("date", &date(a.since)), ("retry", &retry)])
     }
 
-    /// View → Window system (Linux, a Wayland session that runs XWayland too, #624): MDM's own
+    /// View → Window system (Linux, a Wayland session that runs XWayland too, #624): ODM's own
     /// choice at each start, X11 through XWayland, or Wayland's own windows; saved, so every
-    /// way MDM starts (its menu entry, the browser's helper, the session's autostart) uses it
+    /// way ODM starts (its menu entry, the browser's helper, the session's autostart) uses it
     /// from the next start. A greyed line says which one draws now, and when the choice waits
     /// for the next start.
     #[cfg(target_os = "linux")]
@@ -9136,7 +9184,7 @@ impl App {
         let pick = self.settings.window_system;
         let ws = crate::unix::window_system();
         let mut items = vec![
-            // i18n: View → Window system: MDM chooses the window system itself at each start
+            // i18n: View → Window system: ODM chooses the window system itself at each start
             Radio("&Automatic", Cmd::WindowSystem(None), true, pick.is_none()),
             // i18n: View → Window system: X11's windows, through XWayland in a Wayland session (names of Linux display systems, usually kept as is)
             Radio(
@@ -9154,18 +9202,18 @@ impl App {
             ),
             Sep,
             if ws.wayland {
-                // i18n: View → Window system: a greyed note; MDM's windows are Wayland's now
+                // i18n: View → Window system: a greyed note; ODM's windows are Wayland's now
                 off("In use: Wayland")
             } else {
-                // i18n: View → Window system: a greyed note; MDM's windows are X11's (through XWayland) now
+                // i18n: View → Window system: a greyed note; ODM's windows are X11's (through XWayland) now
                 off("In use: X11 (XWayland)")
             },
         ];
         if pick.is_some_and(|p| (p == P::Wayland) != ws.wayland) {
-            // i18n: View → Draw with: a greyed note under the choices; the choice takes effect when MDM is started again
-            items.push(off("Applies the next time MDM starts"));
+            // i18n: View → Draw with: a greyed note under the choices; the choice takes effect when ODM is started again
+            items.push(off("Applies the next time ODM starts"));
         }
-        // i18n: View menu: submenu choosing the window system MDM's windows use on Linux (X11 through XWayland, or Wayland)
+        // i18n: View menu: submenu choosing the window system ODM's windows use on Linux (X11 through XWayland, or Wayland)
         Sub("&Window system", true, items)
     }
 
@@ -9453,7 +9501,10 @@ impl App {
         ];
         #[cfg(windows)]
         if done {
-            entries.insert(3, I("File Explorer menu", Cmd::FileExplorerMenu, true, false));
+            entries.insert(
+                3,
+                I("File Explorer menu", Cmd::FileExplorerMenu, true, false),
+            );
         }
         // A torrent's own actions (#39), after Verify checksum.
         if let Some((i, spec)) = torrent {
@@ -9466,7 +9517,7 @@ impl App {
                 .is_some_and(|s| {
                     matches!(
                         s.phase,
-                        mdm_torrent::Phase::Downloading | mdm_torrent::Phase::Finished
+                        odm_torrent::Phase::Downloading | odm_torrent::Phase::Finished
                     )
                 });
             let at = entries
@@ -10356,7 +10407,7 @@ impl App {
     /// line. One at a time: another that arrives meanwhile waits its turn (the browser has
     /// already given its own copy up, so none may be dropped).
     fn open_file_info(&mut self, new: dialogs::NewUrl, context: ipc::Command, ctx: &egui::Context) {
-        if mdm_engine::mega::is_folder(&new.url) {
+        if odm_engine::mega::is_folder(&new.url) {
             self.show_import(
                 crate::transfer::import(new.url.as_str()),
                 "MEGA folder".into(),
@@ -10533,7 +10584,7 @@ impl App {
 
     /// Download video's Download Now / Later, or the browser's quality menu's choice
     /// (`from_menu`), through the same check as any other download: the same page in the same
-    /// quality is a duplicate, another quality is not. A question opens its own window (MDM's
+    /// quality is a duplicate, another quality is not. A question opens its own window (ODM's
     /// stays where it is). What became of it.
     fn add_video_checked(
         &mut self,
@@ -10679,7 +10730,7 @@ impl App {
         let dt = self
             .drop_target
             .get_or_insert_with(|| crate::droptarget::DropTarget::new(pos));
-        let icon = egui::include_image!("../assets/icons/app/mdm-48.png");
+        let icon = egui::include_image!("../assets/icons/app/odm-48.png");
         for ev in dt.show(ctx, &icon) {
             use crate::droptarget::Event;
             match ev {
@@ -10766,7 +10817,7 @@ impl App {
             (s.show_categories, s.branches, s.view) = pane;
             self.dirty = true;
         }
-        // Not a test instance's off-screen window, nor one zoomed for screenshots (MDM_ZOOM).
+        // Not a test instance's off-screen window, nor one zoomed for screenshots (ODM_ZOOM).
         if crate::offscreen() || crate::scale::test_zoom().is_some() {
             return;
         }
@@ -10881,7 +10932,7 @@ impl App {
         }
         let (links, other): (Vec<String>, Vec<String>) = items
             .into_iter()
-            .partition(|s| url::Url::parse(s.trim()).is_ok_and(|u| mdm_engine::supported(&u)));
+            .partition(|s| url::Url::parse(s.trim()).is_ok_and(|u| odm_engine::supported(&u)));
         if links.len() > 1 {
             self.show_window(ctx);
             let found = links
@@ -10910,7 +10961,7 @@ impl App {
             }
         }
         for s in other {
-            let torrent = mdm_torrent::Source::magnet(&s).is_some()
+            let torrent = odm_torrent::Source::magnet(&s).is_some()
                 || (s.to_ascii_lowercase().ends_with(".torrent")
                     && std::path::Path::new(&s).is_file());
             if torrent {
@@ -10922,7 +10973,7 @@ impl App {
                     ctx,
                 );
             } else {
-                // A file MDM can't download or import (a picture, a program).
+                // A file ODM can't download or import (a picture, a program).
                 self.notice = Some((
                     crate::i18n::mark("Orbit Download Manager"),
                     crate::i18n::fmt(
@@ -11126,7 +11177,7 @@ impl App {
                 password: pk.password.clone(),
             };
             for (d, name, size) in pk.links {
-                if let Some(magnet) = mdm_torrent::Source::magnet(&d.url) {
+                if let Some(magnet) = odm_torrent::Source::magnet(&d.url) {
                     let dir = (!pk.folder.as_os_str().is_empty()).then(|| pk.folder.clone());
                     magnets.push((magnet, dir));
                     continue;
@@ -11142,7 +11193,7 @@ impl App {
                 };
                 // Numbered on as it starts if the name is taken then (#743): no disk here, for
                 // each of thousands of links.
-                let dest = mdm_engine::naming::guess(&dir, &name);
+                let dest = odm_engine::naming::guess(&dir, &name);
                 let context = ipc::Command {
                     referer: d.referer,
                     cookies: d.cookies,
@@ -11233,7 +11284,7 @@ impl App {
             let slot: std::sync::Arc<std::sync::Mutex<Option<_>>> = Default::default();
             let (out, ctx) = (slot.clone(), ctx.clone());
             self.rt.spawn(async move {
-                let res = mdm_engine::probe(url, parts.headers, &parts.opts)
+                let res = odm_engine::probe(url, parts.headers, &parts.opts)
                     .await
                     .map_err(|e| crate::grabber::state_of(&e));
                 *out.lock().unwrap() = Some(res);
@@ -11262,7 +11313,7 @@ impl App {
             let slot: std::sync::Arc<std::sync::Mutex<Option<_>>> = Default::default();
             let (out, ctx) = (slot.clone(), ctx.clone());
             self.rt.spawn(async move {
-                let found = match mdm_engine::page_links(url, parts.headers, &parts.opts).await {
+                let found = match odm_engine::page_links(url, parts.headers, &parts.opts).await {
                     Ok((at, links)) => {
                         tracing::info!("link grabber: {} links on a page", links.len());
                         links
@@ -11371,7 +11422,7 @@ impl App {
         self.move_many_for = ids;
         winui::start_pick(&self.ui_ctx, "app-move-many", move || {
             // Off-screen test runs have no folder dialog to answer.
-            if let Some(dir) = std::env::var_os("MDM_TEST_MOVE_TO") {
+            if let Some(dir) = std::env::var_os("ODM_TEST_MOVE_TO") {
                 return Some(PathBuf::from(dir));
             }
             crate::winui::file_dialog(&title)
@@ -11424,7 +11475,7 @@ impl App {
 
     /// IDM looks for a new version once a week; so do we (off: the switch in Check for updates). Found: the
     /// update window says so; otherwise nothing shows.
-    /// The automatic update check: a few seconds after every start, then once a day while MDM
+    /// The automatic update check: a few seconds after every start, then once a day while ODM
     /// runs (it was at most once a week). A new version's window comes to the front, as apps
     /// announce theirs. Not in off-screen test runs (their windows stay as asked).
     fn auto_update_check(&mut self, ctx: &egui::Context) {
@@ -11436,8 +11487,8 @@ impl App {
             .is_some_and(|t| now - t >= crate::help::CHECK_EVERY);
         if self.auto_update.is_none()
             && self.settings.update_check
-            // Off-screen test runs check only when told where (MDM_UPDATE_FEED: their own feed).
-            && (!crate::offscreen() || std::env::var_os("MDM_UPDATE_FEED").is_some())
+            // Off-screen test runs check only when told where (ODM_UPDATE_FEED: their own feed).
+            && (!crate::offscreen() || odm_ipc::env_var_os("ODM_UPDATE_FEED").is_some())
             && (first || again)
         {
             self.update_checked_this_run = Some(now);
@@ -11524,7 +11575,7 @@ impl App {
         if let Some(d) = &mut self.updates {
             match d.show(ctx, &self.rt, &mut weekly) {
                 Outcome::Open => {}
-                // Update now: the new copy is going in place; MDM saves and closes for it.
+                // Update now: the new copy is going in place; ODM saves and closes for it.
                 Outcome::Done(true) => {
                     self.updates = None;
                     close_for_update = true;
@@ -11776,13 +11827,13 @@ impl App {
                     self.open_torrent_dialog_with(Some(new.url.to_string()), Some(remote), ctx);
                 }
                 // A video's page, not a file (YouTube, Vimeo…): the video window looks it up.
-                Outcome::Done(new) if mdm_tools::pages::is_video_page(&new.url) => {
+                Outcome::Done(new) if odm_tools::pages::is_video_page(&new.url) => {
                     self.add_url = None;
                     self.video_dlg =
                         Some(self.video_dialog(Some((new.url.as_str(), Default::default()))));
                 }
                 // An image gallery's page (Wikimedia Commons, Flickr…): gallery-dl (#58).
-                Outcome::Done(new) if mdm_tools::pages::is_gallery_page(&new.url) => {
+                Outcome::Done(new) if odm_tools::pages::is_gallery_page(&new.url) => {
                     self.add_url = None;
                     let dir = self
                         .settings
@@ -11911,12 +11962,12 @@ impl App {
             // Torrent settings' switch never decided (a list from before #1058, a new one):
             // settled once, as the user chose (the installer's task, an earlier tick, or what the
             // system opens .torrent files with now), and saved for the browser integration. An
-            // instance off the screens (a test's, MDM_OFFSCREEN) never reads this computer's
+            // instance off the screens (a test's, ODM_OFFSCREEN) never reads this computer's
             // installer value or associations: off, unless its list ticked it before.
             if self.settings.torrent_associations.is_none() {
                 let system = !crate::offscreen();
                 #[cfg(windows)]
-                let installer = (system && mdm_ipc::portable_dir().is_none())
+                let installer = (system && odm_ipc::portable_dir().is_none())
                     .then(crate::win32::install_torrents)
                     .flatten();
                 #[cfg(not(windows))]
@@ -11929,7 +11980,7 @@ impl App {
                 };
                 if self.settings.settle_torrent_handler(installer, registered) {
                     tracing::info!(
-                        "torrents: Open magnet links and .torrent files with MDM settled {}",
+                        "torrents: Open magnet links and .torrent files with ODM settled {}",
                         if self.settings.torrent_associations == Some(true) {
                             "on"
                         } else {
@@ -12013,8 +12064,8 @@ impl App {
                             crate::unix::set_torrent_handlers(assoc);
                         }
                         // Windows: a choice recorded in Default apps for another program stays
-                        // first, and only the user can change it (#1091): MDM says so and opens
-                        // its page there. Linux and macOS: the switch made MDM the default.
+                        // first, and only the user can change it (#1091): ODM says so and opens
+                        // its page there. Linux and macOS: the switch made ODM the default.
                         #[cfg(windows)]
                         if assoc {
                             self.tell_torrent_defaults();
@@ -12588,7 +12639,7 @@ impl eframe::App for App {
     /// (no window is raised or focused for it beyond what the command itself does).
     fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         crate::renderer::present_unpaced(frame);
-        // MDM's own work: not counted as the graphics API's time to its first frame (#280).
+        // ODM's own work: not counted as the graphics API's time to its first frame (#280).
         crate::renderer::own_work_begin();
         self.tick(ctx);
         crate::renderer::own_work_end();
@@ -12605,7 +12656,7 @@ impl App {
         // The freeze watchdog times this as it times `ui` (crash.rs): a command or the clock
         // that hangs is reported too, minimized or not (#202).
         crate::crash::logic_begin();
-        // Whether a stall now could be seen: every window of MDM's hidden (the main window in
+        // Whether a stall now could be seen: every window of ODM's hidden (the main window in
         // the notification area, no other window open) is felt by nobody (#1126).
         crate::crash::hidden(self.hidden && ctx.input(|i| i.raw.viewports.len() <= 1));
         crate::crash::armed();
@@ -12692,7 +12743,7 @@ impl App {
             .is_none_or(|t| t.elapsed() > Duration::from_secs(2))
         {
             self.ticked = Some(Instant::now());
-            // For a crash report: what MDM has open and running (sent when it changes).
+            // For a crash report: what ODM has open and running (sent when it changes).
             crate::crash::step(crate::crash::Step::ReportState);
             crate::crash::state(
                 self.items.len(),
@@ -12843,7 +12894,7 @@ impl App {
                     .url
                     .as_deref()
                     .and_then(|u| url::Url::parse(u.trim()).ok())
-                    .filter(mdm_engine::supported)
+                    .filter(odm_engine::supported)
             {
                 unseen.push((url, None, inc.cmd));
             }
@@ -12854,11 +12905,11 @@ impl App {
                 .name
                 .clone()
                 .unwrap_or_else(|| crate::model::browser_guess(&url, &context));
-            let name = mdm_engine::naming::sanitize(&name);
+            let name = odm_engine::naming::sanitize(&name);
             let category = Category::of(&name);
             let dir = self.settings.category_dir(category, &self.downloads);
             // Numbered on as it starts if the name is taken then (#743): no disk here.
-            let dest = mdm_engine::naming::guess(&dir, &name);
+            let dest = odm_engine::naming::guess(&dir, &name);
             let size = context.size;
             let id = self.push_item(
                 url,
@@ -12882,7 +12933,7 @@ impl App {
 impl Drop for App {
     /// Exit, a closed window that quits, a headless run's end: [`App::finish`].
     fn drop(&mut self) {
-        // macOS ends the program right after this when it quits MDM itself (Cmd+Q, MDM → Quit,
+        // macOS ends the program right after this when it quits ODM itself (Cmd+Q, ODM → Quit,
         // the Dock's Quit, logging out): eframe drops the app on the way, and `main` never
         // gets its turn to say the exit was clean (#1125).
         #[cfg(target_os = "macos")]
@@ -12911,7 +12962,7 @@ const EXIT_STOP_WAIT: Duration = Duration::from_secs(10);
 
 impl App {
     /// The session is ending (Windows: shut down, restart, sign out, or an installer closing
-    /// MDM through the Restart Manager; `win32::on_session_end`. Linux: logout or shutdown,
+    /// ODM through the Restart Manager; `win32::on_session_end`. Linux: logout or shutdown,
     /// whose SIGTERM or lost display `unix::on_session_end` and `unix::on_display_lost` hear):
     /// what an Exit does at its end, now, within [`SESSION_END`], on the window's thread between
     /// two frames. Nobody is there to answer a question: nothing is asked. The process ends
@@ -12923,7 +12974,7 @@ impl App {
         self.finish(Some(Instant::now() + SESSION_END));
     }
 
-    /// The tray icon goes, as at an Exit: when only MDM is closed (the Restart Manager) and the
+    /// The tray icon goes, as at an Exit: when only ODM is closed (the Restart Manager) and the
     /// session goes on, it would stay in the notification area until the pointer passed over it.
     /// Last, once all is saved: the shell may be slow to answer (#747).
     #[cfg(windows)]
@@ -12941,8 +12992,8 @@ impl App {
         // The longest first: the downloads save while the rest is done.
         let stopping = self.stop_for_the_end();
         // yt-dlp, gallery-dl and all they started end, and none starts any more (#1301: on
-        // Linux and macOS nothing else ends them with MDM).
-        mdm_tools::proc::end_all();
+        // Linux and macOS nothing else ends them with ODM).
+        odm_tools::proc::end_all();
         let left = |cap: Duration| {
             deadline.map_or(cap, |d| {
                 d.saturating_duration_since(Instant::now()).min(cap)
@@ -12956,14 +13007,14 @@ impl App {
         }
         // An archive being extracted stops; its staging folder goes with it.
         self.extracts.stop();
-        // No wake for a queue MDM won't be there to start (Linux's alarm would outlive it).
+        // No wake for a queue ODM won't be there to start (Linux's alarm would outlive it).
         self.wake.clear();
         self.keep_unseen();
         let until = saves_by(began, deadline);
         let unsaved = self.wait_stopped(&stopping, until);
         // Those paused a moment before, still writing to a slow disk (#1328): their rows say
         // they are stopped already.
-        let settling = mdm_engine::naming::wait_all_settled(until);
+        let settling = odm_engine::naming::wait_all_settled(until);
         if settling > 0 {
             tracing::warn!(
                 "{settling} paused download(s) still saving after {} ms: those resume from their \
@@ -13010,8 +13061,8 @@ impl App {
 
     /// The end ([`App::finish`]): the file downloads that run are stopped as Stop stops them,
     /// which flushes what they received and saves their resume state; their ids. Torrents keep
-    /// their own resume data as they go, and a video's or a gallery's helpers end with MDM
-    /// (`mdm_tools::proc::end_all`).
+    /// their own resume data as they go, and a video's or a gallery's helpers end with ODM
+    /// (`odm_tools::proc::end_all`).
     fn stop_for_the_end(&self) -> Vec<u64> {
         self.items
             .iter()
@@ -13054,8 +13105,8 @@ fn saves_by(began: Instant, deadline: Option<Instant>) -> Instant {
 }
 
 /// A download's run is over, its last state saved: done, failed or stopped.
-fn ended(state: &mdm_engine::download::State) -> bool {
-    use mdm_engine::download::State;
+fn ended(state: &odm_engine::download::State) -> bool {
+    use odm_engine::download::State;
     matches!(state, State::Done | State::Failed | State::Cancelled)
 }
 
@@ -13155,7 +13206,7 @@ mod drag_carries_tests {
     }
 
     /// #1210: a drag of the list's selection carries the finished downloads' files, in the
-    /// list's order; rows not finished, rows not selected and a file moved where MDM couldn't
+    /// list's order; rows not finished, rows not selected and a file moved where ODM couldn't
     /// follow stay out; a selection of unfinished rows only carries nothing.
     #[test]
     fn a_drag_carries_the_selected_finished_files_in_list_order() {
@@ -13266,10 +13317,10 @@ mod same_name_tests {
 
         // A crash left the list's count at nothing, but the resume state says whose the pieces
         // are: that row stays and resumes, the other leaves.
-        let state = mdm_engine::state::state_path(&at);
+        let state = odm_engine::state::state_path(&at);
         let mut items = [waiting(1), waiting(2)];
         let url = items[0].url.clone();
-        mdm_engine::state::ResumeState::new(url.clone(), url, at.clone(), 9, Default::default())
+        odm_engine::state::ResumeState::new(url.clone(), url, at.clone(), 9, Default::default())
             .write(&state)
             .unwrap();
         assert_eq!(place_to_take(&items[0], &items), None);
@@ -13320,10 +13371,10 @@ mod at_login_tests {
     fn the_window_waits_for_the_tray_then_stays_there_or_shows_minimized() {
         let s = Duration::from_secs;
         let icon = |d| Some(s(d));
-        // The tray first (Windows, KDE): MDM's icon registered, the window stays hidden.
+        // The tray first (Windows, KDE): ODM's icon registered, the window stays hidden.
         assert_eq!(at_login(s(0), icon(0), true), AtLogin::Tray);
-        // The decision first (XFCE: MDM looked before its own icon had registered; GNOME: the
-        // AppIndicator extension's tray came 11.5 s after MDM's icon): waited for, hidden, then
+        // The decision first (XFCE: ODM looked before its own icon had registered; GNOME: the
+        // AppIndicator extension's tray came 11.5 s after ODM's icon): waited for, hidden, then
         // the tray.
         assert_eq!(at_login(s(0), None, false), AtLogin::Wait);
         assert_eq!(at_login(s(0), icon(0), false), AtLogin::Wait);
@@ -13332,7 +13383,7 @@ mod at_login_tests {
             at_login(s(60), TRAY_GRACE.checked_sub(s(1)), true),
             AtLogin::Tray
         );
-        // The grace counts from MDM's icon: a slow start of its own leaves the desktop its time.
+        // The grace counts from ODM's icon: a slow start of its own leaves the desktop its time.
         assert_eq!(at_login(TRAY_GRACE + s(5), icon(5), false), AtLogin::Wait);
         // No tray within the grace period (a desktop without one, #59; Windows' taskbar not
         // there to take the icon): shown, minimized.
@@ -13524,7 +13575,7 @@ mod video_goes_tests {
     use super::{VideoGoes, video_goes};
 
     /// The browser's quality menu queues a choice (Options: only add to the queue) in the main
-    /// queue, never through the queue panel, which would open in MDM's window and, cancelled,
+    /// queue, never through the queue panel, which would open in ODM's window and, cancelled,
     /// leave it in no queue; the Download video window's Later still asks when Options say so.
     #[test]
     fn a_choice_from_the_browser_is_queued_without_asking() {
@@ -13542,7 +13593,7 @@ mod video_goes_tests {
 #[cfg(test)]
 mod duplicate_tests {
     use super::*;
-    use mdm_tools::video::{InfoSlot, Preloaded};
+    use odm_tools::video::{InfoSlot, Preloaded};
 
     const SELECTOR: &str = "bv*[height=720]+ba/b[height=720]";
 
@@ -14050,7 +14101,7 @@ mod duplicate_tests {
             "Clip.f137.mp4.part",
             "Clip.f137.mp4.ytdl",
             "CLIP.F137.mp4.part-Frag2",
-            "Clip.v2.zip.mdm.part",
+            "Clip.v2.zip.odm.part",
         ] {
             std::fs::write(d.join(f), b"x").unwrap();
         }
@@ -14134,7 +14185,7 @@ mod duplicate_tests {
         }
         let mut running = video_row(1, d, "Clip.mp4", Status::Downloading);
         // A run of a yt-dlp that isn't there: it fails at once, on its own thread (no network).
-        let job = mdm_tools::video::VideoJob::start(
+        let job = odm_tools::video::VideoJob::start(
             &d.join("no-yt-dlp.exe"),
             page().as_str(),
             SELECTOR,
@@ -14158,7 +14209,7 @@ mod duplicate_tests {
             files,
             [
                 state_path(&d.join("Clip.mp4")),
-                mdm_engine::naming::part_path(&d.join("Clip.mp4")),
+                odm_engine::naming::part_path(&d.join("Clip.mp4")),
                 d.join("Clip.mp4"),
             ]
         );
@@ -14224,7 +14275,7 @@ mod add_batch_tests {
             "a picture and an archive: two categories' folders"
         );
 
-        let folder = std::env::temp_dir().join("mdm-batch-1403");
+        let folder = std::env::temp_dir().join("odm-batch-1403");
         let mut one = app();
         one.add_batch(added(Some(&folder)));
         let dests: Vec<_> = one.items.iter().map(|i| i.dest.clone()).collect();
@@ -14291,7 +14342,7 @@ mod add_checksum_tests {
         assert_eq!(first.items.len(), 1);
         assert_eq!(
             first.items[0].checksum,
-            mdm_engine::verify::Hash::parse(sha256)
+            odm_engine::verify::Hash::parse(sha256)
         );
         // Unreadable: refused as `bad-request`, not as the API being off.
         let mut again = app();
@@ -14326,7 +14377,7 @@ mod add_checksum_tests {
         assert_eq!(app.items.len(), 1);
         assert_eq!(
             app.items[0].checksum,
-            mdm_engine::verify::Hash::parse(sha256)
+            odm_engine::verify::Hash::parse(sha256)
         );
     }
 }
@@ -14768,7 +14819,7 @@ mod access_key_tests {
         ))
     }
 
-    /// Every menu MDM builds, in the states that change them: the menu bar, its menus, the
+    /// Every menu ODM builds, in the states that change them: the menu bar, its menus, the
     /// right-click and drop-down menus, a text box's, and their submenus.
     fn every_menu() -> Vec<Level> {
         let mut app = app();
@@ -15049,7 +15100,7 @@ mod pane_tests {
 mod start_disk_tests {
     use super::*;
     use crate::resumeread::Loader;
-    use mdm_engine::state::ResumeState;
+    use odm_engine::state::ResumeState;
     use std::path::Path;
     use std::sync::{Arc, Mutex};
 
@@ -15096,7 +15147,7 @@ mod start_disk_tests {
 
     fn state_of(url: url::Url, dest: &Path, done: u64) -> ResumeState {
         let mut s = ResumeState::new(url.clone(), url, dest.to_owned(), 100, Default::default());
-        s.segments = vec![mdm_engine::planner::SavedSegment {
+        s.segments = vec![odm_engine::planner::SavedSegment {
             start: 0,
             cursor: done,
             end: 100,
@@ -15491,7 +15542,7 @@ mod start_disk_tests {
         let (a, b) = (dir.path().join("a.bin"), dir.path().join("b.bin"));
         for dest in [&a, &b] {
             std::fs::write(state_path(dest), b"not a state").unwrap();
-            std::fs::write(mdm_engine::naming::part_path(dest), b"old part").unwrap();
+            std::fs::write(odm_engine::naming::part_path(dest), b"old part").unwrap();
         }
         std::fs::write(&a, b"the finished file").unwrap();
         let mut app = app_running(vec![
@@ -15525,9 +15576,9 @@ mod start_disk_tests {
             *seen.lock().unwrap(),
             [
                 state_path(&a),
-                mdm_engine::naming::part_path(&a),
+                odm_engine::naming::part_path(&a),
                 state_path(&b),
-                mdm_engine::naming::part_path(&b),
+                odm_engine::naming::part_path(&b),
             ],
             "in order, the finished file of a Redownload kept"
         );
@@ -15536,7 +15587,7 @@ mod start_disk_tests {
         for id in [1, 2] {
             let run = get(&app, id).live.as_ref().unwrap().dl.snapshot();
             assert!(
-                !matches!(run.failure, Some(mdm_engine::Error::BadState(_))),
+                !matches!(run.failure, Some(odm_engine::Error::BadState(_))),
                 "{id}: {:?}",
                 run.failure
             );
@@ -15706,7 +15757,7 @@ mod start_disk_tests {
         assert!(at.elapsed() < AT_ONCE, "the window doesn't wait");
         assert_eq!(get(&app, 1).url, new);
         assert!(
-            mdm_engine::naming::being_cleared(dir.path()),
+            odm_engine::naming::being_cleared(dir.path()),
             "its start would wait"
         );
         let saved = || ResumeState::load(&state_path(&a)).unwrap();
@@ -15768,7 +15819,7 @@ mod start_disk_tests {
 #[cfg(test)]
 mod fresh_address_tests {
     use super::*;
-    use mdm_labserver::{Config, Faults, LabServer, content};
+    use odm_labserver::{Config, Faults, LabServer, content};
 
     const SIZE: u64 = 2 << 20;
     const SEED: u64 = 7;
@@ -15842,7 +15893,7 @@ mod fresh_address_tests {
         rt: &tokio::runtime::Runtime,
         s: &LabServer,
         dest: &std::path::Path,
-    ) -> (Item, mdm_engine::state::ResumeState) {
+    ) -> (Item, odm_engine::state::ResumeState) {
         let port = s.addr().port();
         let expires = now_ms() + 1500;
         let old = url::Url::parse(&format!(
@@ -15884,7 +15935,7 @@ mod fresh_address_tests {
         while now_ms() <= expires {
             std::thread::sleep(Duration::from_millis(20));
         }
-        let saved = mdm_engine::state::ResumeState::load(&state_path(dest)).unwrap();
+        let saved = odm_engine::state::ResumeState::load(&state_path(dest)).unwrap();
         let mut item = Item::new(1, old, dest.to_owned(), Category::General);
         item.size = Some(SIZE);
         item.downloaded = saved.downloaded();
@@ -15896,7 +15947,7 @@ mod fresh_address_tests {
     }
 
     /// Bytes of `range` (`bytes=a-b`; none: the whole file) that `saved` says were on disk.
-    fn on_disk(range: Option<&str>, saved: &mdm_engine::state::ResumeState) -> u64 {
+    fn on_disk(range: Option<&str>, saved: &odm_engine::state::ResumeState) -> u64 {
         let (from, to) = match range.and_then(|r| r.strip_prefix("bytes=")?.split_once('-')) {
             Some((a, b)) => (
                 a.parse::<u64>().unwrap(),

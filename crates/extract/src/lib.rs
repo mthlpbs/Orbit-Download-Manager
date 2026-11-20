@@ -1,7 +1,7 @@
 //! Safe archive extraction (#37): zip (Deflate, Deflate64, AES), tar and its gz/xz forms and a
 //! single `.gz`/`.xz` file in process; 7z (split `.7z.001` too) and RAR through an installed
 //! 7-Zip, run as its own program (UnRAR's licence forbids linking it into a GPL program, and a 7z
-//! decoder in MDM cost about 1 MB for a format most people who use it have 7-Zip for).
+//! decoder in ODM cost about 1 MB for a format most people who use it have 7-Zip for).
 //!
 //! Every archive is extracted into an empty staging folder beside the destination, each entry's
 //! path checked ([`safe`]), then moved into place: a folder named after the archive when it holds
@@ -44,7 +44,7 @@ pub enum Format {
 
 impl Format {
     /// The format of the archive at `path` (its first volume for a split one), or None when it
-    /// isn't one MDM extracts.
+    /// isn't one ODM extracts.
     pub fn detect(path: &Path) -> std::io::Result<Option<Format>> {
         use std::io::Read;
         let mut head = [0u8; 512];
@@ -115,18 +115,18 @@ pub struct Policy<'a> {
     /// archives fail with [`Error::NoTool`].
     pub tool: Option<PathBuf>,
     /// HatchZip's program ([`find_hatchzip`]), optional: used only for `in_place`, and to finish
-    /// a run of it MDM started.
+    /// a run of it ODM started.
     pub hatchzip: Option<PathBuf>,
     /// Extract in place with HatchZip (when it is installed): the archive is removed while its
     /// files come out, so only they need room. Without HatchZip, a normal extraction.
     pub in_place: bool,
-    /// The folder in MDM's data where the runs in place it started are recorded
+    /// The folder in ODM's data where the runs in place it started are recorded
     /// ([`hatchzip::Runs`]). None: never in place.
     pub runs: Option<PathBuf>,
     /// Told every file put in place: the app marks it as downloaded from the internet, as the
     /// archive is.
     pub on_file: &'a mut dyn FnMut(&Path),
-    /// Set from elsewhere to stop (the download was deleted, MDM is closing).
+    /// Set from elsewhere to stop (the download was deleted, ODM is closing).
     pub cancel: Option<&'a AtomicBool>,
 }
 
@@ -178,7 +178,7 @@ pub enum Error {
         left: PathBuf,
         why: String,
     },
-    /// Not an archive MDM extracts.
+    /// Not an archive ODM extracts.
     Unsupported,
     Cancelled,
     Io(std::io::Error),
@@ -207,7 +207,7 @@ impl std::fmt::Display for Error {
                 to.display(),
                 left.display()
             ),
-            Error::Unsupported => write!(f, "not an archive MDM extracts"),
+            Error::Unsupported => write!(f, "not an archive ODM extracts"),
             Error::Cancelled => write!(f, "cancelled"),
             Error::Io(e) => write!(f, "{e}"),
         }
@@ -247,7 +247,7 @@ pub fn base_name(archive: &Path) -> String {
 pub fn extract(archive: &Path, policy: &mut Policy<'_>) -> Result<Report, Error> {
     let format = Format::detect(archive)?.ok_or(Error::Unsupported)?;
     // In place: every archive HatchZip reads (a single .gz or .xz file isn't one to it). A run
-    // in place MDM started and that stopped partway is always finished by HatchZip: part of the
+    // in place ODM started and that stopped partway is always finished by HatchZip: part of the
     // archive is already gone, and only it knows where it was. HatchZip's progress file alone
     // (it may have come with the download) starts nothing: the archive is extracted as usual.
     if let (Some(tool), Some(runs)) = (policy.hatchzip.clone(), policy.runs.clone())
@@ -283,7 +283,7 @@ pub fn extract(archive: &Path, policy: &mut Policy<'_>) -> Result<Report, Error>
         }
         if unfinished {
             tracing::warn!(
-                "extract: {} has a HatchZip progress file MDM didn't write: extracted as usual",
+                "extract: {} has a HatchZip progress file ODM didn't write: extracted as usual",
                 archive.display()
             );
         }
@@ -319,7 +319,7 @@ pub fn extract(archive: &Path, policy: &mut Policy<'_>) -> Result<Report, Error>
 }
 
 /// HatchZip extracts `archive` (its full path) in place into its own folder beside it
-/// ([`hatchzip::work_folder`], or `resume`'s, the folder of the run MDM recorded), then what
+/// ([`hatchzip::work_folder`], or `resume`'s, the folder of the run ODM recorded), then what
 /// came out is put where `policy` says, as our own extractions are. Nothing it wrote is ever
 /// deleted: those files are no longer in the archive. A failure leaves that folder as it is.
 fn in_place(

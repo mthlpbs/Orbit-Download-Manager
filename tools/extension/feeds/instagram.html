@@ -1,7 +1,7 @@
 <!doctype html>
 <!-- Instagram's home feed, reduced to what names a post (our own sample: no real account, post or
      text). data-expect: what the button must send for each video. -->
-<html><head><meta charset="utf-8"><meta name="mdm-page" content="https://www.instagram.com/"><title>Instagram</title><link rel="stylesheet" href="feeds.css"></head>
+<html><head><meta charset="utf-8"><meta name="odm-page" content="https://www.instagram.com/"><title>Instagram</title><link rel="stylesheet" href="feeds.css"></head>
 <body>
 <main role="main"><div><div>
   <article>
@@ -17,7 +17,14 @@
   </article>
   <article>
     <header><a href="/sample.advertiser/">sample.advertiser</a> Sponsored</header>
-    <div><video data-expect="none"></video></div>
+    <div><video data-expect="none"></video></div><a href="https://notinstagram.com/reel/WrongPost123/">Ad link</a>
   </article>
+  <article>
+    <header><a href="/p/Carousel1234/"><time>1d</time></a></header>
+    <div><video data-expect="https://www.instagram.com/p/Carousel1234/"></video></div>
+    <div hidden><video data-expect="https://www.instagram.com/p/Carousel1234/"></video></div>
+    <a href="/p/RelatedPost1/">Suggested post</a>
+  </article>
+  <div data-permalink="/reel/FeedReel1234/?igsh=tracking"><video data-expect="https://www.instagram.com/reel/FeedReel1234/"></video></div>
 </div></div></main>
 </body></html>

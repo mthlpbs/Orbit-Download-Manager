@@ -32,6 +32,7 @@ pub enum TrayCmd {
     Batch,
     /// Add batch download from clipboard (#709).
     BatchClipboard,
+    VideoPage,
     LimiterOn,
     LimiterOff,
     Scheduler,
@@ -43,7 +44,7 @@ pub enum TrayCmd {
     ShowDownload(u64),
 }
 
-/// Whether a tray shows MDM's icon at all, so hiding a window there can be undone. Windows and
+/// Whether a tray shows ODM's icon at all, so hiding a window there can be undone. Windows and
 /// macOS (the menu bar) always have one; on Linux only when a StatusNotifierItem host runs (#59),
 /// asked each time: it may come and go. (Linux's icon itself is made beside the window: `Setup`.)
 pub fn available() -> bool {
@@ -64,7 +65,7 @@ pub enum OnClose {
     Quit,
 }
 
-/// What closing the main window does: `quitting` whether MDM was asked to quit (File → Exit, the
+/// What closing the main window does: `quitting` whether ODM was asked to quit (File → Exit, the
 /// tray's Exit, `/exit`, Update now, a queue's or a download's "Exit when done": `App::quit`),
 /// which quits whatever the rest says; `keep_running` is Options' "Keep running when closing the
 /// window", `tray` whether a tray object exists, `icon` what the shell last said of its icon
@@ -77,8 +78,8 @@ pub enum OnClose {
 /// shell said the icon is gone. No answer, or an old one, hides the window as an icon that is
 /// there does (#750, #718, #754: a shell that couldn't confirm the icon left the window in the
 /// taskbar with the icon right there); such a window still comes back from the icon once the
-/// shell answers, and a second start of MDM always brings it back. On macOS the Dock is that way
-/// back (#1125): MDM's icon stays there while it runs, and a click on it shows the window, so
+/// shell answers, and a second start of ODM always brings it back. On macOS the Dock is that way
+/// back (#1125): ODM's icon stays there while it runs, and a click on it shows the window, so
 /// closing hides the window as Mac apps do, whatever the menu bar shows (an icon behind the
 /// notch, or turned off in System Settings, is no way back).
 pub fn on_close(
@@ -400,9 +401,9 @@ impl Native {
         return self.icon();
         #[cfg(target_os = "macos")]
         {
-            // MDM_TEST_TRAY_RECT=0: the menu bar gives the item no place.
+            // ODM_TEST_TRAY_RECT=0: the menu bar gives the item no place.
             let placed = self.tray.rect().is_some()
-                && std::env::var_os("MDM_TEST_TRAY_RECT").is_none_or(|v| v != "0");
+                && std::env::var_os("ODM_TEST_TRAY_RECT").is_none_or(|v| v != "0");
             if self.answer.replace(Some(placed)) != Some(placed) {
                 tracing::info!("tray icon: placed {placed}");
             }
@@ -414,7 +415,7 @@ impl Native {
     }
 
     /// Whether a window hidden in the notification area should come back to the taskbar: the
-    /// shell, running and answering, has said for some seconds that it has no icon of MDM's
+    /// shell, running and answering, has said for some seconds that it has no icon of ODM's
     /// (`watch::rescue`). Never on no answer. Windows only: macOS leaves a window hidden in the
     /// menu bar as it was.
     #[cfg(windows)]
@@ -460,6 +461,7 @@ impl Native {
             mark("Add batch download from clipboard"),
             TrayCmd::BatchClipboard,
         );
+        add(&menu, mark("Add video download"), TrayCmd::VideoPage);
         // i18n: tray menu: a submenu of the downloads now running; choosing one shows its progress window
         let downloads_label = mark("Downloads in progress");
         let downloads = Submenu::new(crate::i18n::t(downloads_label), false);
@@ -514,7 +516,7 @@ impl Native {
             .with_tooltip(crate::MAIN_TITLE)
             .with_icon(icon);
         // Linux and the BSDs (StatusNotifierItem): the item's title is its name in the shell's
-        // lists, KDE's notification area among them, which showed MDM's icon with no name (#1305).
+        // lists, KDE's notification area among them, which showed ODM's icon with no name (#1305).
         // Not on macOS, where a title is text beside the icon in the menu bar; Windows has none.
         #[cfg(not(any(windows, target_os = "macos")))]
         let builder = builder.with_title(crate::MAIN_TITLE);
@@ -534,9 +536,9 @@ impl Native {
                 WindowsShell {
                     hwnd: tray.window_handle() as isize,
                     id: None,
-                    // MDM_TEST_TRAY_RECT=0: the shell gives the icon no place, as the reporters'
+                    // ODM_TEST_TRAY_RECT=0: the shell gives the icon no place, as the reporters'
                     // did for one behind ^ (the close test, with a real icon the shell holds).
-                    rect_withheld: std::env::var_os("MDM_TEST_TRAY_RECT").is_some_and(|v| v == "0"),
+                    rect_withheld: std::env::var_os("ODM_TEST_TRAY_RECT").is_some_and(|v| v == "0"),
                     fit: picture::Fit::new(fitted),
                     shown: None,
                 },
@@ -664,11 +666,11 @@ impl Native {
 }
 
 /// What the tests say of the icon, as off-screen tests can't make the shell answer reliably
-/// (MDM_TEST_TRAY_VISIBLE: 1 there, anything else gone; the startup and close tests use it with
-/// MDM_TEST_TRAY).
+/// (ODM_TEST_TRAY_VISIBLE: 1 there, anything else gone; the startup and close tests use it with
+/// ODM_TEST_TRAY).
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 fn test_visible() -> Option<Icon> {
-    std::env::var_os("MDM_TEST_TRAY_VISIBLE")
+    std::env::var_os("ODM_TEST_TRAY_VISIBLE")
         .map(|v| if v == "1" { Icon::There } else { Icon::Gone })
 }
 
@@ -844,11 +846,11 @@ mod tests {
         }
     }
 
-    /// #1125: on macOS a click on MDM's icon in the Dock brings the window back, so closing
-    /// leaves MDM running there, as Mac apps do, whatever the menu bar shows of its icon and even
+    /// #1125: on macOS a click on ODM's icon in the Dock brings the window back, so closing
+    /// leaves ODM running there, as Mac apps do, whatever the menu bar shows of its icon and even
     /// with no menu bar icon at all. Unticked, "Keep running when closing the window" still quits.
     #[test]
-    fn on_macos_closing_leaves_mdm_in_the_dock() {
+    fn on_macos_closing_leaves_odm_in_the_dock() {
         for tray in [true, false] {
             for icon in [Icon::There, Icon::Unknown, Icon::Gone] {
                 assert_eq!(on_close(false, true, tray, icon, true, true), OnClose::Hide);
@@ -856,15 +858,15 @@ mod tests {
                     on_close(false, false, tray, icon, true, true),
                     OnClose::Quit
                 );
-                // Cmd+Q, MDM → Quit, Exit when done: quits.
+                // Cmd+Q, ODM → Quit, Exit when done: quits.
                 assert_eq!(on_close(true, true, tray, icon, true, true), OnClose::Quit);
             }
         }
     }
 
-    /// Asked to quit (File → Exit, the tray's Exit, `/exit`, Update now, "Exit when done"), MDM
+    /// Asked to quit (File → Exit, the tray's Exit, `/exit`, Update now, "Exit when done"), ODM
     /// quits whatever "Keep running when closing the window" and the shell say; only a plain close
-    /// of the window follows them (a finished queue set to exit used to hide MDM in the tray).
+    /// of the window follows them (a finished queue set to exit used to hide ODM in the tray).
     #[test]
     fn a_quit_request_quits_whatever_the_close_setting_says() {
         for keep in [true, false] {

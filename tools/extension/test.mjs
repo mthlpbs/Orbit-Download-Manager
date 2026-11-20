@@ -369,10 +369,10 @@ const ok = (what) => {
   await settle();
   assert.deepEqual(natives(calls), []);
   assert.deepEqual(steps(calls), []);
-  // Said, for MDM's log, under its own key and without an address.
+  // Said, for ODM's log, under its own key and without an address.
   assert.deepEqual(notices(calls), [{ why: "file-type", name: "page.html", site: "x" }]);
   assert.ok(!calls.some((c) => c[0] === "native" && c[2].declined && "url" in c[2]));
-  ok("a type not listed stays with the browser, and MDM's log hears why");
+  ok("a type not listed stays with the browser, and ODM's log hears why");
 }
 
 // Chrome: incognito downloads use the incognito store; the address asked for goes as the
@@ -426,7 +426,7 @@ const ok = (what) => {
 // DetermineFilename and DeterminerCallback): no valid suggestion goes as an empty name with no
 // conflict action, which counts as a name; a name the browser refuses is emptied after the
 // answer is counted, and only an empty name with "uniquify" is no name at all. The newest
-// extension's name wins (here MDM's, updated after Save In was installed).
+// extension's name wins (here ODM's, updated after Save In was installed).
 {
   const answer = (s) => {
     const valid = s && typeof s === "object" && typeof s.filename === "string" && s.filename.length > 0;
@@ -453,12 +453,12 @@ const ok = (what) => {
     const { api, listeners } = fakeApi({ firefox: false });
     load(api, false);
     const other = item.byExtensionId && !creator ? { filename: `Pic/OthersW/${item.filename}` } : undefined;
-    let mdm = "none";
-    listeners.determining(item, (s) => (mdm = s));
+    let odm = "none";
+    listeners.determining(item, (s) => (odm = s));
     await settle();
-    assert.notEqual(mdm, "none", `${what}: answered, the download doesn't wait`);
+    assert.notEqual(odm, "none", `${what}: answered, the download doesn't wait`);
     const want = other ? other.filename : creator;
-    assert.equal(determined(creator, other ? [other, mdm] : [mdm]), want, `${what}: MDM's answer gives no name of its own`);
+    assert.equal(determined(creator, other ? [other, odm] : [odm]), want, `${what}: ODM's answer gives no name of its own`);
   }
   // The model, checked: Chromium's own cases.
   assert.equal(determined("Pic/a.jpg", [undefined]), "", "suggest() empties the creator's name");
@@ -520,7 +520,7 @@ const ok = (what) => {
   await settle();
   assert.ok(calls.some((c) => c[0] === "openTab" && c[1].endsWith("#not-installed")));
   const items = calls.filter((c) => c[0] === "menu-item").map((c) => c[1].id);
-  assert.deepEqual(items, ["mdm-link", "mdm-selected", "mdm-all"]);
+  assert.deepEqual(items, ["odm-link", "odm-selected", "odm-all"]);
   ok("installed without the app: the help page, the menus");
 }
 
@@ -782,7 +782,7 @@ const ok = (what) => {
 
 // #948: the rule leaves an attachment alone (its server's name stays the browser's). A file it
 // made a download, which Chromium then names after its address (`main.mkv`, an inline answer's own
-// name dropped with the header), goes to MDM as only a guess: MDM names it from the server's answer.
+// name dropped with the header), goes to ODM as only a guess: ODM names it from the server's answer.
 // A name of the browser's own, or a type the rule doesn't take, stays a name.
 {
   const { api, calls, listeners } = fakeApi({ firefox: false, types: "MKV MP4 ZIP" });
@@ -827,16 +827,16 @@ const ok = (what) => {
 {
   const { api, calls, listeners } = fakeApi({ firefox: false });
   load(api, false);
-  await listeners.menu({ menuItemId: "mdm-link", linkUrl: "https://x/page.html", pageUrl: "https://x/" }, { incognito: false });
+  await listeners.menu({ menuItemId: "odm-link", linkUrl: "https://x/page.html", pageUrl: "https://x/" }, { incognito: false });
   await settle();
   const [m] = natives(calls);
   assert.deepEqual([m.url, m.explicit, m.referrer], ["https://x/page.html", true, "https://x/"]);
-  await listeners.menu({ menuItemId: "mdm-all", pageUrl: "https://x/" }, { id: 1, incognito: false });
+  await listeners.menu({ menuItemId: "odm-all", pageUrl: "https://x/" }, { id: 1, incognito: false });
   await settle();
   assert.deepEqual(natives(calls)[1].links, ["https://x/1.zip", "https://x/2.zip"]);
   const failing = fakeApi({ firefox: false, reply: { ok: false, why: "not-running" } });
   load(failing.api, false);
-  await failing.listeners.menu({ menuItemId: "mdm-link", linkUrl: "https://x/a.zip", pageUrl: "https://x/" }, {});
+  await failing.listeners.menu({ menuItemId: "odm-link", linkUrl: "https://x/a.zip", pageUrl: "https://x/" }, {});
   await settle();
   assert.ok(failing.calls.some((c) => c[0] === "openTab" && c[1].endsWith("#not-running")));
   ok("context menus: explicit links, a page's links, failures explained");
@@ -902,7 +902,7 @@ const ok = (what) => {
     load(f.api, false);
     // Its start's own asking for the rules done first.
     await settle();
-    await f.listeners.menu({ menuItemId: "mdm-all", pageUrl: "https://x.test/files/", frameId: 0 }, { id: 1, incognito: false });
+    await f.listeners.menu({ menuItemId: "odm-all", pageUrl: "https://x.test/files/", frameId: 0 }, { id: 1, incognito: false });
     await settle();
     return { sent: natives(f.calls), tabs: f.calls.filter((c) => c[0] === "openTab").map((c) => c[1]), store: f.store };
   };
@@ -934,7 +934,7 @@ const ok = (what) => {
   // Another click: another batch.
   const again = await run(long);
   assert.notEqual(again.sent[0].linksPart.batch, sent[0].linksPart.batch);
-  // A part refused (MDM quit meanwhile): no more parts, and the help page says why.
+  // A part refused (ODM quit meanwhile): no more parts, and the help page says why.
   let answered = 0;
   ({ sent, tabs } = await run(long, () => (++answered === 3 ? { ok: false, why: "not-running" } : { ok: true })));
   assert.equal(sent.length, 3);
@@ -1027,7 +1027,7 @@ const ok = (what) => {
   listeners.responseStarted({ tabId: 7, frameId: 2, url: "https://cdn.test/s/master.m3u8", responseHeaders: [] });
   listeners.responseStarted({ tabId: 7, frameId: 0, url: "https://other.test/x/main.mpd", responseHeaders: [] });
   await listeners.menu(
-    { menuItemId: "mdm-link", srcUrl: "blob:https://player.test/1", frameId: 2, frameUrl: "https://player.test/embed", pageUrl: "https://blog.test/post" },
+    { menuItemId: "odm-link", srcUrl: "blob:https://player.test/1", frameId: 2, frameUrl: "https://player.test/embed", pageUrl: "https://blog.test/post" },
     { id: 7, incognito: false, title: "A post with a film" },
   );
   await settle();
@@ -1038,17 +1038,17 @@ const ok = (what) => {
     "the frame's stream, not the page alone; the tab's title names its file",
   );
   assert.ok(calls.some((c) => c[0] === "cookies" && c[1].url === "https://cdn.test/s/master.m3u8"), "the stream's cookies");
-  await listeners.menu({ menuItemId: "mdm-link", linkUrl: "https://cdn.test/s/other.m3u8", pageUrl: "https://blog.test/post" }, { id: 7, incognito: false, title: "A post with a film" });
+  await listeners.menu({ menuItemId: "odm-link", linkUrl: "https://cdn.test/s/other.m3u8", pageUrl: "https://blog.test/post" }, { id: 7, incognito: false, title: "A post with a film" });
   await settle();
   const linked = natives(calls).filter((x) => x.video)[1];
   assert.deepEqual([linked.src, linked.title], ["https://cdn.test/s/other.m3u8", "A post with a film"], "a manifest's link: named after its tab");
   assert.ok(calls.some((c) => c[0] === "cookies" && c[1].url === "https://cdn.test/s/other.m3u8"), "the manifest's cookies");
   // Firefox names no address for a player fed by a MediaSource: the same stream goes.
-  await listeners.menu({ menuItemId: "mdm-link", mediaType: "video", frameId: 2, frameUrl: "https://player.test/embed", pageUrl: "https://blog.test/post" }, { id: 7, incognito: false });
+  await listeners.menu({ menuItemId: "odm-link", mediaType: "video", frameId: 2, frameUrl: "https://player.test/embed", pageUrl: "https://blog.test/post" }, { id: 7, incognito: false });
   await settle();
   assert.equal(natives(calls).filter((x) => x.video).pop().src, "https://cdn.test/s/master.m3u8", "Firefox: no srcUrl");
   // Nothing loaded in that tab: the page, as before (a page yt-dlp may know).
-  await listeners.menu({ menuItemId: "mdm-link", srcUrl: "blob:https://tube.test/2", frameId: 0, pageUrl: "https://tube.test/watch" }, { id: 9, incognito: false });
+  await listeners.menu({ menuItemId: "odm-link", srcUrl: "blob:https://tube.test/2", frameId: 0, pageUrl: "https://tube.test/watch" }, { id: 9, incognito: false });
   await settle();
   const page = natives(calls).filter((x) => x.video).pop();
   assert.deepEqual([page.url, page.src], ["https://tube.test/watch", undefined]);
@@ -1192,7 +1192,7 @@ const ok = (what) => {
 // The button's qualities: an app whose rules say it looks videos up (`videoLookup`, kept with the
 // status) gets the click as a lookup, never with `video` or a top-level `url` (an older host
 // refuses such a message and does nothing), with the cookies of what yt-dlp is given; its answer
-// goes back to the page as `lookup`. Without that (an older app, another MDM chosen, an answer
+// goes back to the page as `lookup`. Without that (an older app, another ODM chosen, an answer
 // that isn't a lookup's) the page gets {fallback: true}: the click as it always was.
 {
   const ask = (listeners, m, sender) => new Promise((r) => listeners.message(m, sender, (x) => r(JSON.parse(JSON.stringify(x)))));
@@ -1205,7 +1205,7 @@ const ok = (what) => {
     await settle();
     assert.equal(store.status.videoLookup, true, "kept from the answer to rules");
     const r = await ask(listeners, { type: "video-lookup", src: "https://cdn.test/v/clip.mp4", title: "A story's film", url: "https://news.test/story", at: { x: 1, y: 1 } }, sender);
-    // `show`: the address MDM lists its download under, for the button's "Show" (#703).
+    // `show`: the address ODM lists its download under, for the button's "Show" (#703).
     assert.deepEqual(r, { lookup: { state: "pending", token: "t1" }, show: "https://cdn.test/v/clip.mp4" });
     const m = natives(calls).find((x) => x.videoLookup);
     assert.deepEqual([m.video, m.url], [undefined, undefined], "no `video`, no top-level `url`");
@@ -1237,7 +1237,7 @@ const ok = (what) => {
     assert.deepEqual(await ask(listeners, { type: "video-lookup", src: "https://cdn.test/v/clip.mp4" }, sender), { fallback: true });
     assert.deepEqual(lookups(calls), []);
   }
-  // Another MDM chosen: none of the three goes to the host, nor to the other MDM.
+  // Another ODM chosen: none of the three goes to the host, nor to the other ODM.
   {
     const { api, calls, listeners, store } = fakeApi({ firefox: false, rules: { videoLookup: true }, lookup: () => ({ ok: true, lookup: { state: "pending", token: "t1" } }) });
     load(api, false);
@@ -1248,9 +1248,9 @@ const ok = (what) => {
       assert.deepEqual(await ask(listeners, m, sender), { fallback: true }, m.type);
     }
     assert.deepEqual(lookups(calls), []);
-    assert.deepEqual(fetched, [], "nothing to the other MDM");
+    assert.deepEqual(fetched, [], "nothing to the other ODM");
   }
-  // The ability kept from before, an older host or app now (MDM went back a version): its answer
+  // The ability kept from before, an older host or app now (ODM went back a version): its answer
   // has no `lookup`. Not kept as able, its rules asked again, the click as it was; the next click
   // sends no lookup at all. A refused message is no broken connection.
   {
@@ -1327,8 +1327,8 @@ const ok = (what) => {
     assert.equal(calls.filter((c) => c[0] === "dnr").length, rules, "the rule for PDFs and music untouched");
     assert.equal(store.status.videoLookup, true, "still able");
   }
-  // #703: the button's own actions. "Show" (MDM's window, the download selected), "Turn on" (the
-  // site off the list, at once here too), "Get MDM" and "Open post" (a tab next to this one; a post
+  // #703: the button's own actions. "Show" (ODM's window, the download selected), "Turn on" (the
+  // site off the list, at once here too), "Get ODM" and "Open post" (a tab next to this one; a post
   // only on this page's site), a plain file sent as a file. None of them has a top-level `url`.
   {
     const { api, calls, listeners } = fakeApi({ firefox: false, rules: { videoLookup: true } });
@@ -1344,7 +1344,7 @@ const ok = (what) => {
     const sent = natives(calls);
     assert.ok(sent.some((x) => x.showDownload === "https://news.test/story" && !x.url));
     assert.ok(sent.some((x) => x.showSite === "news.test" && !x.url));
-    await ask(listeners, { type: "get-mdm" }, from);
+    await ask(listeners, { type: "get-odm" }, from);
     await ask(listeners, { type: "open-post", url: "https://news.test/p/1" }, from);
     assert.deepEqual(await ask(listeners, { type: "open-post", url: "https://elsewhere.test/p/1" }, from), { ok: false }, "a post on this page's site only");
     assert.deepEqual(opened, [
@@ -1367,7 +1367,7 @@ const ok = (what) => {
     await ask(listeners, { type: "video", url: "https://news.test/story", direct: true, src: "blob:https://news.test/x" }, from);
     assert.equal(natives(calls).filter((x) => x.video).at(-1).direct, undefined);
   }
-  ok("video button: qualities looked up by the app, picked in the page; else the window, as before; Show, Turn on, Get MDM, Open post, a plain file");
+  ok("video button: qualities looked up by the app, picked in the page; else the window, as before; Show, Turn on, Get ODM, Open post, a plain file");
 }
 
 // The title a video is named by when yt-dlp knows it only by its address goes without the site's
@@ -1986,7 +1986,7 @@ const MPD = (protect) => `<?xml version="1.0"?>
   await settle();
   fetched.length = 0;
   await listeners.menu(
-    { menuItemId: "mdm-link", srcUrl: "blob:https://emb.test/1", frameId: 2, frameUrl: "https://emb.test/player", pageUrl: "https://blog.test/post" },
+    { menuItemId: "odm-link", srcUrl: "blob:https://emb.test/1", frameId: 2, frameUrl: "https://emb.test/player", pageUrl: "https://blog.test/post" },
     { id: 7, incognito: false },
   );
   await settle();
@@ -2001,11 +2001,16 @@ const MPD = (protect) => `<?xml version="1.0"?>
   ok("#171: the button and the menu read the frame's possible manifests when no stream is known");
 }
 
-// The button's logo is the extension's own icon, kept in video.js as data.
+// The video overlay has its own SVGs and makes no page-origin asset requests.
 {
   const video = readText("../../extension/video.js");
-  const icon = readFileSync(new URL("../../extension/icons/icon-48.png", import.meta.url)).toString("base64");
-  assert.ok(video.includes(`"data:image/png;base64,${icon}"`), "video.js's LOGO is extension/icons/icon-48.png");
+  assert.ok(video.includes('glassIcon("logo", "logo", "trigger-logo")'));
+  assert.ok(video.includes('glassIcon("logo", "tile", "panel-logo")'));
+  assert.ok(!/runtime\.getURL|new FontFace/.test(video));
+  for (const manifest of ["manifest.json", "manifest.firefox.json"]) {
+    const m = JSON.parse(readText(`../../extension/${manifest}`));
+    assert.ok(!m.web_accessible_resources?.some(({ resources }) => resources.some((name) => name.includes("overlay-"))));
+  }
   ok("video button logo");
 }
 
@@ -2243,7 +2248,7 @@ function samplePage(html) {
       yield* all(c);
     }
   };
-  const page = doc.querySelector('meta[name="mdm-page"]').getAttribute("content");
+  const page = doc.querySelector('meta[name="odm-page"]').getAttribute("content");
   base = page;
   return { document: doc, page, videos: [...all(doc)].filter((e) => e.localName === "video") };
 }
@@ -2442,7 +2447,7 @@ function videoButton({ stored = {} } = {}) {
       getBoundingClientRect: () => ({ left: 0, top: 0, right: 640, bottom: 360, width: 640, height: 360 }),
     };
     el.handlers = {};
-    if (name === "mdm-video-button") root = el;
+    if (name === "odm-video-button") root = el;
     return el;
   };
   const rect = { left: 0, top: 0, right: 640, bottom: 360, width: 640, height: 360 };
@@ -2774,7 +2779,7 @@ function videoButton({ stored = {} } = {}) {
   assert.deepEqual([f.result, f.asked.length], [null, 1]);
   // The background's other answers.
   assert.deepEqual((await follow(pending, [{ late: true }])).result, { state: "late" });
-  assert.deepEqual((await follow(pending, [{ fallback: true }])).result, { state: "use-window", token: "t1" }, "another MDM chosen meanwhile");
+  assert.deepEqual((await follow(pending, [{ fallback: true }])).result, { state: "use-window", token: "t1" }, "another ODM chosen meanwhile");
   assert.deepEqual((await follow(pending, [{ ok: false }])).result, { state: "gone" });
   assert.equal((await follow(pending, [{ ok: false, gone: true }])).result, null, "the extension gone");
   f = await follow({ state: "pending" }, []);
@@ -2823,7 +2828,7 @@ function videoButton({ stored = {} } = {}) {
   assert.deepEqual(act({ fallback: true }, true), { act: "window" });
   assert.equal(act({ ok: false, gone: true }, true), null);
   // #852: the app's word on what the look-up lacked, shown with the qualities: its text, and a
-  // link to MDM's own help page only (never another address a page could slip in).
+  // link to ODM's own help page only (never another address a page could slip in).
   const { noticeOf } = make(["noticeOf"], "{ noticeOf }");
   const help = "https://github.com/mthlpbs/Orbit-Download-Manager/blob/main/docs/video.md#javascript-runtime";
   const notice = { text: "YouTube needs a JavaScript runtime", link: "How to install one", url: help };
@@ -2881,11 +2886,8 @@ function videoButton({ stored = {} } = {}) {
   assert.ok(/shadow\.addEventListener\("keydown", \(e\) => \{\s*if \(!e\.isTrusted\) return;/.test(source), "keys: the user's own");
   assert.ok(/menu\.addEventListener\("click", \(e\) => \{\s*if \(!e\.isTrusted\) return;/.test(source), "rows: the user's own clicks");
   assert.ok(/acts\.addEventListener\("click", async \(e\) => \{\s*if \(!e\.isTrusted\) return;/.test(source), "a status's buttons: the user's own clicks");
-  // The page's own controls: a key the open menu used doesn't reach the page, and the button (and
-  // so its menu) stays where it is while the menu is open.
-  const keys = source.slice(source.indexOf('shadow.addEventListener("keydown"'), source.indexOf("// The main part: a click downloads"));
-  assert.equal(keys.match(/e\.stopPropagation\(\)/g).length, 5, "Escape (the menu, the button), Enter and Space, the arrows, ↓ on the button: not the page's too");
-  assert.ok(fn("spot").includes("if (menuOpen && auto.v === video && auto.at) return auto.at;"), "spot: still while its menu is open");
+  // The button and its panel stay put while the pointer moves to a quality.
+  assert.ok(fn("position").includes("const fixedMenu = menuOpen && pinFits;"), "keep the menu anchor while it still fits its player");
   assert.equal(source.match(/innerHTML/g).length, 1, "markup only for the fixed parts");
   assert.ok(!/insertAdjacentHTML|outerHTML|setInterval/.test(source));
   assert.ok(/send\(\{ type: "video-pick", token: l\.token, choice: i \}\)/.test(fn("pick")), "a pick: the token and the row's number");
@@ -2998,7 +3000,7 @@ function videoButton({ stored = {} } = {}) {
     assert.equal(asked.length, 3);
     // A private window: neither the button showing nor resting on it asks; the click and the menu do.
     assert.ok(source.includes("const PRIVATE = Boolean(ext.extension?.inIncognitoContext);"), "PRIVATE: the browser's word");
-    assert.ok(fn("show").includes("if (!PRIVATE && !usable(looks.get(c.key))) scheduleLook(v);"), "show: not in a private window");
+    assert.ok(fn("show").includes("if (!PRIVATE && !c.d.thumbnail && !usable(looks.get(c.key))) scheduleLook(v);"), "no automatic lookup for private windows or thumbnail-only cards");
     assert.ok(/restWait\(\s*REST_MS,\s*\(v\) => \{\s*if \(!PRIVATE && video === v && v\.isConnected && root\.matches\(":hover"\)\) startLook\(describeNow\(v\)\);/.test(source), "resting: not in a private window, the same video, still on the button");
     assert.ok(/pill\.addEventListener\("pointerenter", \(\) => \{\s*if \(video && !PRIVATE\) resting\.rest\(video\);\s*\}\);\s*pill\.addEventListener\("pointerleave", \(\) => resting\.leave\(\)\);/.test(source), "the pointer on the button rests, off it leaves");
     assert.ok(fn("hide").includes("resting.leave();") && fn("teardown").includes("resting.leave();"), "hidden or torn down: no rest's look-up after");
@@ -3013,10 +3015,10 @@ function videoButton({ stored = {} } = {}) {
   const english = JSON.parse(readText("../../extension/_locales/en/messages.json"));
   for (const key of ["video_looking", "video_all_qualities", "video_no_choices", "video_playlist", "video_no_ytdlp", "video_too_long", "video_busy", "video_queued", "video_failed_lookup",
     "video_off", "video_drm", "video_cant_save", "video_open_post", "video_open_post_button", "video_drag_dots", "video_sending", "video_added", "video_show",
-    "video_no_answer", "video_get_mdm", "video_retry", "video_turn_on", "video_default_quality", "video_use_site_cookies", "video_original", "video_compatible"]) {
+    "video_no_answer", "video_get_odm", "video_retry", "video_turn_on", "video_default_quality", "video_use_site_cookies", "video_original", "video_compatible"]) {
     assert.ok(english[key], key);
     assert.ok(source.includes(`${key}: ${JSON.stringify(english[key].message)}`), `video.js FALLBACK: ${key}`);
-    assert.ok(source.includes(`t("${key}")`), `video.js uses ${key}`);
+    assert.ok(source.includes(JSON.stringify(key)), `video.js uses ${key}`);
   }
   {
     const w = make(["sizeText", "choiceSize", "qualityName", "qualityMeta", "bestOf", "chipFor", "tipFor", "durationText", "headerLine", "moveIn", "fitsWords", "compactFor"],
@@ -3044,7 +3046,7 @@ function videoButton({ stored = {} } = {}) {
     assert.equal(w.qualityMeta({ height: 720, ext: "mp4", codec: "H.264".repeat(9) }, tt).length, 24, "a codec's name is cut");
     // #1439: the most compatible choice (H.264 + AAC) says so in place of its codec.
     const compatible = { label: "Most compatible (H.264 + AAC) · 1080p", ext: "mp4", height: 1080, fps: 60, codec: "H.264", compatible: true };
-    assert.ok(source.includes('if (c && c.compatible === true) b.title = String(c.label ?? "").slice(0, 200);'), "its line's tip is the app's whole name");
+    assert.ok(fn("row").includes('c.compatible ? String(c.label ?? "").slice(0, 200)'), "its line's tip is the app's whole name");
     assert.equal(w.qualityName(compatible, tt), "1080p");
     assert.equal(w.qualityMeta(compatible, tt), "video_compatible");
     // #801: an estimate is marked; an exact size isn't; an older app's has no mark.
@@ -3052,13 +3054,12 @@ function videoButton({ stored = {} } = {}) {
     assert.equal(w.choiceSize({ size: 557842432 }, "en"), "532 MB");
     assert.equal(w.choiceSize({ size: null, approx: true }, "en"), "");
     assert.equal(w.choiceSize(null, "en"), "");
-    // The list's sound lines: the type, then the bitrate, and "original" for the sound as the site
-    // sends it (with or without a bitrate); a conversion's VBR.
+    // Audio rows show the type and bitrate. The Original badge is rendered separately.
     const lw = make(["qualityName", "qualityMeta", "lineWords"], "lineWords");
-    assert.deepEqual({ ...lw({ ext: "m4a", audio: true, kbps: 128, original: true }, tt) }, { q: "M4A", f: "128 kbps · video_original" });
-    assert.deepEqual({ ...lw({ ext: "mp4", audio: true, original: true }, tt) }, { q: "MP4", f: "video_original" });
-    assert.deepEqual({ ...lw({ ext: "mp3", audio: true, kbps: 320 }, tt) }, { q: "MP3", f: "320 kbps" });
-    assert.deepEqual({ ...lw({ ext: "mp3", audio: true, label: "Audio only MP3 VBR" }, tt) }, { q: "MP3", f: "VBR" });
+    assert.deepEqual({ ...lw({ ext: "m4a", audio: true, kbps: 128, original: true }, tt) }, { q: "M4A · 128 kbps", f: "" });
+    assert.deepEqual({ ...lw({ ext: "mp4", audio: true, original: true }, tt) }, { q: "MP4", f: "" });
+    assert.deepEqual({ ...lw({ ext: "mp3", audio: true, kbps: 320 }, tt) }, { q: "MP3 · 320 kbps", f: "" });
+    assert.deepEqual({ ...lw({ ext: "mp3", audio: true, label: "Audio only MP3 VBR" }, tt) }, { q: "MP3 · VBR", f: "" });
     // The best: the app's first video choice (its order is best first), else its first.
     const ready = { state: "ready", choices: [sound, hd, older] };
     assert.equal(w.bestOf(ready), hd);
@@ -3093,10 +3094,10 @@ function videoButton({ stored = {} } = {}) {
       assert.equal(w.compactFor(true, width, full, 14), true, `Compact: round at ${width} px whatever the language`);
     }
     assert.equal(w.compactFor(undefined, 1280, english, 14), false, "not said (an older app): Full");
-    // The answer to `panel` sets it, and position() decides from it.
+    // The panel setting and visible player width both inform the button's size.
     const ask = fn("ask");
     assert.ok(ask.includes("compactAlways = Boolean(r && r.compact);"), "ask: the size comes with the app's answer");
-    assert.ok(fn("position").includes('pill.classList.toggle("compact", compactFor(compactAlways, vr.width, fullWidth, INSET));'), "position: compact from the setting and the video's width");
+    assert.ok(fn("rects").includes('compactFor(compactAlways, r.width, fullWidth, INSET)'), "use the visible width when sizing the button");
   }
   ok("video.js: the qualities' menu follows a lookup one question at a time for a minute; rows as text, the user's own clicks and keys; its words, #703's early look-up, #741's moves");
 }
@@ -3500,7 +3501,7 @@ for (const firefox of [false, true]) {
 }
 ok("#1058: a torrent stays with the browser while the app's Torrent settings leave torrents alone");
 
-// The codes agree end to end: the app's (mdm_ipc::capture::Declined::code), the extension's own
+// The codes agree end to end: the app's (odm_ipc::capture::Declined::code), the extension's own
 // ("site-access"), and a popup text for each.
 {
   const rust = readText("../../crates/ipc/src/capture.rs");
@@ -3754,7 +3755,7 @@ const ask = (listeners) => (m, sender) => new Promise((r) => listeners.message(m
   assert.deepEqual(natives(calls).map((m) => m.proxy), [undefined, undefined, undefined, undefined, "http://10.0.0.9:3128"]);
   ok("Firefox: loopback addresses skip its proxy settings' proxy, as Firefox itself does");
 }
-// A type the app doesn't take: the browser goes on (its dialog shows), MDM's log hears why once,
+// A type the app doesn't take: the browser goes on (its dialog shows), ODM's log hears why once,
 // and the download after the dialog isn't paused or asked again.
 {
   const { api, calls, listeners } = fakeApi({ firefox: true });
@@ -3899,7 +3900,7 @@ const ask = (listeners) => (m, sender) => new Promise((r) => listeners.message(m
     calls.length = 0;
     await send({ type: "bypass", url: "https://site.test/dl/10" }, page);
     assert.ok(!(await kept({ id: 64, url: "https://other.test/e.zip", referrer: "https://other.test/page", filename: "e.zip" })), "another site's");
-    // Ten seconds on, the click is forgotten: its link goes to MDM again.
+    // Ten seconds on, the click is forgotten: its link goes to ODM again.
     clock.t += 10001;
     assert.ok(!(await kept({ id: 65, url: "https://site.test/dl/10", referrer: "https://site.test/files", filename: "f.zip" })), "forgotten");
     assert.equal(natives(calls).length, 2);
@@ -3921,7 +3922,7 @@ const ask = (listeners) => (m, sender) => new Promise((r) => listeners.message(m
     await send({ type: "bypass", url: "https://site.test/thanks?f=c" }, page);
     assert.deepEqual(await held(listeners, answer("https://cdn.test/c.zip", zip, { requestId: "r3" })), {}, "a script's, same tab");
     assert.deepEqual(natives(calls), []);
-    // That click's leave is used: the next download in the tab is MDM's.
+    // That click's leave is used: the next download in the tab is ODM's.
     assert.deepEqual(await held(listeners, answer("https://cdn.test/d.zip", zip, { requestId: "r4" })), { cancel: true });
     assert.equal(natives(calls).length, 1);
     // The download Firefox itself makes of it (a save with browser.altClickSave, a script's
@@ -3991,11 +3992,11 @@ for (const [id, url] of [
   );
   await settle();
   assert.ok(suggested, `the browser keeps Telegram Web's download (${url})`);
-  assert.equal(natives(calls).length, 0, "nothing offered to MDM");
+  assert.equal(natives(calls).length, 0, "nothing offered to ODM");
 }
 ok("#1345 Chromium: Telegram Web's service-worker downloads stay in the browser");
 // #603: only a tokenized Colab runtime-proxy transfer stays with the browser. A normal
-// download linked from a Colab notebook is still offered to MDM.
+// download linked from a Colab notebook is still offered to ODM.
 {
   const { api, calls, listeners } = fakeApi({ firefox: false });
   load(api, false);
@@ -4036,7 +4037,7 @@ ok("#1345 Chromium: Telegram Web's service-worker downloads stay in the browser"
   );
   await settle();
   assert.equal(natives(calls).length, 1, "ordinary notebook links remain capturable");
-  ok("#603 Chromium: a GitHub file linked from Colab is still handed to MDM");
+  ok("#603 Chromium: a GitHub file linked from Colab is still handed to ODM");
 }
 {
   const { api, calls, listeners } = fakeApi({ firefox: true });
@@ -4086,7 +4087,7 @@ ok("#1345 Chromium: Telegram Web's service-worker downloads stay in the browser"
     () => {},
   );
   await settle();
-  assert.equal(natives(calls).length, 1, "a token on a non-proxy host must not bypass MDM");
+  assert.equal(natives(calls).length, 1, "a token on a non-proxy host must not bypass ODM");
   ok("#603 Chromium: tokenized non-Colab URLs remain capturable");
 }
 {
@@ -4106,7 +4107,7 @@ ok("#1345 Chromium: Telegram Web's service-worker downloads stay in the browser"
     () => {},
   );
   await settle();
-  assert.equal(natives(calls).length, 1, "a proxy host without its token must not bypass MDM");
+  assert.equal(natives(calls).length, 1, "a proxy host without its token must not bypass ODM");
   ok("#603 Chromium: an un-tokenized Colab host remains capturable");
 }
 
@@ -4127,7 +4128,7 @@ ok("#1345 Chromium: Telegram Web's service-worker downloads stay in the browser"
   assert.ok(en.popup_proxy && en.popup_proxy_title && en.popup_proxy_title_chromium, "the switch's texts");
   ok("manifests: proxy optional in Firefox, required in Chrome; the popup's switch in each");
 }
-// Another MDM (#157): the file types caught for it are the app's defaults, and every message
+// Another ODM (#157): the file types caught for it are the app's defaults, and every message
 // the pairing can end with is there.
 {
   const capture = readText("../../crates/ipc/src/capture.rs");
@@ -4139,7 +4140,7 @@ ok("#1345 Chromium: Telegram Web's service-worker downloads stay in the browser"
     assert.ok(english[`remote_${why}`], `remote_${why}`);
   }
   assert.ok(english.status_remote, "status_remote");
-  ok("another MDM: the app's file types, every pairing message");
+  ok("another ODM: the app's file types, every pairing message");
 }
 // Safari has no downloads API: the extension still starts, and a link page.js holds (a file type
 // Options lists) is offered to the app as a browser's download is; the app taking it is told to
@@ -4153,7 +4154,7 @@ ok("#1345 Chromium: Telegram Web's service-worker downloads stay in the browser"
   const m = natives(calls)[0];
   assert.deepEqual([m.url, m.filename, m.referrer, m.cookies], ["https://x.test/files/a.zip", "a.zip", "https://page.test/dl", "sid=1"]);
   assert.ok(!("explicit" in m), "Options' rules apply, as for the browser's own downloads");
-  // Not a listed type: the click goes on, and MDM's log hears why.
+  // Not a listed type: the click goes on, and ODM's log hears why.
   calls.length = 0;
   assert.deepEqual(await send({ type: "link", url: "https://x.test/page.html" }, sender), { taken: false });
   await settle();

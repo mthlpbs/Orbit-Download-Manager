@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use egui::{Pos2, Ui, ViewportId, vec2};
-use mdm_engine::ProbeInfo;
+use odm_engine::ProbeInfo;
 use url::Url;
 
 use crate::model::{self, Category};
@@ -18,8 +18,8 @@ pub enum Outcome<T> {
     Closed,
 }
 
-const MAIN_RECT: &str = "mdm-main-rect";
-const MAIN_RECT_PX: &str = "mdm-main-rect-px";
+const MAIN_RECT: &str = "odm-main-rect";
+const MAIN_RECT_PX: &str = "odm-main-rect-px";
 
 /// The main window publishes its outer rect each frame so dialogs can centre on it, with the
 /// zoom it is measured at (not in the frame the interface size changes: its rect is still
@@ -349,7 +349,7 @@ const QUEUE_GATES: [&str; 2] = ["file-info", "duplicate"];
 
 /// A window that must be on the screen and isn't (hidden, not minimized): shown again after a
 /// moment, however it got that way, directly: winit believes it is still visible and ignores
-/// `Visible(true)`. The other platforms have nothing to ask: MDM's windows have no owner there,
+/// `Visible(true)`. The other platforms have nothing to ask: ODM's windows have no owner there,
 /// and the window manager doesn't say whether it shows a window.
 #[cfg(windows)]
 fn keep_on_screen(ctx: &egui::Context, key: egui::Id, title: &str) {
@@ -445,7 +445,7 @@ enum Kind {
     },
 }
 
-/// Interactive dialogs (`Plain` and `Question`) activate MDM and come forward when shown on
+/// Interactive dialogs (`Plain` and `Question`) activate ODM and come forward when shown on
 /// macOS; passive `Notice` windows (`Download complete`) stay non-activating so typing in another
 /// program is never interrupted.
 fn dialog_activates_on_open(kind: Kind) -> bool {
@@ -812,7 +812,7 @@ impl AddUrl {
         }
     }
 
-    /// The clipboard's text in the box, when it is an address MDM downloads and the box is
+    /// The clipboard's text in the box, when it is an address ODM downloads and the box is
     /// still empty (nothing typed or picked meanwhile).
     fn fill_from_clipboard(&mut self, clip: &str) {
         let clip = clip.trim();
@@ -824,7 +824,7 @@ impl AddUrl {
             return;
         }
         if let Ok(u) = Url::parse(clip)
-            && (mdm_engine::supported(&u) || u.scheme() == "magnet")
+            && (odm_engine::supported(&u) || u.scheme() == "magnet")
         {
             self.address = clip.to_owned();
         }
@@ -1026,7 +1026,7 @@ impl AddUrl {
                 }
                 if ok || (enter && !list_was_open) {
                     match self.parsed_address() {
-                        Ok(url) if mdm_engine::supported(&url) || url.scheme() == "magnet" => {
+                        Ok(url) if odm_engine::supported(&url) || url.scheme() == "magnet" => {
                             return Outcome::Done(NewUrl {
                                 url,
                                 login: self.typed_login(),
@@ -1051,7 +1051,7 @@ pub(crate) struct PlaceAsk {
     /// The place the early download already has, when there is one (#597): its own part and
     /// state files beside exactly this path are its own, not other data.
     pub own: Option<PathBuf>,
-    /// A name MDM gave: numbered on when it is taken there (`naming::destination`). A typed one
+    /// A name ODM gave: numbered on when it is taken there (`naming::destination`). A typed one
     /// only has its folder looked at (its download is numbered as it starts if it is taken).
     pub number: bool,
 }
@@ -1070,14 +1070,14 @@ pub(crate) type Look = Arc<dyn Fn(&PlaceAsk) -> Found + Send + Sync>;
 /// Once the old files being deleted in that folder for a new start are gone (a duplicate
 /// overwritten: its new copy takes its name, `naming::clear`).
 fn look(ask: &PlaceAsk) -> Found {
-    mdm_engine::naming::wait_cleared(&ask.dir);
+    odm_engine::naming::wait_cleared(&ask.dir);
     Found {
         dest: if ask.number {
             match &ask.own {
                 // The download that started early is already writing here: its own part and
                 // state files must not number it (#597).
-                Some(own) if mdm_engine::naming::guess(&ask.dir, &ask.name) == *own => own.clone(),
-                _ => mdm_engine::naming::destination(&ask.dir, &ask.name),
+                Some(own) if odm_engine::naming::guess(&ask.dir, &ask.name) == *own => own.clone(),
+                _ => odm_engine::naming::destination(&ask.dir, &ask.name),
             }
         } else {
             ask.dir.join(&ask.name)
@@ -1096,7 +1096,7 @@ pub(crate) struct SaveAsPlace {
     look: Look,
     repaint: Option<egui::Context>,
     /// The early download's own place (#597), if the dialog started one: Save As keeps that
-    /// name even though its `.mdm.part` and `.mdm.json` sit beside it.
+    /// name even though its `.odm.part` and `.odm.json` sit beside it.
     own: Option<PathBuf>,
     /// The last question, Save As's text it is for (as the answer set it, once taken), and its
     /// answer to come. A new question asks on a thread of its own: one that hangs on a dead
@@ -1125,10 +1125,10 @@ impl SaveAsPlace {
         self.own = own;
     }
 
-    /// `name` in `dir` as MDM names it: Save As's text for now (fitted, not numbered: no wait
+    /// `name` in `dir` as ODM names it: Save As's text for now (fitted, not numbered: no wait
     /// for the disk), its free numbered name asked for.
     pub fn name_in(&mut self, dir: &Path, name: &str) -> String {
-        let shown = display_path(&mdm_engine::naming::guess(dir, name));
+        let shown = display_path(&odm_engine::naming::guess(dir, name));
         let ask = PlaceAsk {
             dir: dir.to_owned(),
             name: name.to_owned(),
@@ -1161,7 +1161,7 @@ impl SaveAsPlace {
     }
 
     /// Each frame, never waiting: once the answer has come for what Save As (`save_as`) still
-    /// shows, a name MDM gave takes its free numbered name; whether its folder is there. None
+    /// shows, a name ODM gave takes its free numbered name; whether its folder is there. None
     /// while it hasn't come, or when Save As was typed over since.
     pub fn follow(&mut self, save_as: &mut String) -> Option<bool> {
         let (ask, shown, asked) = self.asking.as_mut()?;
@@ -1217,7 +1217,7 @@ pub struct FileInfo {
     /// … category on last selected" says.
     pub remember: bool,
     url_text: String,
-    /// The URL box holds no address MDM downloads: Start and Later wait.
+    /// The URL box holds no address ODM downloads: Start and Later wait.
     url_bad: bool,
     /// Save As has been given the focus (once, when the dialog opens).
     focused: bool,
@@ -1228,17 +1228,17 @@ pub struct FileInfo {
     probe: Arc<Mutex<Option<Probed>>>,
     info: Option<Result<ProbeInfo, String>>,
     /// The look's open answer, for the download to read instead of asking again (#28).
-    kept: Option<mdm_engine::KeptAnswer>,
+    kept: Option<odm_engine::KeptAnswer>,
     edited: bool,
     downloads: PathBuf,
     /// Options → Save to folders per category (label, folder).
     dirs: Vec<(String, String)>,
     category_open: bool,
     /// Browser request context for the download this dialog adds.
-    pub context: mdm_ipc::Command,
+    pub context: odm_ipc::Command,
     /// Start or Later held while the folder is looked at, and asked to be created when missing.
     asking: FolderGate<Start>,
-    /// Save As's name was typed by the user (its keys), not given by MDM or the Save dialog
+    /// Save As's name was typed by the user (its keys), not given by ODM or the Save dialog
     /// since (#1447): a file already there under it is asked about as Start or Later is
     /// pressed (`replacing`), not numbered without a word.
     typed: bool,
@@ -1296,7 +1296,7 @@ impl FileInfo {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         new: NewUrl,
-        context: mdm_ipc::Command,
+        context: odm_ipc::Command,
         request: crate::app::RequestParts,
         route: crate::debrid::Route,
         downloads: PathBuf,
@@ -1309,7 +1309,7 @@ impl FileInfo {
         let from_browser = context
             .name
             .as_deref()
-            .map(mdm_engine::naming::sanitize)
+            .map(odm_engine::naming::sanitize)
             .filter(|n| !n.is_empty());
         let name = from_browser
             .clone()
@@ -1388,7 +1388,7 @@ impl FileInfo {
     }
 
     /// The account that takes the address appeared or changed (the services' host lists are
-    /// read when MDM starts, and Options may change them while the dialog is open): looked up
+    /// read when ODM starts, and Options may change them while the dialog is open): looked up
     /// again its way. A download the browser had started keeps the browser's answer, and goes
     /// directly unless the line is ticked.
     fn follow_route(&mut self, ctx: &egui::Context) {
@@ -1403,19 +1403,19 @@ impl FileInfo {
         }
     }
 
-    /// The URL box changed: a new address MDM downloads is the one to download (looked up
+    /// The URL box changed: a new address ODM downloads is the one to download (looked up
     /// again; its file name too, unless Save As was edited); anything else holds Start and
     /// Later back.
     fn url_edited(&mut self, ctx: &egui::Context) {
         match crate::model::parse_address(&self.url_text) {
-            Ok(url) if mdm_engine::supported(&url) => {
+            Ok(url) if odm_engine::supported(&url) => {
                 self.url_bad = false;
                 if url == self.url {
                     return;
                 }
                 let from_browser = crate::debrid::browser_started(&self.context);
                 if !self.edited {
-                    let name = mdm_engine::naming::file_name(None, &url);
+                    let name = odm_engine::naming::file_name(None, &url);
                     self.category = Category::of(&name);
                     let dir =
                         crate::model::category_folder(self.category, &self.downloads, &self.dirs);
@@ -1460,7 +1460,7 @@ impl FileInfo {
         // Fitted to the new folder too (#28): a deeper one leaves a long name less room.
         self.save_as = self.place.name_in(folder, &name);
         self.edited = true;
-        // MDM's name in that folder now: numbered there when taken.
+        // ODM's name in that folder now: numbered there when taken.
         self.typed = false;
     }
 
@@ -1506,7 +1506,7 @@ impl FileInfo {
 
     /// The look's open answer, for the download of this address to start from (#28); taken
     /// once.
-    pub fn take_kept(&mut self) -> Option<mdm_engine::KeptAnswer> {
+    pub fn take_kept(&mut self) -> Option<odm_engine::KeptAnswer> {
         self.kept.take()
     }
 
@@ -1552,7 +1552,7 @@ impl FileInfo {
     }
 
     /// Whether Save As's folder is there, as looked at off the window's thread for the name it
-    /// shows now (None: not known yet). A name MDM gave has its free numbered name by then.
+    /// shows now (None: not known yet). A name ODM gave has its free numbered name by then.
     pub fn folder_found(&mut self) -> Option<bool> {
         self.place.folder(&mut self.save_as)
     }
@@ -1561,7 +1561,7 @@ impl FileInfo {
     /// held while the disk is looked at (`exists`, off the window's thread), then the duplicate
     /// question about it (`show`). Overwrite: the download replaces that file as it completes
     /// ([`Self::replaces`], as the Save dialog's Replace? does); numbered name: as before, the
-    /// download is numbered as it starts; Cancel: back to the dialog. A name MDM gave, and the
+    /// download is numbered as it starts; Cancel: back to the dialog. A name ODM gave, and the
     /// early download's own place (its file finished behind the dialog), ask nothing.
     fn ask_replace(
         &mut self,
@@ -2083,7 +2083,7 @@ fn cancel_waiting(ctx: &egui::Context, n: usize) -> Outcome<bool> {
     question(
         ctx,
         "cancel-waiting",
-        "Mister Download Manager",
+        "Orbit Download Manager",
         [374.0, 100.0 + extra],
         false,
         winui::BG(),
@@ -2141,7 +2141,7 @@ fn cancel_waiting(ctx: &egui::Context, n: usize) -> Outcome<bool> {
 /// Look `url` up in the background (name, size) as the download will ask it (`request`), the
 /// answer landing in the slot returned.
 /// A look's result: what it learned, and its open answer when the download can read it.
-type Probed = Result<(ProbeInfo, Option<mdm_engine::KeptAnswer>), String>;
+type Probed = Result<(ProbeInfo, Option<odm_engine::KeptAnswer>), String>;
 
 fn start_probe(
     rt: &tokio::runtime::Handle,
@@ -2154,7 +2154,7 @@ fn start_probe(
     let (headers, opts) = (request.headers.clone(), request.opts.clone());
     rt.spawn(async move {
         // In the interface language (the engine's own words are English).
-        let res = mdm_engine::probe_kept(url, headers, &opts)
+        let res = odm_engine::probe_kept(url, headers, &opts)
             .await
             .map_err(|e| crate::errors::describe(&e));
         *slot.lock().unwrap() = Some(res);
@@ -2182,7 +2182,7 @@ pub struct Complete {
     pub opening: Option<crate::launch::Asked<PathBuf, bool>>,
     /// Snooze picked a time (#741): the window closes, and no other opens until then.
     pub snooze: Option<crate::finish::SnoozeFor>,
-    /// The file was dragged out of the box to a place MDM couldn't learn (#869): Open and Open
+    /// The file was dragged out of the box to a place ODM couldn't learn (#869): Open and Open
     /// folder say so.
     pub moved_away: bool,
 }
@@ -2322,7 +2322,7 @@ impl Complete {
                 // Drag handle: white box with a 1 px #828790 border; drag it to drop the file into
                 // Explorer, a mail or a chat (IDM 5.05). The drop target decides, as for a file
                 // dragged in Explorer: moved on the same drive (or with Shift), copied to another
-                // (or with Ctrl), and MDM's download follows a move (#869). Windows only: dragging
+                // (or with Ctrl), and ODM's download follows a move (#869). Windows only: dragging
                 // a file out to another app goes through OLE there; Linux and macOS have no such
                 // drag built yet (no drag source in their window library), so the handle isn't
                 // shown there and nothing is moved: Open folder is the way to the file.
@@ -2685,7 +2685,7 @@ impl GroupDone {
                     unreachable!("three buttons")
                 };
                 let folder = btn(ui, folder_at, "Open folder", ButtonKind::Default);
-                // i18n: button: shows these downloads in MDM's list, selected
+                // i18n: button: shows these downloads in ODM's list, selected
                 let list = btn(ui, list_at, "Show in list", ButtonKind::Normal);
                 // i18n: verb: closes this window
                 let close = btn(ui, close_at, "Close", ButtonKind::Normal);
@@ -3405,7 +3405,7 @@ fn tell_turn_off_failed(why: String) {
 pub enum DraggedOut {
     /// Moved there (the shell said where).
     Moved(PathBuf),
-    /// Gone from its place, to somewhere MDM couldn't learn (a program that took it, the
+    /// Gone from its place, to somewhere ODM couldn't learn (a program that took it, the
     /// Recycle Bin).
     MovedAway,
 }
@@ -3498,7 +3498,7 @@ pub fn open_file(path: &Path) {
 }
 
 /// [`open_file`] for a download: `moved_away`, its file was dragged out of Download complete to
-/// a place MDM couldn't learn (#869), which is said when it isn't there.
+/// a place ODM couldn't learn (#869), which is said when it isn't there.
 pub fn open_download(path: &Path, moved_away: bool) {
     let path = path.to_owned();
     crate::launch::spawn("open file", move || {
@@ -3531,13 +3531,13 @@ pub fn open_download_now(path: &Path, moved_away: bool) -> bool {
     })
 }
 
-/// Why a download's file isn't where MDM saved it, when it was dragged out of Download complete
-/// (#869) or the list (#1210) to a place MDM couldn't learn.
+/// Why a download's file isn't where ODM saved it, when it was dragged out of Download complete
+/// (#869) or the list (#1210) to a place ODM couldn't learn.
 fn moved_away_text(path: &Path) -> String {
     let name = crate::i18n::isolate(&path.file_name().unwrap_or_default().to_string_lossy());
     crate::i18n::fmt(
         crate::i18n::t(
-            "{file} was moved elsewhere by dragging it out of MDM, and MDM couldn't learn where. Look for it where you dropped it.",
+            "{file} was moved elsewhere by dragging it out of ODM, and ODM couldn't learn where. Look for it where you dropped it.",
         ),
         &[("file", &name)],
     )
@@ -3611,7 +3611,7 @@ pub(crate) fn file_menu_now(
 }
 
 /// Hand the downloaded file `path` to `hand` (which opens it, or shows a chooser for it), or say
-/// why not: moved or deleted since (`moved_away`: dragged out to a place MDM couldn't learn,
+/// why not: moved or deleted since (`moved_away`: dragged out to a place ODM couldn't learn,
 /// #869), or `hand`'s error. True when it was handed over. Waits for `hand`, so it runs on a
 /// thread other than the window's.
 fn hand_over(
@@ -3643,7 +3643,7 @@ pub fn show_in_folder(path: &Path) {
 }
 
 /// [`show_in_folder`] for a download: `moved_away`, its file was dragged out of Download
-/// complete to a place MDM couldn't learn (#869): when it isn't there, that is said instead of
+/// complete to a place ODM couldn't learn (#869): when it isn't there, that is said instead of
 /// opening the folder it left.
 pub fn show_download_in_folder(path: &Path, moved_away: bool) {
     let path = path.to_owned();
@@ -3707,7 +3707,7 @@ pub fn open_download_with(path: &Path, moved_away: bool) {
                     std::io::Error::from_raw_os_error(hr).to_string()
                 })
             }
-            // Linux and macOS have no chooser MDM can call for a file: the desktop's opener
+            // Linux and macOS have no chooser ODM can call for a file: the desktop's opener
             // (xdg-open, which goes through the desktop portal in a sandbox, or macOS's `open`)
             // opens it with the program set for its type, which the user changes there.
             #[cfg(not(windows))]
@@ -4511,7 +4511,7 @@ pub type ReplaceGate<T> = Gate<T, bool, Duplicate>;
 /// duplicate question about that file ([`Duplicate::file`], shown by `show`). Its overwrite
 /// answer gives `true` (the download replaces the file as it completes, `Item::replace_file`),
 /// its numbered name `false` (numbered as the download starts, as before); Cancel goes back to
-/// the dialog. A name MDM gave (not `typed`) passes as it is, numbered as it starts if taken.
+/// the dialog. A name ODM gave (not `typed`) passes as it is, numbered as it starts if taken.
 /// `gate` lives in the dialog, across frames.
 pub fn ensure_replace_asked<T>(
     ctx: &egui::Context,
@@ -4523,7 +4523,7 @@ pub fn ensure_replace_asked<T>(
     show: impl FnOnce(&mut Duplicate, &egui::Context) -> Outcome<usize>,
 ) -> Outcome<(T, bool)> {
     if !typed && gate.idle() {
-        // Nothing to ask about a name MDM gave: no look at the disk either.
+        // Nothing to ask about a name ODM gave: no look at the disk either.
         return out.map(|v| (v, false));
     }
     gate.pass(
@@ -4533,7 +4533,7 @@ pub fn ensure_replace_asked<T>(
         || {
             move |d: &PathBuf| {
                 if let Some(dir) = d.parent().filter(|p| !p.as_os_str().is_empty()) {
-                    mdm_engine::naming::wait_cleared(dir);
+                    odm_engine::naming::wait_cleared(dir);
                 }
                 exists(d)
             }
@@ -4565,7 +4565,7 @@ mod tests {
             "in front now, still on its own"
         );
         forget_window(&ctx, ViewportId::from_hash_of("owned-test"), key);
-        assert!(owned_by_main(&ctx, key, || true), "opened from MDM: owned");
+        assert!(owned_by_main(&ctx, key, || true), "opened from ODM: owned");
         assert!(owned_by_main(&ctx, key, || panic!("asked again")));
     }
 
@@ -5034,7 +5034,7 @@ mod tests {
     /// answer comes at last.
     #[test]
     fn a_disk_that_never_answers_holds_up_no_frame() {
-        let dir = std::env::temp_dir().join("mdm-743-slow");
+        let dir = std::env::temp_dir().join("odm-743-slow");
         let (look, release) = slow_look(&["a.zip"]);
         let mut place = SaveAsPlace::with(look, None);
         let started = std::time::Instant::now();
@@ -5063,7 +5063,7 @@ mod tests {
     /// what was typed, and a new name asked for (another folder) drops the old question's.
     #[test]
     fn a_late_answer_never_replaces_what_was_typed_or_picked_since() {
-        let dir = std::env::temp_dir().join("mdm-743-typed");
+        let dir = std::env::temp_dir().join("odm-743-typed");
         let (look, release) = slow_look(&["a.zip", "b.zip"]);
         let mut place = SaveAsPlace::with(look, None);
         let _guess = place.name_in(&dir, "a.zip");
@@ -5096,7 +5096,7 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         std::fs::write(d.path().join("a.zip"), b"x").unwrap();
         std::fs::write(
-            mdm_engine::naming::part_path(&d.path().join("a (1).zip")),
+            odm_engine::naming::part_path(&d.path().join("a (1).zip")),
             b"x",
         )
         .unwrap();
@@ -5106,7 +5106,7 @@ mod tests {
         assert_eq!(save_as, display_path(&d.path().join("a (2).zip")));
         assert_eq!(
             resolve_path(&save_as),
-            mdm_engine::naming::destination(d.path(), "a.zip")
+            odm_engine::naming::destination(d.path(), "a.zip")
         );
         let gone = d.path().join("not-there");
         let mut save_as = place.name_in(&gone, "a.zip");
@@ -5114,15 +5114,15 @@ mod tests {
         assert_eq!(save_as, display_path(&gone.join("a.zip")));
     }
 
-    /// #597: with Start immediately on, the early download's own `.mdm.part` and `.mdm.json`
+    /// #597: with Start immediately on, the early download's own `.odm.part` and `.odm.json`
     /// sit beside its name. Picking the same folder in Save As keeps that name, so `adopt_early`
     /// sees no move and the download is not restarted.
     #[test]
     fn the_early_downloads_own_part_and_state_keep_its_name() {
         let d = tempfile::tempdir().unwrap();
         let own = d.path().join("song.mp3");
-        std::fs::write(mdm_engine::naming::part_path(&own), b"x").unwrap();
-        std::fs::write(mdm_engine::state::state_path(&own), b"{}").unwrap();
+        std::fs::write(odm_engine::naming::part_path(&own), b"x").unwrap();
+        std::fs::write(odm_engine::state::state_path(&own), b"{}").unwrap();
         let mut place = SaveAsPlace::new(None);
         place.own(Some(own.clone()));
         let mut save_as = place.name_in(d.path(), "song.mp3");
@@ -5132,7 +5132,7 @@ mod tests {
         assert_eq!(resolve_path(&save_as), own);
         // Another download's part beside another name still counts.
         std::fs::write(
-            mdm_engine::naming::part_path(&d.path().join("other.mp3")),
+            odm_engine::naming::part_path(&d.path().join("other.mp3")),
             b"x",
         )
         .unwrap();
@@ -5162,7 +5162,7 @@ mod tests {
         assert_eq!(resolve_path(&save_as), d.path().join("testName.7z"));
         // Where the download goes as it starts: the next free name.
         assert_eq!(
-            mdm_engine::naming::destination(d.path(), "testName.7z"),
+            odm_engine::naming::destination(d.path(), "testName.7z"),
             d.path().join("testName (1).7z")
         );
     }
@@ -5178,7 +5178,7 @@ mod tests {
                 url: Url::parse(&format!("http://127.0.0.1:9/{name}")).unwrap(),
                 login: None,
             },
-            mdm_ipc::Command {
+            odm_ipc::Command {
                 name: Some(name.to_owned()),
                 ..Default::default()
             },
@@ -5331,11 +5331,11 @@ mod tests {
         assert_eq!(fi.replaces(), Some(taken));
     }
 
-    /// #1447: what asks nothing. A typed name no file has; a name MDM gave, even one a file has
+    /// #1447: what asks nothing. A typed name no file has; a name ODM gave, even one a file has
     /// by now (numbered as it starts, as before, and let go in the same frame: no look at the
     /// disk); the name of the download started early behind the dialog (#597: its own file).
     #[test]
-    fn a_name_mdm_gave_or_a_free_one_is_not_asked_about() {
+    fn a_name_odm_gave_or_a_free_one_is_not_asked_about() {
         let d = tempfile::tempdir().unwrap();
         let taken = d.path().join("taken.7z");
         std::fs::write(&taken, b"the old file").unwrap();
@@ -5348,7 +5348,7 @@ mod tests {
         assert!(matches!(out, Some(Outcome::Done(Start::Now))));
         assert_eq!(fi.replaces(), None);
 
-        // MDM's name (a category or folder chosen gives it again), the file there meanwhile.
+        // ODM's name (a category or folder chosen gives it again), the file there meanwhile.
         fi.set_category(Category::General);
         fi.save_as = display_path(&taken);
         let ctx = egui::Context::default();
@@ -5403,7 +5403,7 @@ mod tests {
         let ctx = egui::Context::default();
         let (release, stuck) = std::sync::mpsc::channel::<()>();
         let mut gate = FolderGate::<u32>::default();
-        let folder = std::env::temp_dir().join("mdm-743-gate");
+        let folder = std::env::temp_dir().join("odm-743-gate");
         let started = std::time::Instant::now();
         let is_dir = move |_: &Path| {
             let _ = stuck.recv();

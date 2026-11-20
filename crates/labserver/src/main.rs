@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Context;
 use clap::Parser;
-use mdm_labserver::{Config, Faults, LabServer};
+use odm_labserver::{Config, Faults, LabServer};
 
 /// HTTP Range test server with a request log and fault injection.
 #[derive(Parser)]
@@ -55,7 +55,7 @@ struct Args {
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let faults = Faults::parse(&args.faults).context("--faults")?;
-    let cert = mdm_labserver::Cert::parse(&args.tls_cert).with_context(|| {
+    let cert = odm_labserver::Cert::parse(&args.tls_cert).with_context(|| {
         format!(
             "--tls-cert: {:?} (test-ca, expired, self-signed or wrong-name)",
             args.tls_cert
@@ -70,7 +70,7 @@ async fn main() -> anyhow::Result<()> {
         )),
         None => None,
     };
-    let on_log = Arc::new(move |e: &mdm_labserver::LogEntry| {
+    let on_log = Arc::new(move |e: &odm_labserver::LogEntry| {
         let line = serde_json::to_string(e).expect("log entry serializes");
         println!("{line}");
         if let Some(f) = &file {
@@ -94,13 +94,13 @@ async fn main() -> anyhow::Result<()> {
     );
     if let Some(ca) = server.ca_der() {
         let path =
-            std::env::temp_dir().join(format!("mdm-labserver-ca-{}.der", server.addr().port()));
+            std::env::temp_dir().join(format!("odm-labserver-ca-{}.der", server.addr().port()));
         std::fs::write(&path, ca)?;
         eprintln!("its test CA's certificate (DER): {}", path.display());
     }
     let _ftp = match args.ftp {
         Some(bind) => {
-            use mdm_labserver::ftp::{FtpConfig, FtpServer, FtpTls};
+            use odm_labserver::ftp::{FtpConfig, FtpServer, FtpTls};
             let tls = match args.ftp_tls.as_deref() {
                 None => FtpTls::None,
                 Some("explicit") => FtpTls::Explicit,
@@ -116,7 +116,7 @@ async fn main() -> anyhow::Result<()> {
                 None => None,
             };
             let rate = match args.ftp_rate.as_deref() {
-                Some(r) => Some(mdm_labserver::content::parse_size(r).context("--ftp-rate")?),
+                Some(r) => Some(odm_labserver::content::parse_size(r).context("--ftp-rate")?),
                 None => None,
             };
             let ftp = FtpServer::start(

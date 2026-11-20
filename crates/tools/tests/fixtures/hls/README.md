@@ -13,7 +13,7 @@ only, and yt-dlp's own answer for it:
   `filesize_approx`, `tbr`, `protocol` (each kept only where yt-dlp gave it, nulls included).
   Formats keep yt-dlp's order.
 
-yt-dlp **2026.10.26** (the Windows `yt-dlp.exe` MDM installs), on 2026-11-09. Each case ran
+yt-dlp **2026.10.26** (the Windows `yt-dlp.exe` ODM installs), on 2026-11-09. Each case ran
 
     yt-dlp --ignore-config --no-update --proxy "" -J --no-playlist <address>
 
@@ -31,13 +31,13 @@ yt-dlp **2026.10.26** (the Windows `yt-dlp.exe` MDM installs), on 2026-11-09. Ea
 | `order` | `http://127.0.0.1:8094/order.m3u8` | `/a/en.m3u8` |
 | `redirect` | `http://127.0.0.1:8093/redirect?to=http%3A%2F%2F127.0.0.1%3A8094%2Frepeated.m3u8` | `/v/v720.m3u8` |
 
-Port 8093 is `mdm-labserver`; 8094 served the streams `capture.py` lists (`STREAMS`), then with
+Port 8093 is `odm-labserver`; 8094 served the streams `capture.py` lists (`STREAMS`), then with
 Python's `http.server`, as `application/vnd.apple.mpegurl`.
 
 To make the corpus again (it rewrites these folders; nothing is asked of any other host):
 
-    cargo run -p mdm-labserver -- --bind 127.0.0.1:8093
+    cargo run -p odm-labserver -- --bind 127.0.0.1:8093
     python -I crates/tools/tests/fixtures/hls/capture.py --ytdlp <yt-dlp 2026.10.26> [--out DIR]
 
 With yt-dlp 2026.10.26 it writes these files byte for byte. A newer yt-dlp may answer otherwise:
-then the test says where MDM's reading and yt-dlp's part.
+then the test says where ODM's reading and yt-dlp's part.

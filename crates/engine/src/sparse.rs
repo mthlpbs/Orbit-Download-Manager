@@ -181,12 +181,12 @@ mod linux_tests {
         assert!(!set(&f, false));
     }
 
-    /// An NTFS folder mounted with ntfs3: `MDM_TEST_NTFS_DIR=/mnt/ntfs cargo test -p mdm-engine
+    /// An NTFS folder mounted with ntfs3: `ODM_TEST_NTFS_DIR=/mnt/ntfs cargo test -p odm-engine
     /// sparse -- --ignored`.
     #[test]
-    #[ignore = "needs an NTFS folder (ntfs3) in MDM_TEST_NTFS_DIR"]
+    #[ignore = "needs an NTFS folder (ntfs3) in ODM_TEST_NTFS_DIR"]
     fn an_ntfs3_part_file_is_written_far_in_without_a_fill() {
-        let root = std::env::var_os("MDM_TEST_NTFS_DIR").expect("MDM_TEST_NTFS_DIR");
+        let root = std::env::var_os("ODM_TEST_NTFS_DIR").expect("ODM_TEST_NTFS_DIR");
         let dir = tempfile::tempdir_in(root).unwrap();
         let f = part_file(dir.path());
         assert!(set(&f, true), "ntfs3 takes the sparse attribute");

@@ -4,7 +4,7 @@
 
 use std::net::IpAddr;
 
-use mdm_engine::net::Adapter;
+use odm_engine::net::Adapter;
 
 /// [`chosen`]'s choice for this computer only: other devices can't reach it (tests, a reverse
 /// proxy on the same computer).

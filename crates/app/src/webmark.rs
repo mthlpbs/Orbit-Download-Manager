@@ -1,7 +1,7 @@
 //! The mark a downloaded file carries to say it came from the internet (#813): Windows' Mark of
 //! the Web (the `Zone.Identifier` stream SmartScreen and Office's Protected View read), macOS'
 //! quarantine attribute (Gatekeeper's), Linux's origin attributes (shown by file managers,
-//! enforced by nothing). Every download MDM makes is marked here (the engine's files as they are
+//! enforced by nothing). Every download ODM makes is marked here (the engine's files as they are
 //! created, extracted files, videos, galleries, torrents), as Options → Downloads → "Mark
 //! downloaded files as coming from the internet" says and, on Windows, as Windows' own policy
 //! for attachments says: browsers save their downloads through Windows' attachment services,
@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 static ON: AtomicBool = AtomicBool::new(true);
 
 /// Options → Downloads → "Mark downloaded files as coming from the internet", as it is now
-/// (MDM's start, Options → OK).
+/// (ODM's start, Options → OK).
 pub fn set(on: bool) {
     ON.store(on, Ordering::Relaxed);
 }
@@ -33,7 +33,7 @@ pub fn keeps_zones(machine: Option<u32>, user: Option<u32>) -> bool {
     machine.or(user) != Some(1)
 }
 
-/// Whether a downloaded file is marked: MDM's option, and the system's policy.
+/// Whether a downloaded file is marked: ODM's option, and the system's policy.
 pub fn wanted(option: bool, system_keeps: bool) -> bool {
     option && system_keeps
 }
@@ -47,7 +47,7 @@ fn system_keeps() -> bool {
         keeps_zones(machine, user)
     }
     // macOS has no such policy for its quarantine attribute (Gatekeeper's, which only
-    // MDM's option leaves out), nor Linux for its origin attributes, which nothing enforces.
+    // ODM's option leaves out), nor Linux for its origin attributes, which nothing enforces.
     #[cfg(not(windows))]
     {
         true
@@ -55,7 +55,7 @@ fn system_keeps() -> bool {
 }
 
 /// Mark `path`, a file being downloaded (or just downloaded) from `url` (`referrer`'s page), as
-/// coming from the internet, unless MDM's option or the system's policy says not to.
+/// coming from the internet, unless ODM's option or the system's policy says not to.
 pub fn mark(path: &Path, url: &str, referrer: Option<&str>) {
     if !wanted(ON.load(Ordering::Relaxed), system_keeps()) {
         return;

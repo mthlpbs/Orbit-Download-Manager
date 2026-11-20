@@ -16,7 +16,7 @@ use crate::protocol::{AppState, Freeze, Panic, Session, kind};
 /// its own, and the window goes on ([`CONNECT_FOR`] keeps the try going beside it).
 const FIRST_TRY: Duration = Duration::from_millis(500);
 /// How long the connection is tried in all. The window never waits past [`FIRST_TRY`], so a
-/// slow monitor (a cold disk at log-on) is given a minute; past it MDM runs on without crash
+/// slow monitor (a cold disk at log-on) is given a minute; past it ODM runs on without crash
 /// reports, as when the monitor couldn't start at all.
 const CONNECT_FOR: Duration = Duration::from_secs(60);
 /// Between two tries to connect, doubling up to [`RETRY_MAX`].
@@ -81,7 +81,7 @@ impl Tries {
 impl Reporter {
     /// Start `exe --crash-monitor <socket> --data <dir> --parent <pid>` and connect to it: the
     /// window thread tries for a moment, then a thread of its own takes the try over. None when
-    /// it can't start: MDM runs on without crash reports.
+    /// it can't start: ODM runs on without crash reports.
     pub fn start(exe: &Path, data: &Path) -> Option<Arc<Reporter>> {
         let socket = crate::monitor::socket_path(std::process::id());
         let mut cmd = Command::new(exe);
@@ -121,7 +121,7 @@ impl Reporter {
 
     /// Connect to the monitor from a thread of its own. It listens a moment after it starts,
     /// and a slow start (or a socket the system refuses for a while: a Windows Server was seen
-    /// refusing MDM's for five seconds with os error 10022, #476) must neither hold the window
+    /// refusing ODM's for five seconds with os error 10022, #476) must neither hold the window
     /// back nor take the monitor away: it may answer later, and what was sent meanwhile goes
     /// over then. Past `deadline` it is given up.
     fn connect_in_background(
@@ -213,7 +213,7 @@ impl Reporter {
     }
 
     /// Crash reports are off for the session: the monitor can never be reached, or is gone. It
-    /// is ended, so no second MDM process stays behind.
+    /// is ended, so no second ODM process stays behind.
     fn give_up(&self, why: &str) {
         tracing::warn!("crash reports are off for this session ({why})");
         self.off.store(true, Ordering::Release);

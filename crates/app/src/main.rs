@@ -103,19 +103,19 @@ pub fn app_icon() -> std::sync::Arc<egui::IconData> {
 pub fn app_picture() -> std::sync::Arc<egui::IconData> {
     static ICON: std::sync::OnceLock<std::sync::Arc<egui::IconData>> = std::sync::OnceLock::new();
     ICON.get_or_init(|| {
-        let png = include_bytes!("../assets/icons/app/mdm-256.png");
+        let png = include_bytes!("../assets/icons/app/odm-256.png");
         std::sync::Arc::new(eframe::icon_data::from_png_bytes(png).unwrap_or_default())
     })
     .clone()
 }
 
-/// MDM_OFFSCREEN=1, for screenshots and checks (tools/lab/docs-shots.ps1): every window opens
+/// ODM_OFFSCREEN=1, for screenshots and checks (tools/lab/docs-shots.ps1): every window opens
 /// far off the screens, never takes the focus and has no taskbar button, and there is no tray
 /// icon and no sound, so nothing shows while it runs. The windows still draw, and PrintWindow
 /// captures them.
 pub fn offscreen() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("MDM_OFFSCREEN").is_some_and(|v| v == "1"))
+    *ON.get_or_init(|| odm_ipc::env_var_os("ODM_OFFSCREEN").is_some_and(|v| v == "1"))
 }
 
 /// The clipboard's text, if any. Never read in an off-screen run ([`offscreen`]): its windows
@@ -123,12 +123,12 @@ pub fn offscreen() -> bool {
 /// address came from it, and was fetched). It may wait for the clipboard's owner for ever:
 /// never called on the window's thread, only by `clipboard`'s reader (#418, #661).
 pub fn clipboard_text() -> clipboard::Read {
-    // Off-screen test copies: MDM_TEST_CLIPBOARD=<file> is what they find in the clipboard
+    // Off-screen test copies: ODM_TEST_CLIPBOARD=<file> is what they find in the clipboard
     // (#709's checks of Add batch download from clipboard), read when they ask, as the
     // clipboard would be; the person's own clipboard is never read. No file: an empty
     // clipboard; a file that can't be read (a check holds it open, #1157's): one that can't be.
     if offscreen()
-        && let Some(file) = std::env::var_os("MDM_TEST_CLIPBOARD")
+        && let Some(file) = std::env::var_os("ODM_TEST_CLIPBOARD")
     {
         return match std::fs::read_to_string(file) {
             Ok(text) => clipboard::Read::Text(text),
@@ -168,10 +168,10 @@ fn system_clipboard_text() -> clipboard::Read {
 /// A number that changes whenever the clipboard does, so the watch for copied links
 /// (clipboard.rs) reads it only then: Windows' sequence number. None where the system keeps none
 /// a program can ask for without opening the clipboard (Linux, macOS): read at each look.
-/// Off-screen test copies: when their `MDM_TEST_CLIPBOARD` file last changed (or never).
+/// Off-screen test copies: when their `ODM_TEST_CLIPBOARD` file last changed (or never).
 pub fn clipboard_changes() -> Option<u64> {
     if offscreen() {
-        let changed = std::env::var_os("MDM_TEST_CLIPBOARD")
+        let changed = std::env::var_os("ODM_TEST_CLIPBOARD")
             .and_then(|f| std::fs::metadata(f).ok()?.modified().ok())
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .map_or(0, |d| d.as_nanos() as u64);
@@ -193,11 +193,11 @@ const CLIPBOARD_WAIT: std::time::Duration = std::time::Duration::from_millis(500
 /// One use of the clipboard at a time in the whole process, egui's copy and paste included
 /// (the same lock, `egui_winit::clipboard::lock_system_clipboard`): Windows lets the threads
 /// of a process open it at the same time, and two reads at once (the clipboard monitor's and
-/// Add URL's) corrupted the heap and ended MDM (#629). None: the wait ran out.
+/// Add URL's) corrupted the heap and ended ODM (#629). None: the wait ran out.
 fn clipboard_lock() -> Option<egui_winit::clipboard::SystemClipboardLock> {
     let lock = egui_winit::clipboard::lock_system_clipboard(CLIPBOARD_WAIT);
     if lock.is_none() {
-        tracing::warn!("clipboard: still in use elsewhere in MDM, not read or written");
+        tracing::warn!("clipboard: still in use elsewhere in ODM, not read or written");
     }
     lock
 }
@@ -244,12 +244,12 @@ fn write_clipboard(off: bool, text: String) -> Option<String> {
     }
 }
 
-/// Where [`offscreen`] puts the main window: far off the screens, or at `MDM_OFFSCREEN_AT=x,y`.
+/// Where [`offscreen`] puts the main window: far off the screens, or at `ODM_OFFSCREEN_AT=x,y`.
 /// That is for a machine whose screen nobody watches (the docs screenshots on GitHub's runner,
 /// .github/workflows/docs-shots.yml): there the software OpenGL (Mesa's llvmpipe) presents
 /// through GDI, which draws nothing off the screens.
 pub fn offscreen_at() -> [f32; 2] {
-    std::env::var("MDM_OFFSCREEN_AT")
+    odm_ipc::env_var("ODM_OFFSCREEN_AT")
         .ok()
         .and_then(|v| {
             let (x, y) = v.split_once(',')?;
@@ -273,8 +273,8 @@ pub fn quiet(builder: egui::ViewportBuilder) -> egui::ViewportBuilder {
 pub enum Start {
     /// In front, as a start by the user does.
     Shown,
-    /// Started with the session (the startup entry's [`mdm_ipc::STARTUP`]): hidden, downloads,
-    /// queues and the Scheduler running. It stays in the notification area once MDM's icon is
+    /// Started with the session (the startup entry's [`odm_ipc::STARTUP`]): hidden, downloads,
+    /// queues and the Scheduler running. It stays in the notification area once ODM's icon is
     /// there, or shows minimized if none comes (app.rs `at_login`, decided there alone).
     Session,
     /// Started with the session where a window can't be hidden (Wayland): minimized.
@@ -300,7 +300,7 @@ fn can_hide() -> bool {
 }
 
 /// Whether the main window can wait hidden in the notification area (Options' tooltip): a tray
-/// shows MDM's icon (Linux: a tray host is there, #59) and the window can be hidden.
+/// shows ODM's icon (Linux: a tray host is there, #59) and the window can be hidden.
 pub fn can_start_in_tray() -> bool {
     can_hide() && tray::available()
 }
@@ -309,19 +309,19 @@ fn main() -> std::process::ExitCode {
     renderer::mark_start();
     // PAC's myIpAddress from the routing table, not a UDP socket (a firewall prompt, #35).
     #[cfg(windows)]
-    mdm_engine::net::set_source_lookup(win32::source_address);
+    odm_engine::net::set_source_lookup(win32::source_address);
     // Whether paths may pass Windows' MAX_PATH (#1102): names are fitted to it while they may
     // not. Linux and macOS have no such switch, only their own fixed limits (naming::Limits).
     #[cfg(windows)]
-    mdm_engine::naming::set_long_paths(win32::long_paths_enabled());
+    odm_engine::naming::set_long_paths(win32::long_paths_enabled());
     // orbitdownloadmanager-cli's commands (crates/cli): its launcher starts this program for
     // them. Nothing of the app's runs: no window, instance, crash monitor or crash log.
-    if let Some(cli) = mdm_cli::launched(std::env::args_os().collect()) {
+    if let Some(cli) = odm_cli::launched(std::env::args_os().collect()) {
         // The default browser's User-Agent (#668): a command's download starts at once, so it
         // waits for it a moment (Windows reads it from the registry; Linux and macOS may ask the
         // browser its version). Only `get` and `resume` download with it: the others don't wait.
         let found = defaultbrowser::start();
-        if mdm_cli::downloads(&cli.args) {
+        if odm_cli::downloads(&cli.args) {
             defaultbrowser::wait(&found, std::time::Duration::from_secs(3));
         }
         // A windowed program has no console: the launcher's, unless the output goes to a file
@@ -329,9 +329,9 @@ fn main() -> std::process::ExitCode {
         #[cfg(windows)]
         win32::cli_console(cli.launcher);
         // Downloads go through the debrid accounts of Options → Accounts (#44).
-        return mdm_cli::main_with(cli.args, Some(&debrid::CliAccounts));
+        return odm_cli::main_with(cli.args, Some(&debrid::CliAccounts));
     }
-    // The Windows uninstaller, when the user chose to remove the data too: MDM's sign-ins leave
+    // The Windows uninstaller, when the user chose to remove the data too: ODM's sign-ins leave
     // the system's keychain with it (#44).
     if std::env::args().nth(1).as_deref() == Some("--forget-sign-ins") {
         return secrets::forget_all();
@@ -353,25 +353,25 @@ fn main() -> std::process::ExitCode {
         }
     };
     // The log's last lines, still on their way to the file (its own thread, #513).
-    mdm_crash::logs::flush(LOG_AT_THE_END);
+    odm_crash::logs::flush(LOG_AT_THE_END);
     code
 }
 
-/// How long MDM's end waits for its log's last lines (a disk that holds them longer loses them).
+/// How long ODM's end waits for its log's last lines (a disk that holds them longer loses them).
 const LOG_AT_THE_END: std::time::Duration = std::time::Duration::from_secs(2);
 
 fn app() -> eframe::Result {
-    // MDM's crash monitor (crash.rs started it): the report window when the app crashes or
-    // freezes; it never becomes MDM's instance.
+    // ODM's crash monitor (crash.rs started it): the report window when the app crashes or
+    // freezes; it never becomes ODM's instance.
     let all: Vec<String> = std::env::args().collect();
-    if let Some(m) = mdm_crash::MonitorArgs::parse(&all) {
+    if let Some(m) = odm_crash::MonitorArgs::parse(&all) {
         return crashui::monitor_main(m);
     }
 
     // A windowed app has no console: record panics in %APPDATA%\orbitdownloadmanager\crash.log.
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        if let Some(dir) = mdm_ipc::data_dir() {
+        if let Some(dir) = odm_ipc::data_dir() {
             let _ = std::fs::create_dir_all(&dir);
             let bt = std::backtrace::Backtrace::force_capture();
             let _ = std::fs::write(dir.join("crash.log"), format!("{info}\n\n{bt}"));
@@ -381,12 +381,12 @@ fn app() -> eframe::Result {
 
     // IDM-style command line; hand it to a running instance if there is one.
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let cmd = mdm_ipc::parse_args(&args);
+    let cmd = odm_ipc::parse_args(&args);
     // Started by an update (update.rs): the old copy may still be closing; this one waits for
     // it rather than handing it anything.
     let after_update = args.iter().any(|a| a.eq_ignore_ascii_case(update::UPDATED));
     if !after_update
-        && (mdm_ipc::send(&cmd.clone().unwrap_or_default()).is_ok()
+        && (odm_ipc::send(&cmd.clone().unwrap_or_default()).is_ok()
             || cmd.as_ref().is_some_and(|c| c.exit))
     {
         return Ok(());
@@ -396,10 +396,10 @@ fn app() -> eframe::Result {
     let lock = if after_update {
         update::lock_after_update()
     } else {
-        mdm_ipc::instance_lock()
+        odm_ipc::instance_lock()
     };
     let Some(_instance) = lock else {
-        let _ = mdm_ipc::send_waiting(&cmd.unwrap_or_default(), std::time::Duration::from_secs(10));
+        let _ = odm_ipc::send_waiting(&cmd.unwrap_or_default(), std::time::Duration::from_secs(10));
         return Ok(());
     };
     #[cfg(windows)]
@@ -407,7 +407,7 @@ fn app() -> eframe::Result {
     // Started with the session (#226): read before the command goes to the channel; the start's
     // mode once the window system is known (below).
     let at_login = cmd.as_ref().is_some_and(|c| c.startup);
-    // This launch is MDM: its fonts are looked up while the rest starts (only the instance pays
+    // This launch is ODM: its fonts are looked up while the rest starts (only the instance pays
     // for them, not a launch that hands its command over).
     theme::prepare_fonts();
     // And the file icons' themes (Linux: gsettings), off the window's thread.
@@ -415,12 +415,12 @@ fn app() -> eframe::Result {
     unix::prepare_file_icons();
     // What an earlier update set aside (old programs, a Mac's old app, downloaded files).
     update::tidy();
-    // The command channel opens now, before the window: the browser's host that started MDM
+    // The command channel opens now, before the window: the browser's host that started ODM
     // waits for it, and what arrives meanwhile is handled at the first frame. Without it the
     // app still works; it just can't receive commands.
     let (tx, commands) = std::sync::mpsc::channel();
     if let Some(cmd) = cmd {
-        let _ = tx.send(mdm_ipc::Incoming { cmd, reply: None });
+        let _ = tx.send(odm_ipc::Incoming { cmd, reply: None });
     }
     let window: std::sync::Arc<std::sync::OnceLock<egui::Context>> = Default::default();
     let wake = window.clone();
@@ -437,22 +437,22 @@ fn app() -> eframe::Result {
     #[cfg(target_os = "macos")]
     unix::open_events::start(tx.clone(), wake.clone());
     // The remote control (#141) sends its commands down the same channel.
-    let sink = mdm_ipc::Sink::new(tx.clone(), wake.clone());
-    let _ = mdm_ipc::serve(tx, move || wake());
+    let sink = odm_ipc::Sink::new(tx.clone(), wake.clone());
+    let _ = odm_ipc::serve(tx, move || wake());
 
     // Downloads run on a Tokio runtime; the UI thread only reads snapshots.
     let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
     let handle = rt.handle().clone();
     // The list and settings, read before the window opens: it comes back where it was left.
     let loaded = store::load();
-    // View → Interface size (#262), or MDM_ZOOM=2 (everything drawn twice as large: sharp 2×
+    // View → Interface size (#262), or ODM_ZOOM=2 (everything drawn twice as large: sharp 2×
     // screenshots, the windows' sizing at high display scaling). The window is made before the
     // zoom applies: its sizes are given zoomed here.
     let z = scale::startup(loaded.settings.interface_size);
     theme::init_smooth_text(loaded.settings.smooth_text);
     // The log (release builds too) and the crash monitor.
-    if let Some(data) = mdm_ipc::data_dir() {
-        mdm_crash::logs::init(&data, mdm_crash::logs::APP);
+    if let Some(data) = odm_ipc::data_dir() {
+        odm_crash::logs::init(&data, odm_crash::logs::APP);
         tracing::info!(
             "Orbit Download Manager {} ({}) starting",
             help::VERSION,
@@ -462,7 +462,7 @@ fn app() -> eframe::Result {
     // The default browser, looked for once on a thread of its own (logged): its User-Agent is
     // the one links added by hand go with (#668).
     defaultbrowser::start();
-    if let Some(data) = mdm_ipc::data_dir() {
+    if let Some(data) = odm_ipc::data_dir() {
         crash::start(
             &data,
             crash::session("en", loaded.settings.dark_mode_support),
@@ -474,10 +474,10 @@ fn app() -> eframe::Result {
     #[cfg(target_os = "linux")]
     unix::on_session_end(rt.handle(), wake_at_end);
     // Linux: the libraries the window loads when it opens (#265). Without them it can't open
-    // (winit stopped at start): MDM says what's missing, in its language, and how to install it.
+    // (winit stopped at start): ODM says what's missing, in its language, and how to install it.
     #[cfg(target_os = "linux")]
     {
-        // View → Window system's choice (#624): the same however MDM was started.
+        // View → Window system's choice (#624): the same however ODM was started.
         unix::set_window_system_pick(loaded.settings.window_system);
         let ws = unix::window_system();
         if !ws.missing.is_empty() {
@@ -560,7 +560,7 @@ fn app() -> eframe::Result {
             loaded,
             start,
         )));
-        // The session's end saves as an Exit saves, and MDM ends. Windows (shut down, restart,
+        // The session's end saves as an Exit saves, and ODM ends. Windows (shut down, restart,
         // sign out, an installer's Restart Manager): before Windows is answered. Linux (logout,
         // shutdown): logind's SIGTERM at the next frame (`Shared::logic`, heard since the start:
         // `unix::on_session_end`), or the X server going away (GNOME's ends at logout before the
@@ -584,7 +584,7 @@ fn app() -> eframe::Result {
                     Some(app) => drop(save_for_session_end(&app, unix::SessionEnd::DisplayLost)),
                     None => crash::clean_exit(),
                 }
-                mdm_crash::logs::flush(LOG_AT_THE_END);
+                odm_crash::logs::flush(LOG_AT_THE_END);
                 true
             });
         }
@@ -606,7 +606,7 @@ impl eframe::App for Shared {
         #[cfg(target_os = "linux")]
         if let Some(why) = unix::session_ending() {
             drop(save_for_session_end(&self.0, why));
-            mdm_crash::logs::flush(LOG_AT_THE_END);
+            odm_crash::logs::flush(LOG_AT_THE_END);
             unix::exit_now(0);
         }
         eframe::App::logic(&mut *self.0.borrow_mut(), ctx, frame);
@@ -618,7 +618,7 @@ impl eframe::App for Shared {
 }
 
 /// The session ends: the app's end as an Exit's (`App::end_session`), within the time the
-/// system gives (Windows: 5 s before it says MDM keeps the computer from shutting down), and the
+/// system gives (Windows: 5 s before it says ODM keeps the computer from shutting down), and the
 /// crash monitor told it's a clean one. The process ends right after (the caller): the app, when
 /// it could be reached, for what's left before.
 #[cfg(any(windows, target_os = "linux"))]
@@ -661,7 +661,7 @@ fn end_session(app: &std::rc::Weak<std::cell::RefCell<app::App>>, why: win32::Se
     {
         app.take_down_tray();
     }
-    mdm_crash::logs::flush(LOG_AT_THE_END);
+    odm_crash::logs::flush(LOG_AT_THE_END);
     std::process::exit(0);
 }
 
@@ -717,7 +717,7 @@ mod tests {
         );
     }
 
-    /// #1157: a read that waited out the lock (another use of the clipboard in MDM held it) is
+    /// #1157: a read that waited out the lock (another use of the clipboard in ODM held it) is
     /// a read that failed, not an empty clipboard: the watch for copied links keeps what it saw.
     #[test]
     fn a_read_that_waits_out_the_lock_failed() {
@@ -776,7 +776,7 @@ mod tests {
     }
 
     /// #629, #1103 on Windows' real clipboard, a private one (win32.rs `private_clipboard`: the
-    /// person's is neither read nor written): MDM's reads (the clipboard monitor's, Add URL's) and
+    /// person's is neither read nor written): ODM's reads (the clipboard monitor's, Add URL's) and
     /// writes, and egui's paste and copy in a text box, all at once from their threads for two
     /// seconds, and on until the reads have found a text and Copy… has written one a hundred
     /// times each (a busy machine does less in two seconds). Every read finds a whole text that

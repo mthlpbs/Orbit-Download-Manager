@@ -5,7 +5,7 @@
 //! a network or USB drive, a file another program holds), and the window waited for each: 8 s in
 //! #1170's report, for one file.
 //!
-//! A deleted download's place stays held ([`mdm_engine::naming::reserve`]) from the moment its
+//! A deleted download's place stays held ([`odm_engine::naming::reserve`]) from the moment its
 //! row leaves the list until its files are gone, so a download added meanwhile under that name
 //! (or a video under that stem) is numbered as it would be for a file still there: what is
 //! deleted here is only ever what the deleted download had, never a file of one that came after.
@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
-use mdm_engine::naming::{self, Reservation};
+use odm_engine::naming::{self, Reservation};
 
 /// Files found when their download's turn comes, not when it is deleted (a video's leftovers:
 /// looking for them reads its folder).
@@ -92,7 +92,7 @@ impl Doomed {
         let spare: Vec<String> = self.spare.iter().map(|p| low(p)).collect();
         let kept = |f: &PathBuf| !spare.contains(&low(f));
         let mut working = vec![
-            mdm_engine::state::state_path(&self.place),
+            odm_engine::state::state_path(&self.place),
             naming::part_path(&self.place),
         ];
         for f in self.later.take().map(|l| l()).unwrap_or_default() {
@@ -350,7 +350,7 @@ impl Deleter {
         *self.pending.0.lock().unwrap() -= 1;
     }
 
-    /// Wait until every batch handed over is deleted, for at most `wait` (MDM's end: a disk that
+    /// Wait until every batch handed over is deleted, for at most `wait` (ODM's end: a disk that
     /// holds a delete doesn't hold the exit). True when none is left.
     pub fn finish(&self, wait: Duration) -> bool {
         let (n, done) = &*self.pending;
@@ -410,7 +410,7 @@ mod tests {
         for f in [
             &a,
             &naming::part_path(&b),
-            &mdm_engine::state::state_path(&b),
+            &odm_engine::state::state_path(&b),
             &d.join("c.f137.mp4"),
         ] {
             std::fs::write(f, b"x").unwrap();
@@ -426,7 +426,7 @@ mod tests {
             Some(later),
         )]);
         assert!(deleter.finish(Duration::from_secs(10)));
-        let state = mdm_engine::state::state_path;
+        let state = odm_engine::state::state_path;
         assert_eq!(
             *seen.lock().unwrap(),
             vec![
@@ -538,7 +538,7 @@ mod tests {
     fn a_rewrite_goes_in_turn_and_holds_its_folders_starts() {
         let dir = tempfile::tempdir().unwrap();
         let d = dir.path();
-        let (gone, state) = (d.join("gone.bin"), d.join("kept.bin.mdm.json"));
+        let (gone, state) = (d.join("gone.bin"), d.join("kept.bin.odm.json"));
         std::fs::write(&gone, b"x").unwrap();
         std::fs::write(&state, b"old").unwrap();
         let gate = Arc::new(Mutex::new(()));

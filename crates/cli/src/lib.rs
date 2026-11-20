@@ -10,8 +10,8 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use mdm_engine::download::{ConnStatus, MAX_CONNECTIONS_UNLOCKED, State};
-use mdm_engine::{Destination, Download, Options, Proxy, Request};
+use odm_engine::download::{ConnStatus, MAX_CONNECTIONS_UNLOCKED, State};
+use odm_engine::{Destination, Download, Options, Proxy, Request};
 use reqwest::header::{COOKIE, HeaderMap, HeaderName, HeaderValue, REFERER, USER_AGENT};
 use serde_json::json;
 
@@ -61,13 +61,13 @@ enum Cmd {
         /// The finished file must have this hash: hex MD5 / SHA-1 / SHA-256 / SHA-512 / CRC32,
         /// optionally named ("sha256:…").
         #[arg(long, value_parser = parse_checksum)]
-        checksum: Option<mdm_engine::verify::Hash>,
+        checksum: Option<odm_engine::verify::Hash>,
         /// The DNS that looks the names up: "system" (the default); a service and how to ask it,
         /// "cloudflare-https", "quad9-tls", "google-plain", "adguard-https", "nextdns-tls"; DNS
         /// servers' addresses, "9.9.9.9,149.112.112.112"; or a DNS-over-HTTPS address,
         /// "https://dns.example/dns-query". No falling back to the system's DNS.
         #[arg(long, default_value = "system", value_parser = parse_dns)]
-        dns: mdm_engine::DnsChoice,
+        dns: odm_engine::DnsChoice,
         /// The network adapter every connection goes through (#35): its name ("Ethernet",
         /// "wg0") or one of its addresses. When it isn't there or has no address, nothing is
         /// sent and the download fails.
@@ -162,7 +162,7 @@ enum Cmd {
         /// Put the subtitles into the video file instead of beside it (needs ffmpeg; MP4/MKV).
         #[arg(long)]
         embed_subs: bool,
-        /// Connections per stream (1 to 128), as `get`'s: MDM's engine downloads the streams
+        /// Connections per stream (1 to 128), as `get`'s: ODM's engine downloads the streams
         /// yt-dlp finds (#769), one in pieces (HLS, DASH) this many pieces at once.
         #[arg(short, long, default_value_t = Options::default().max_connections,
               value_parser = clap::value_parser!(u32).range(1..=MAX_CONNECTIONS_UNLOCKED as i64))]
@@ -327,9 +327,9 @@ enum Cmd {
         #[arg(value_parser = ["on", "off"])]
         state: String,
     },
-    /// Continue a paused or interrupted download from its `.mdm.json` state file.
+    /// Continue a paused or interrupted download from its `.odm.json` state file.
     Resume {
-        /// The `<file>.mdm.json` next to the unfinished download.
+        /// The `<file>.odm.json` next to the unfinished download.
         state: PathBuf,
         /// Maximum connections (1 to 128).
         #[arg(short, long, default_value_t = Options::default().max_connections,
@@ -358,7 +358,7 @@ enum Cmd {
 pub type Unlocking<'a> = std::pin::Pin<
     Box<
         dyn std::future::Future<
-                Output = Result<Option<std::sync::Arc<dyn mdm_engine::Unlocker>>, String>,
+                Output = Result<Option<std::sync::Arc<dyn odm_engine::Unlocker>>, String>,
             > + Send
             + 'a,
     >,
@@ -425,11 +425,11 @@ impl std::error::Error for Reported {}
 
 /// Ask the running app (automation API) and print its answer, which is JSON already; an
 /// `{"error"}` answer fails the command.
-fn ask(cmd: mdm_ipc::Command) -> anyhow::Result<()> {
-    let answer = mdm_ipc::request(&cmd)
+fn ask(cmd: odm_ipc::Command) -> anyhow::Result<()> {
+    let answer = odm_ipc::request(&cmd)
         .map_err(|e| anyhow::anyhow!("Orbit Download Manager isn't running ({e})"))?;
     println!("{answer}");
-    if serde_json::from_str::<mdm_ipc::api::ErrorAnswer>(&answer).is_ok() {
+    if serde_json::from_str::<odm_ipc::api::ErrorAnswer>(&answer).is_ok() {
         return Err(Reported.into());
     }
     Ok(())
@@ -443,13 +443,13 @@ fn status_command(
     queue: Option<String>,
     limit: Option<usize>,
 ) -> anyhow::Result<()> {
-    let answer = mdm_ipc::request(&mdm_ipc::Command {
+    let answer = odm_ipc::request(&odm_ipc::Command {
         query: Some("list".into()),
         ..Default::default()
     })
     .map_err(|e| anyhow::anyhow!("Orbit Download Manager isn't running ({e})"))?;
 
-    if serde_json::from_str::<mdm_ipc::api::ErrorAnswer>(&answer).is_ok() {
+    if serde_json::from_str::<odm_ipc::api::ErrorAnswer>(&answer).is_ok() {
         println!("{answer}");
         return Err(Reported.into());
     }
@@ -465,10 +465,10 @@ fn status_command(
         return Ok(());
     }
 
-    let list: mdm_ipc::api::ListAnswer =
+    let list: odm_ipc::api::ListAnswer =
         serde_json::from_str(&answer).map_err(|e| anyhow::anyhow!("unreadable answer: {e}"))?;
 
-    let filter = mdm_ipc::api::ListFilter {
+    let filter = odm_ipc::api::ListFilter {
         id,
         status: status.as_deref(),
         search: search.as_deref(),
@@ -498,7 +498,7 @@ fn add_command(
     later: bool,
     silent: bool,
     private: bool,
-) -> anyhow::Result<mdm_ipc::Command> {
+) -> anyhow::Result<odm_ipc::Command> {
     add_command_with(
         url,
         output,
@@ -545,7 +545,7 @@ fn add_command_with(
     silent: bool,
     private: bool,
     stdin: impl Read,
-) -> anyhow::Result<mdm_ipc::Command> {
+) -> anyhow::Result<odm_ipc::Command> {
     let dir = output.map(|p| {
         std::path::absolute(&p)
             .unwrap_or(p)
@@ -553,7 +553,7 @@ fn add_command_with(
             .to_string()
     });
     let cookies = read_cookie(cookie, stdin)?;
-    Ok(mdm_ipc::Command {
+    Ok(odm_ipc::Command {
         url: Some(url),
         dir,
         name,
@@ -573,17 +573,17 @@ fn add_command_with(
 /// `pair`: a new pairing code from the running app, printed for a person (or raw JSON with `--json`).
 fn pair(json: bool) -> anyhow::Result<()> {
     if json {
-        return ask(mdm_ipc::Command {
+        return ask(odm_ipc::Command {
             pair: true,
             ..Default::default()
         });
     }
-    let answer = mdm_ipc::request(&mdm_ipc::Command {
+    let answer = odm_ipc::request(&odm_ipc::Command {
         pair: true,
         ..Default::default()
     })
     .map_err(|e| anyhow::anyhow!("Orbit Download Manager isn't running ({e})"))?;
-    match mdm_ipc::api::parse::<mdm_ipc::api::PairAnswer>(&answer).map_err(anyhow::Error::msg)? {
+    match odm_ipc::api::parse::<odm_ipc::api::PairAnswer>(&answer).map_err(anyhow::Error::msg)? {
         Ok(a) => {
             println!("{}", a.qr);
             println!(
@@ -607,7 +607,7 @@ fn pair(json: bool) -> anyhow::Result<()> {
 
 /// An automation API action on the running app's downloads; prints its answer.
 fn act(action: &str, ids: Vec<u64>) -> anyhow::Result<()> {
-    ask(mdm_ipc::Command {
+    ask(odm_ipc::Command {
         action: Some(action.into()),
         ids,
         ..Default::default()
@@ -681,7 +681,7 @@ pub fn main(args: Vec<OsString>) -> ExitCode {
 }
 
 /// [`main`], downloading through the app's debrid `accounts` (#44).
-/// Does the command line `args` (as [`main_with`] takes them) download a link with MDM's own
+/// Does the command line `args` (as [`main_with`] takes them) download a link with ODM's own
 /// User-Agent (`get`, `resume`)? The app waits for the default browser's (#668) only for these.
 pub fn downloads(args: &[OsString]) -> bool {
     Cli::try_parse_from(std::iter::once(OsString::from(NAME)).chain(args.iter().cloned()))
@@ -753,7 +753,7 @@ fn end_helpers_when_stopped(rt: &tokio::runtime::Runtime, json: bool) {
             _ = term.recv() => 15,
             _ = hup.recv() => 1,
         };
-        mdm_tools::proc::end_all();
+        odm_tools::proc::end_all();
         if json {
             emit(json!({ "event": "stopped" }));
         } else {
@@ -788,8 +788,8 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
                 checksum,
                 dns,
                 // Worked out once, as the app does each second (a missing adapter: Down).
-                route: adapter.map_or(mdm_engine::Route::Any, |a| {
-                    mdm_engine::net::route_for(&a, &mdm_engine::net::adapters())
+                route: adapter.map_or(odm_engine::Route::Any, |a| {
+                    odm_engine::net::route_for(&a, &odm_engine::net::adapters())
                 }),
                 ..opts(connections)
             };
@@ -798,8 +798,8 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
             watch(Download::start(req, opts), json).await
         }
         Cmd::InstallYtdlp => {
-            let dir = mdm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
-            let i = mdm_tools::install_latest(&dir, &mdm_tools::net(Proxy::System), None).await?;
+            let dir = odm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
+            let i = odm_tools::install_latest(&dir, &odm_tools::net(Proxy::System), None).await?;
             if json {
                 emit(json!({ "tool": "yt-dlp", "version": i.version, "path": i.exe }));
             } else {
@@ -812,8 +812,8 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
             Ok(())
         }
         Cmd::InstallFfmpeg => {
-            let dir = mdm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
-            let i = mdm_tools::ffmpeg::install_latest(&dir, &mdm_tools::net(Proxy::System), None)
+            let dir = odm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
+            let i = odm_tools::ffmpeg::install_latest(&dir, &odm_tools::net(Proxy::System), None)
                 .await?;
             if json {
                 emit(json!({ "tool": "ffmpeg", "version": i.version, "path": i.exe }));
@@ -827,8 +827,8 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
             Ok(())
         }
         Cmd::InstallGalleryDl => {
-            let dir = mdm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
-            let i = mdm_tools::gallery::install_latest(&dir, &mdm_tools::net(Proxy::System), None)
+            let dir = odm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
+            let i = odm_tools::gallery::install_latest(&dir, &odm_tools::net(Proxy::System), None)
                 .await?;
             if json {
                 emit(json!({ "tool": "gallery-dl", "version": i.version, "path": i.exe }));
@@ -847,40 +847,40 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
             limit,
             adapter,
         } => {
-            use mdm_tools::video::State;
+            use odm_tools::video::State;
             let route =
-                adapter.map(|a| mdm_engine::net::route_for(&a, &mdm_engine::net::adapters()));
+                adapter.map(|a| odm_engine::net::route_for(&a, &odm_engine::net::adapters()));
             if let Some(r) = &route {
-                mdm_tools::proc::set_route(r.clone());
+                odm_tools::proc::set_route(r.clone());
             }
-            let dir = mdm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
-            // A gallery-dl of the person's too old for MDM is passed over (#236), said plainly.
-            let old = mdm_tools::gallery::chosen_too_old(&dir).map(|old| {
+            let dir = odm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
+            // A gallery-dl of the person's too old for ODM is passed over (#236), said plainly.
+            let old = odm_tools::gallery::chosen_too_old(&dir).map(|old| {
                 format!(
-                    "your gallery-dl {} ({}) is too old: MDM needs {} or newer",
+                    "your gallery-dl {} ({}) is too old: ODM needs {} or newer",
                     old.version,
                     old.exe.display(),
-                    mdm_tools::gallery::OLDEST
+                    odm_tools::gallery::OLDEST
                 )
             });
-            let tool = mdm_tools::gallery::installed(&dir).ok_or_else(|| match &old {
-                Some(why) => anyhow::anyhow!("{why}; run install-gallery-dl for MDM's own copy"),
+            let tool = odm_tools::gallery::installed(&dir).ok_or_else(|| match &old {
+                Some(why) => anyhow::anyhow!("{why}; run install-gallery-dl for ODM's own copy"),
                 None => anyhow::anyhow!("gallery-dl is not installed: run install-gallery-dl"),
             })?;
             if let Some(why) = &old {
                 if tool.is_system() {
                     eprintln!("{why}: using the system's, {}", tool.exe.display());
                 } else {
-                    eprintln!("{why}: using MDM's own copy, {}", tool.version);
+                    eprintln!("{why}: using ODM's own copy, {}", tool.version);
                 }
             }
-            if !mdm_tools::gallery::handles(&tool, &url)? {
+            if !odm_tools::gallery::handles(&tool, &url)? {
                 anyhow::bail!("gallery-dl can't read this address");
             }
-            let name = mdm_tools::gallery::name_of(&url::Url::parse(&url)?);
+            let name = odm_tools::gallery::name_of(&url::Url::parse(&url)?);
             let folder = output.join(name);
-            let ask = mdm_tools::gallery::Ask { limit, rate: None };
-            let job = mdm_tools::gallery::GalleryJob::start(
+            let ask = odm_tools::gallery::Ask { limit, rate: None };
+            let job = odm_tools::gallery::GalleryJob::start(
                 &tool,
                 &url,
                 &folder,
@@ -919,14 +919,14 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
             }
         }
         Cmd::VideoInfo { url } => {
-            let dir = mdm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
-            let tool = mdm_tools::installed(&dir)
+            let dir = odm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
+            let tool = odm_tools::installed(&dir)
                 .ok_or_else(|| anyhow::anyhow!("yt-dlp is not installed (install-ytdlp)"))?;
             // The page's own declared video when yt-dlp read it generically (#1076).
             let (looked, declared) = look_up_page(&tool.exe, &url, Options::default())?;
             let v = match looked {
-                mdm_tools::resolve::Looked::Video(v) => v,
-                mdm_tools::resolve::Looked::List(l) => {
+                odm_tools::resolve::Looked::Video(v) => v,
+                odm_tools::resolve::Looked::List(l) => {
                     let size = l.total.map_or(String::new(), |n| format!(", {n} videos"));
                     if json {
                         emit(json!({ "list": l.title, "total": l.total }));
@@ -936,11 +936,11 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
                     return Ok(());
                 }
             };
-            let merge = mdm_tools::ffmpeg::installed(&dir).is_some();
-            let choices = mdm_tools::resolve::choices(&v, merge);
+            let merge = odm_tools::ffmpeg::installed(&dir).is_some();
+            let choices = odm_tools::resolve::choices(&v, merge);
             // The subtitles a person would be offered (the automatic ones: the spoken
             // language's and English).
-            let subs = mdm_tools::resolve::sub_choices(&v, "en");
+            let subs = odm_tools::resolve::sub_choices(&v, "en");
             if json {
                 let choices: Vec<_> = choices.iter().map(choice_json).collect();
                 let subs: Vec<_> = subs
@@ -976,11 +976,11 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
             Ok(())
         }
         Cmd::PlaylistInfo { url, from, count } => {
-            let dir = mdm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
-            let tool = mdm_tools::installed(&dir)
+            let dir = odm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
+            let tool = odm_tools::installed(&dir)
                 .ok_or_else(|| anyhow::anyhow!("yt-dlp is not installed (install-ytdlp)"))?;
             let to = count.map(|c| from + c.max(1) - 1);
-            let listing = mdm_tools::playlist::Listing::start(
+            let listing = odm_tools::playlist::Listing::start(
                 &tool.exe,
                 &url,
                 &Default::default(),
@@ -1001,7 +1001,7 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
                     } else {
                         let len = e
                             .duration
-                            .map_or("--:--".into(), mdm_tools::playlist::clock);
+                            .map_or("--:--".into(), odm_tools::playlist::clock);
                         let gone = if e.unavailable { "  (unavailable)" } else { "" };
                         println!("{:>6}  {len:>8}  {}  {}{gone}", e.index, e.title, e.url);
                     }
@@ -1035,12 +1035,12 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
             from,
             count,
         } => {
-            let dir = mdm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
-            let tool = mdm_tools::installed(&dir)
+            let dir = odm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
+            let tool = odm_tools::installed(&dir)
                 .ok_or_else(|| anyhow::anyhow!("yt-dlp is not installed (install-ytdlp)"))?;
-            let ffmpeg = mdm_tools::ffmpeg::installed(&dir).map(|f| f.exe);
+            let ffmpeg = odm_tools::ffmpeg::installed(&dir).map(|f| f.exe);
             let to = count.map(|c| from + c.max(1) - 1);
-            let listing = mdm_tools::playlist::Listing::start(
+            let listing = odm_tools::playlist::Listing::start(
                 &tool.exe,
                 &url,
                 &Default::default(),
@@ -1060,21 +1060,21 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
                 .filter(|e| !e.unavailable)
                 .collect();
             // A folder named after the list, as the window makes it.
-            let folder = output.join(mdm_engine::naming::sanitize(
+            let folder = output.join(odm_engine::naming::sanitize(
                 p.title.as_deref().unwrap_or("playlist"),
             ));
             std::fs::create_dir_all(&folder)?;
-            let ext = mdm_tools::resolve::mp3_quality(&format).map_or("mp4", |_| "mp3");
+            let ext = odm_tools::resolve::mp3_quality(&format).map_or("mp4", |_| "mp3");
             let n = entries.len();
             let mut failed = 0;
             for (i, e) in entries.iter().enumerate() {
-                let name = format!("{}.{ext}", mdm_engine::naming::sanitize(&e.title));
-                let free = mdm_engine::naming::stem_destination(&folder, &name, |_| false);
+                let name = format!("{}.{ext}", odm_engine::naming::sanitize(&e.title));
+                let free = odm_engine::naming::stem_destination(&folder, &name, |_| false);
                 let stem = free
                     .file_stem()
                     .map(|s| s.to_string_lossy().into_owned())
                     .unwrap_or_else(|| "video".into());
-                let job = mdm_tools::video::VideoJob::start(
+                let job = odm_tools::video::VideoJob::start(
                     &tool.exe,
                     &e.url,
                     &format,
@@ -1090,12 +1090,12 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
                 let state = loop {
                     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                     let s = job.progress().state;
-                    if s != mdm_tools::video::State::Running {
+                    if s != odm_tools::video::State::Running {
                         break s;
                     }
                 };
                 match state {
-                    mdm_tools::video::State::Done(f) => {
+                    odm_tools::video::State::Done(f) => {
                         if json {
                             emit(json!({ "event": "done", "index": e.index, "path": f }));
                         } else {
@@ -1120,10 +1120,10 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
             Ok(())
         }
         Cmd::TorrentCreate { path, output } => {
-            let spawner = mdm_torrent::librqbit::spawn_utils::BlockingSpawner::new(1);
-            let made = mdm_torrent::librqbit::create_torrent(
+            let spawner = odm_torrent::librqbit::spawn_utils::BlockingSpawner::new(1);
+            let made = odm_torrent::librqbit::create_torrent(
                 &path,
-                mdm_torrent::librqbit::CreateTorrentOptions {
+                odm_torrent::librqbit::CreateTorrentOptions {
                     name: None,
                     trackers: Vec::new(),
                     piece_length: None,
@@ -1215,7 +1215,7 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
                         s.peers_seen
                     );
                 }
-                if s.phase == mdm_torrent::Phase::Finished {
+                if s.phase == odm_torrent::Phase::Finished {
                     if json {
                         emit(json!({ "event": "done", "path": folder, "size": s.total }));
                     } else {
@@ -1254,13 +1254,13 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
             adapter,
         } => {
             let route =
-                adapter.map(|a| mdm_engine::net::route_for(&a, &mdm_engine::net::adapters()));
+                adapter.map(|a| odm_engine::net::route_for(&a, &odm_engine::net::adapters()));
             if let Some(r) = &route {
-                mdm_tools::proc::set_route(r.clone());
+                odm_tools::proc::set_route(r.clone());
             }
             let subs = subs_arg(&subs, auto_subs, embed_subs);
-            let dir = mdm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
-            let tool = mdm_tools::installed(&dir)
+            let dir = odm_tools::tools_dir().ok_or_else(|| anyhow::anyhow!("no data folder"))?;
+            let tool = odm_tools::installed(&dir)
                 .ok_or_else(|| anyhow::anyhow!("yt-dlp is not installed (install-ytdlp)"))?;
             // The page's own declared video when yt-dlp read it generically (#1076): the one
             // downloaded, asked with the page as its Referer.
@@ -1270,8 +1270,8 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
             };
             let (looked, declared) = look_up_page(&tool.exe, &url, page_opts)?;
             let v = match looked {
-                mdm_tools::resolve::Looked::Video(v) => v,
-                mdm_tools::resolve::Looked::List(l) => {
+                odm_tools::resolve::Looked::Video(v) => v,
+                odm_tools::resolve::Looked::List(l) => {
                     anyhow::bail!(
                         "yt-dlp failed: the address is a list of videos ({})",
                         l.title
@@ -1288,24 +1288,24 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
                 Some(d) => (d.address.clone(), d.browser(&Default::default())),
                 None => (url.clone(), Default::default()),
             };
-            let ffmpeg = mdm_tools::ffmpeg::installed(&dir).map(|f| f.exe);
+            let ffmpeg = odm_tools::ffmpeg::installed(&dir).map(|f| f.exe);
             // The qualities Download video lists for it (#1240), and the one it starts on, or
             // the height asked's nearest.
-            let choices = mdm_tools::resolve::choices(&v, ffmpeg.is_some());
+            let choices = odm_tools::resolve::choices(&v, ffmpeg.is_some());
             let format = match format {
                 Some(f) => f,
                 None => pick_quality(&v, &choices, quality, ffmpeg.is_some(), json)?,
             };
             // A stem no file in the folder has, whatever the extension: yt-dlp takes any
             // `<stem>.*` there as its own (#32). The extension only sizes the name.
-            let ext = mdm_tools::resolve::audio_conversion(&format).map_or("mp4", |a| a.format);
-            let name = format!("{}.{ext}", mdm_engine::naming::sanitize(&v.title));
-            let free = mdm_engine::naming::stem_destination(&output, &name, |_| false);
+            let ext = odm_tools::resolve::audio_conversion(&format).map_or("mp4", |a| a.format);
+            let name = format!("{}.{ext}", odm_engine::naming::sanitize(&v.title));
+            let free = odm_engine::naming::stem_destination(&output, &name, |_| false);
             let stem = free
                 .file_stem()
                 .map(|s| s.to_string_lossy().into_owned())
                 .unwrap_or_else(|| "video".into());
-            let job = mdm_tools::video::VideoJob::start(
+            let job = odm_tools::video::VideoJob::start(
                 &tool.exe,
                 &address,
                 &format,
@@ -1352,24 +1352,24 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
                 if !json
                     && matches!(
                         p.state,
-                        mdm_tools::video::State::Failed(_) | mdm_tools::video::State::Stopped
+                        odm_tools::video::State::Failed(_) | odm_tools::video::State::Stopped
                     )
                 {
                     eprintln!();
                 }
                 match p.state {
-                    mdm_tools::video::State::Running => {}
-                    mdm_tools::video::State::Done(f) => {
+                    odm_tools::video::State::Running => {}
+                    odm_tools::video::State::Done(f) => {
                         // Subtitles the site refused: the video is saved all the same (#68).
                         let problems: Vec<(String, String, String, bool)> = p
                             .sub_problems
                             .iter()
                             .map(|s| {
                                 let why = match &s.reason {
-                                    mdm_tools::video::SubReason::TooManyRequests => {
+                                    odm_tools::video::SubReason::TooManyRequests => {
                                         "the site refused (too many requests)".to_owned()
                                     }
-                                    mdm_tools::video::SubReason::Other(w) => w.clone(),
+                                    odm_tools::video::SubReason::Other(w) => w.clone(),
                                 };
                                 (s.code.clone(), s.name.clone(), why, false)
                             })
@@ -1408,19 +1408,19 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
                         return Ok(());
                     }
                     // A path yt-dlp couldn't make, too long for the system (#1102): said as such.
-                    mdm_tools::video::State::Failed(e)
-                        if let Some(path) = mdm_tools::video::too_long(&e) =>
+                    odm_tools::video::State::Failed(e)
+                        if let Some(path) = odm_tools::video::too_long(&e) =>
                     {
-                        anyhow::bail!(mdm_tools::proc::ProcError::PathTooLong(path))
+                        anyhow::bail!(odm_tools::proc::ProcError::PathTooLong(path))
                     }
                     // No format the page offers matched (#1240): with the ones it does.
-                    mdm_tools::video::State::Failed(e)
-                        if mdm_tools::servers::format_unavailable(&e) =>
+                    odm_tools::video::State::Failed(e)
+                        if odm_tools::servers::format_unavailable(&e) =>
                     {
                         anyhow::bail!(NoFormat::new(without_list_advice(&e), &v, &choices))
                     }
                     // yt-dlp's words, not `Failed("…")`.
-                    mdm_tools::video::State::Failed(e) => anyhow::bail!(e),
+                    odm_tools::video::State::Failed(e) => anyhow::bail!(e),
                     other => anyhow::bail!("{other:?}"),
                 }
             }
@@ -1454,18 +1454,18 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
             url, output, name, category, queue, checksum, referer, user_agent, cookie, later,
             silent, private,
         )?),
-        Cmd::StartQueue { queue, name } => ask(mdm_ipc::Command {
+        Cmd::StartQueue { queue, name } => ask(odm_ipc::Command {
             action: Some("start_queue".into()),
             queue: queue.or(name),
             ..Default::default()
         }),
-        Cmd::StopQueue { queue, name } => ask(mdm_ipc::Command {
+        Cmd::StopQueue { queue, name } => ask(odm_ipc::Command {
             action: Some("stop_queue".into()),
             queue: queue.or(name),
             ..Default::default()
         }),
         Cmd::Pair => pair(json),
-        Cmd::Api { state } => ask(mdm_ipc::Command {
+        Cmd::Api { state } => ask(odm_ipc::Command {
             api: Some(state == "on"),
             ..Default::default()
         }),
@@ -1480,7 +1480,7 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
         } => {
             // Through the account its address goes through (#44): the link a service gave
             // expires, and the service gives a new one.
-            let opts = match mdm_engine::state::ResumeState::load(&state) {
+            let opts = match odm_engine::state::ResumeState::load(&state) {
                 Ok(saved) => {
                     through_account(accounts, &saved.url, direct, opts(connections), json).await?
                 }
@@ -1495,29 +1495,29 @@ async fn run(cmd: Cmd, json: bool, accounts: Option<&dyn Accounts>) -> anyhow::R
 }
 
 /// `video-get --subs` (#68): "none" (or nothing), "all", or language codes separated by commas.
-fn subs_arg(langs: &str, automatic: bool, embed: bool) -> mdm_tools::video::Subs {
+fn subs_arg(langs: &str, automatic: bool, embed: bool) -> odm_tools::video::Subs {
     let langs: Vec<String> = langs
         .split(',')
         .map(str::trim)
         .filter(|l| !l.is_empty() && !l.eq_ignore_ascii_case("none"))
         .map(|l| {
-            if l.eq_ignore_ascii_case(mdm_tools::video::ALL_UPLOADERS) {
-                mdm_tools::video::ALL_UPLOADERS.to_owned()
+            if l.eq_ignore_ascii_case(odm_tools::video::ALL_UPLOADERS) {
+                odm_tools::video::ALL_UPLOADERS.to_owned()
             } else {
                 l.to_owned()
             }
         })
         .collect();
-    mdm_tools::video::Subs {
+    odm_tools::video::Subs {
         langs,
         automatic,
         embed,
     }
 }
 
-/// MDM's engine for a video's streams (#769): this many connections each, through `route`.
-fn video_engine(connections: u32, route: Option<mdm_engine::Route>) -> mdm_tools::streams::Engine {
-    mdm_tools::streams::Engine {
+/// ODM's engine for a video's streams (#769): this many connections each, through `route`.
+fn video_engine(connections: u32, route: Option<odm_engine::Route>) -> odm_tools::streams::Engine {
+    odm_tools::streams::Engine {
         handle: tokio::runtime::Handle::current(),
         opts: Options {
             route: route.unwrap_or_default(),
@@ -1528,30 +1528,30 @@ fn video_engine(connections: u32, route: Option<mdm_engine::Route>) -> mdm_tools
 
 /// yt-dlp's look-up of the page `url` as the app's Download video window makes it (#1076): the
 /// video the page declares its own when yt-dlp read it generically, the page read through
-/// `opts` (`mdm_tools::declared::look_up`). On this runtime's thread, which it holds meanwhile.
+/// `opts` (`odm_tools::declared::look_up`). On this runtime's thread, which it holds meanwhile.
 fn look_up_page(
     exe: &std::path::Path,
     url: &str,
     opts: Options,
 ) -> Result<
     (
-        mdm_tools::resolve::Looked,
-        Option<mdm_tools::declared::Declared>,
+        odm_tools::resolve::Looked,
+        Option<odm_tools::declared::Declared>,
     ),
-    mdm_tools::proc::ProcError,
+    odm_tools::proc::ProcError,
 > {
-    let reader = mdm_tools::streams::Engine {
+    let reader = odm_tools::streams::Engine {
         handle: tokio::runtime::Handle::current(),
         opts,
     };
     tokio::task::block_in_place(|| {
-        mdm_tools::declared::look_up(exe, url, &Default::default(), &reader)
+        odm_tools::declared::look_up(exe, url, &Default::default(), &reader)
             .map(|(looked, _, declared)| (looked, declared))
     })
 }
 
 /// What `video-info` and `video-get` say when the page's declared video is the one looked up.
-fn declared_note(d: &mdm_tools::declared::Declared) -> String {
+fn declared_note(d: &odm_tools::declared::Declared) -> String {
     format!("the page declares its video: {}", d.address)
 }
 
@@ -1587,7 +1587,7 @@ fn parse_height(s: &str) -> Result<u32, String> {
 }
 
 /// A quality as `video-info --json` lists it, and `video-get --json`'s error (#1240).
-fn choice_json(c: &mdm_tools::resolve::Choice) -> serde_json::Value {
+fn choice_json(c: &odm_tools::resolve::Choice) -> serde_json::Value {
     json!({
         "label": c.label,
         "format": c.selector,
@@ -1602,7 +1602,7 @@ fn choice_json(c: &mdm_tools::resolve::Choice) -> serde_json::Value {
 
 /// A quality's line as `video-info` prints it, and `video-get`'s error (#1240): its label, size
 /// (the streams' own bytes, or "~" before an estimate, #801) and what `-f` takes for it.
-fn choice_line(c: &mdm_tools::resolve::Choice) -> String {
+fn choice_line(c: &odm_tools::resolve::Choice) -> String {
     let about = if c.approx { "~" } else { "" };
     let size = c
         .size
@@ -1611,17 +1611,17 @@ fn choice_line(c: &mdm_tools::resolve::Choice) -> String {
 }
 
 /// `video-get` without `-f` (#1240): the quality Download video starts on, or the one of the
-/// height asked, else its nearest ([`mdm_tools::resolve::pick`]), or the most compatible one
+/// height asked, else its nearest ([`odm_tools::resolve::pick`]), or the most compatible one
 /// (#1439), said on stderr (a `quality` event with `--json`). Its selector; or, with nothing to
 /// download, what the page offers.
 fn pick_quality(
-    v: &mdm_tools::resolve::Video,
-    choices: &[mdm_tools::resolve::Choice],
+    v: &odm_tools::resolve::Video,
+    choices: &[odm_tools::resolve::Choice],
     quality: Option<Quality>,
     merge: bool,
     json: bool,
 ) -> anyhow::Result<String> {
-    use mdm_tools::resolve::{compatible_choice, is_audio, needs_merging, pick};
+    use odm_tools::resolve::{compatible_choice, is_audio, needs_merging, pick};
     // Its own line in the list, or the best when that is the very download (#1439).
     if quality == Some(Quality::Compatible) {
         let Some(c) = compatible_choice(v, merge) else {
@@ -1702,19 +1702,19 @@ fn without_list_advice(message: &str) -> String {
 #[derive(Debug)]
 struct NoFormat {
     why: String,
-    choices: Vec<mdm_tools::resolve::Choice>,
-    formats: Vec<mdm_tools::resolve::Format>,
+    choices: Vec<odm_tools::resolve::Choice>,
+    formats: Vec<odm_tools::resolve::Format>,
 }
 
 impl NoFormat {
     fn new(
         why: String,
-        v: &mdm_tools::resolve::Video,
-        choices: &[mdm_tools::resolve::Choice],
+        v: &odm_tools::resolve::Video,
+        choices: &[odm_tools::resolve::Choice],
     ) -> Self {
         let choices = choices
             .iter()
-            .filter(|c| mdm_tools::resolve::audio_conversion(&c.selector).is_none())
+            .filter(|c| odm_tools::resolve::audio_conversion(&c.selector).is_none())
             .cloned()
             .collect();
         NoFormat {
@@ -1725,7 +1725,7 @@ impl NoFormat {
     }
 
     /// yt-dlp's format, briefly: its ID, type, height and what it carries.
-    fn format_line(f: &mdm_tools::resolve::Format) -> String {
+    fn format_line(f: &odm_tools::resolve::Format) -> String {
         let height = f.height.map_or(String::new(), |h| format!(" {h}p"));
         let has = match (f.video, f.audio) {
             (true, true) => "picture and sound",
@@ -1780,23 +1780,23 @@ impl std::fmt::Display for NoFormat {
 
 impl std::error::Error for NoFormat {}
 
-/// A download's options: the app's defaults (the default browser's User-Agent, #668, MDM's
-/// former one once if a site refuses it, #372, and MDM's own name once if a site's bot check
+/// A download's options: the app's defaults (the default browser's User-Agent, #668, ODM's
+/// former one once if a site refuses it, #372, and ODM's own name once if a site's bot check
 /// refuses the browser's and the browser-like connection too, #1422; a `--user-agent` or a
 /// `User-Agent` header given is the only one sent).
 fn opts(connections: u32) -> Options {
     Options {
         max_connections: connections,
-        agent_fallback: Some(mdm_engine::agent::IE11_USER_AGENT.to_owned()),
-        own_agent: Some(mdm_engine::agent::OWN_USER_AGENT.to_owned()),
+        agent_fallback: Some(odm_engine::agent::IE11_USER_AGENT.to_owned()),
+        own_agent: Some(odm_engine::agent::OWN_USER_AGENT.to_owned()),
         ..Options::default()
     }
 }
 
 /// `--dns`: see [`Cmd::Get`].
-fn parse_dns(s: &str) -> Result<mdm_engine::DnsChoice, String> {
-    use mdm_engine::DnsChoice;
-    use mdm_engine::dns::{Dns, Mode, Preset, parse_servers};
+fn parse_dns(s: &str) -> Result<odm_engine::DnsChoice, String> {
+    use odm_engine::DnsChoice;
+    use odm_engine::dns::{Dns, Mode, Preset, parse_servers};
     let s = s.trim();
     if s.is_empty() || s.eq_ignore_ascii_case("system") {
         return Ok(DnsChoice::default());
@@ -1835,8 +1835,8 @@ fn parse_dns(s: &str) -> Result<mdm_engine::DnsChoice, String> {
     })
 }
 
-fn parse_checksum(s: &str) -> Result<mdm_engine::verify::Hash, String> {
-    mdm_engine::verify::Hash::parse(s)
+fn parse_checksum(s: &str) -> Result<odm_engine::verify::Hash, String> {
+    odm_engine::verify::Hash::parse(s)
         .ok_or_else(|| "not a checksum (hex MD5, SHA-1, SHA-256, SHA-512 or CRC32)".into())
 }
 
@@ -1963,8 +1963,8 @@ async fn watch(dl: Download, json: bool) -> anyhow::Result<()> {
             }
             Ok(())
         }
-        Err(mdm_engine::Error::Cancelled) => {
-            let state = file.map(|f| mdm_engine::state::state_path(&f));
+        Err(odm_engine::Error::Cancelled) => {
+            let state = file.map(|f| odm_engine::state::state_path(&f));
             if json {
                 emit(json!({ "event": "paused", "state": state }));
             } else if let Some(state) = state {
@@ -1984,16 +1984,16 @@ fn mb(b: u64) -> String {
 }
 
 /// A throwaway torrent session for the command line (its own state folder, nothing kept).
-async fn torrents() -> anyhow::Result<(mdm_torrent::Torrents, tempfile::TempDir)> {
+async fn torrents() -> anyhow::Result<(odm_torrent::Torrents, tempfile::TempDir)> {
     let dir = tempfile::tempdir()?;
-    let t = mdm_torrent::Torrents::start(mdm_torrent::Config::new(dir.path().to_owned())).await?;
+    let t = odm_torrent::Torrents::start(odm_torrent::Config::new(dir.path().to_owned())).await?;
     Ok((t, dir))
 }
 
-fn torrent_source(s: &str) -> anyhow::Result<mdm_torrent::Source> {
-    match mdm_torrent::Source::magnet(s) {
+fn torrent_source(s: &str) -> anyhow::Result<odm_torrent::Source> {
+    match odm_torrent::Source::magnet(s) {
         Some(m) => Ok(m),
-        None => Ok(mdm_torrent::Source::File(mdm_torrent::read_file(
+        None => Ok(odm_torrent::Source::File(odm_torrent::read_file(
             std::path::Path::new(s),
         )?)),
     }
@@ -2034,14 +2034,14 @@ mod tests {
     /// joined to the best sound; without, no video to give, said with what the page offers.
     #[test]
     fn video_get_picks_as_the_window_does() {
-        let v = mdm_tools::resolve::parse(
+        let v = odm_tools::resolve::parse(
             br#"{"title": "A video", "formats": [
             {"format_id": "30216", "ext": "m4a", "vcodec": "none", "acodec": "mp4a.40.2", "filesize": 1200000},
             {"format_id": "100022", "ext": "mp4", "height": 288, "vcodec": "av01.0.00M.08", "acodec": "none", "filesize": 4890000},
             {"format_id": "30016", "ext": "mp4", "height": 288, "vcodec": "avc1.64001E", "acodec": "none", "filesize": 5380000}]}"#,
         )
         .unwrap();
-        let merged = mdm_tools::resolve::choices(&v, true);
+        let merged = odm_tools::resolve::choices(&v, true);
         assert_eq!(
             pick_quality(&v, &merged, None, true, true).unwrap(),
             "100022+30216/bv*[height=288]+ba/b[height=288]"
@@ -2050,7 +2050,7 @@ mod tests {
             pick_quality(&v, &merged, Some(Quality::Height(4320)), true, true).unwrap(),
             "100022+30216/bv*[height=288]+ba/b[height=288]"
         );
-        let apart = mdm_tools::resolve::choices(&v, false);
+        let apart = odm_tools::resolve::choices(&v, false);
         let e = pick_quality(&v, &apart, None, false, true).unwrap_err();
         let n = e.downcast_ref::<NoFormat>().expect("the formats said");
         assert!(n.why.contains("needs ffmpeg"), "{}", n.why);
@@ -2062,7 +2062,7 @@ mod tests {
         assert_eq!(json["formats"][1]["id"], "100022");
         assert_eq!(json["formats"][1]["audio"], false);
         // Nothing at all on the page: yt-dlp's own formats, or that there are none.
-        let empty = mdm_tools::resolve::parse(br#"{"title": "T", "formats": []}"#).unwrap();
+        let empty = odm_tools::resolve::parse(br#"{"title": "T", "formats": []}"#).unwrap();
         let e = pick_quality(&empty, &[], None, true, true).unwrap_err();
         assert!(e.to_string().ends_with("the page lists no format"), "{e}");
         // #1439: the most compatible: its H.264 picture (30016) with the AAC sound, not the AV1
@@ -2075,13 +2075,13 @@ mod tests {
         );
         let e = pick_quality(&v, &apart, compatible, false, true).unwrap_err();
         assert!(e.to_string().contains("needs ffmpeg"), "{e}");
-        let av1 = mdm_tools::resolve::parse(
+        let av1 = odm_tools::resolve::parse(
             br#"{"title": "A video", "formats": [
             {"format_id": "251", "ext": "webm", "vcodec": "none", "acodec": "opus", "filesize": 1200000},
             {"format_id": "399", "ext": "mp4", "height": 1080, "vcodec": "av01.0.08M.08", "acodec": "none", "filesize": 4890000}]}"#,
         )
         .unwrap();
-        let offered = mdm_tools::resolve::choices(&av1, true);
+        let offered = odm_tools::resolve::choices(&av1, true);
         let e = pick_quality(&av1, &offered, compatible, true, true).unwrap_err();
         let n = e.downcast_ref::<NoFormat>().expect("the formats said");
         assert!(n.why.contains("no H.264 video with AAC sound"), "{}", n.why);
@@ -2114,7 +2114,7 @@ mod tests {
             "get",
             "https://example.test/a.zip"
         ])));
-        assert!(downloads(&args(&["resume", "a.zip.mdm.json"])));
+        assert!(downloads(&args(&["resume", "a.zip.odm.json"])));
         assert!(!downloads(&args(&["start-queue"])));
         assert!(!downloads(&args(&["stop-queue"])));
         assert!(!downloads(&args(&["add", "https://example.test/a.zip"])));
@@ -2532,7 +2532,7 @@ mod tests {
         let cli = Cli::try_parse_from([
             NAME,
             "resume",
-            "test.mdm.json",
+            "test.odm.json",
             "-r",
             "https://example.test/source",
             "--user-agent",
@@ -2644,7 +2644,7 @@ mod tests {
     #[derive(Debug)]
     struct Service;
 
-    impl mdm_engine::Unlocker for Service {
+    impl odm_engine::Unlocker for Service {
         fn name(&self) -> &str {
             "Fake-Debrid"
         }
@@ -2657,7 +2657,7 @@ mod tests {
         ) -> std::pin::Pin<
             Box<
                 dyn std::future::Future<
-                        Output = Result<Option<mdm_engine::Unlocked>, mdm_engine::ServiceFault>,
+                        Output = Result<Option<odm_engine::Unlocked>, odm_engine::ServiceFault>,
                     > + Send
                     + 'a,
             >,
@@ -2677,7 +2677,7 @@ mod tests {
                     return Err("Fake-Debrid didn't say".into());
                 }
                 Ok((url.host_str() == Some("hoster.test")).then(|| {
-                    std::sync::Arc::new(Service) as std::sync::Arc<dyn mdm_engine::Unlocker>
+                    std::sync::Arc::new(Service) as std::sync::Arc<dyn odm_engine::Unlocker>
                 }))
             })
         }
@@ -2729,15 +2729,15 @@ mod tests {
 
     #[test]
     fn the_launcher_flag_starts_the_command_line() {
-        let l = launched(args(&["mdm", "--cli", "get", "x"])).unwrap();
+        let l = launched(args(&["odm", "--cli", "get", "x"])).unwrap();
         assert_eq!((l.launcher, l.args), (None, args(&["get", "x"])));
-        let l = launched(args(&["mdm", "--cli=42", "status"])).unwrap();
+        let l = launched(args(&["odm", "--cli=42", "status"])).unwrap();
         assert_eq!((l.launcher, l.args), (Some(42), args(&["status"])));
         // The app's own command line, and look-alikes, start the app.
-        assert!(launched(args(&["mdm"])).is_none());
-        assert!(launched(args(&["mdm", "/d", "--cli"])).is_none());
-        assert!(launched(args(&["mdm", "--cli=x"])).is_none());
-        assert!(launched(args(&["mdm", "--client"])).is_none());
+        assert!(launched(args(&["odm"])).is_none());
+        assert!(launched(args(&["odm", "/d", "--cli"])).is_none());
+        assert!(launched(args(&["odm", "--cli=x"])).is_none());
+        assert!(launched(args(&["odm", "--client"])).is_none());
         // A link named as the launcher (Linux and macOS).
         let named = launched(args(&["/usr/bin/orbitdownloadmanager-cli", "status"]));
         assert_eq!(named.is_some(), cfg!(unix));

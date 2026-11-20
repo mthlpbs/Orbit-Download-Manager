@@ -1,4 +1,4 @@
-//! YouTube with the browser's cookies (#686). The browser's extension sends MDM the cookies of
+//! YouTube with the browser's cookies (#686). The browser's extension sends ODM the cookies of
 //! the page a video is on, so a private or a members' video downloads as it plays there. Signed
 //! in, yt-dlp asks YouTube as the signed-in players do, and YouTube refuses those more often than
 //! a visitor's: it wants proofs from them (PO tokens) that yt-dlp can't give, and answers the
@@ -41,7 +41,7 @@ pub fn needs_sign_in(message: &str) -> bool {
 }
 
 /// Did YouTube refuse what was asked with the browser's cookies in a way a private window gets
-/// past (yt-dlp's message, or MDM's engine's for a stream)?
+/// past (yt-dlp's message, or ODM's engine's for a stream)?
 /// - its bot check, "Sign in to confirm you're not a bot", which a signed-in session gets when
 ///   YouTube no longer takes its cookies;
 /// - 403 from its servers: the player API's at the look-up ("Unable to download API page: HTTP
@@ -119,7 +119,7 @@ mod tests {
             assert!(needs_sign_in(&e), "{name}: {e}");
             assert!(!refused_signed_in(&e), "{name}: {e}");
         }
-        // MDM's engine's words for a stream googlevideo.com refused (`mdm_engine::Error`), a
+        // ODM's engine's words for a stream googlevideo.com refused (`odm_engine::Error`), a
         // piece's (`pieces.rs`), and an address refused again after yt-dlp gave a new one.
         for e in [
             "server answered 403 Forbidden",

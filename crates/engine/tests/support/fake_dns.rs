@@ -1,6 +1,6 @@
-//! A small DNS server on 127.0.0.1, plain over TCP (MDM asks plain DNS over TCP only), for the
+//! A small DNS server on 127.0.0.1, plain over TCP (ODM asks plain DNS over TCP only), for the
 //! tests that choose it in Options → Connection → DNS (#36): the names they look up are answered
-//! here, never by the system's DNS or the network. It answers `*.mdm.test` with 127.0.0.1 and
+//! here, never by the system's DNS or the network. It answers `*.odm.test` with 127.0.0.1 and
 //! every other name with NXDOMAIN ("no such name"), at once; or, silent, never answers.
 //!
 //! Shared by the test files that use it (`#[path]`), each with only some of it.
@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-/// The answer to DNS query `q`: an A record 127.0.0.1 for names ending in `.mdm.test` (others:
+/// The answer to DNS query `q`: an A record 127.0.0.1 for names ending in `.odm.test` (others:
 /// NXDOMAIN), and the name asked; None for a query it can't read.
 fn answer(q: &[u8]) -> Option<(Vec<u8>, String)> {
     if q.len() < 12 {
@@ -31,7 +31,7 @@ fn answer(q: &[u8]) -> Option<(Vec<u8>, String)> {
     }
     let qtype = u16::from_be_bytes([q[i + 1], q[i + 2]]);
     let name = labels.join(".");
-    let ours = name.ends_with(".mdm.test");
+    let ours = name.ends_with(".odm.test");
     let mut r = Vec::with_capacity(64);
     r.extend_from_slice(&q[..2]); // the id
     // A response, recursion available; NXDOMAIN when the name isn't ours.

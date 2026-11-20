@@ -5,14 +5,14 @@
 
 use std::sync::Arc;
 
-use mdm_ipc::Command;
-use mdm_ipc::api::{API_OFF as API_OFF_CODE, ErrorAnswer, ListAnswer};
+use odm_ipc::Command;
+use odm_ipc::api::{API_OFF as API_OFF_CODE, ErrorAnswer, ListAnswer};
 use rmcp::handler::server::{router::tool::ToolRouter, wrapper::Parameters};
 use rmcp::{ServerHandler, tool, tool_handler, tool_router};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-/// How a tool reaches the app: [`mdm_ipc::request`] in the program, a stand-in in tests.
+/// How a tool reaches the app: [`odm_ipc::request`] in the program, a stand-in in tests.
 pub type Ask = Arc<dyn Fn(&Command) -> Result<String, String> + Send + Sync>;
 
 /// Downloads listed when the assistant doesn't say how many.
@@ -377,7 +377,7 @@ fn explain(answer: Result<String, String>) -> Result<String, String> {
     Ok(answer)
 }
 
-/// What the app adds (`mdm_engine::supported`, and magnet links for Add torrent).
+/// What the app adds (`odm_engine::supported`, and magnet links for Add torrent).
 fn addable(url: &str) -> bool {
     if url
         .get(..7)
@@ -393,7 +393,7 @@ fn addable(url: &str) -> bool {
 fn filter_list(answer: &str, args: &ListArgs) -> Result<String, String> {
     let list: ListAnswer =
         serde_json::from_str(answer).map_err(|e| format!("unreadable answer: {e}"))?;
-    let filter = mdm_ipc::api::ListFilter {
+    let filter = odm_ipc::api::ListFilter {
         id: args.id,
         status: args.status.as_deref(),
         search: args.search.as_deref(),

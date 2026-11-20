@@ -6,21 +6,21 @@ How Orbit Download Manager's pieces fit together.
 
 | Path | Crate | Role |
 |---|---|---|
-| `crates/engine` | `mdm-engine` | Downloads one file over HTTP(S) or FTP(S): probe, segment planner, connection workers, resume state, per-host limits, speed limiter, checksums, proxy scripts |
-| `crates/app` | `mdm-app` | The desktop app (`orbitdownloadmanager.exe`, egui): list, categories, queues, scheduler, dialogs, tray, settings |
-| `crates/cli` | `mdm-cli` | Headless downloads with progress (`get`, `resume`), videos, torrents and the automation API's commands: a library the app's program runs (`orbitdownloadmanager --cli …`), and `orbitdownloadmanager-cli`, a small launcher that starts it with the same arguments, terminal and exit code |
-| `crates/mcp` | `mdm-mcp` | The MCP server (`orbitdownloadmanager-mcp`): AI assistants list, add and control the running app's downloads through the automation API |
-| `crates/remote` | `mdm-remote` | The remote control (#141): the HTTPS server a paired phone or computer on the local network uses (its page, pairing codes, device tokens, the self-signed certificate); every request becomes an automation API command the app answers |
-| `crates/nmhost` | `mdm-nmhost` | The browser's native messaging host: takes captured downloads from the extension and hands them to the app |
-| `crates/ipc` | `mdm-ipc` | The single-instance channel (a token-protected local socket), the data folder, and the capture rules shared by the app and the host |
-| `crates/debrid` | `mdm-debrid` | Debrid accounts (#44): the services' official APIs (Real-Debrid, AllDebrid, Premiumize, TorBox, Mega-Debrid) turn a file host's link into a direct one the engine downloads |
-| `crates/cnl` | `mdm-cnl` | Click'n'Load 2 (#37): the listener on 127.0.0.1:9666 that reads a link site's posts into packages for Link grabber, with limits on what it takes |
-| `crates/extract` | `mdm-extract` | Archive extraction (#37): zip, tar, gz and xz in process; 7z and RAR through an installed 7-Zip, run as its own program; in place through HatchZip when asked |
-| `crates/geo` | `mdm-geo` | Where a download's server is (#140): an IP-to-country range table built from DB-IP's Lite data (`tools/geo/build.py`), looked up on this computer only, and the countries' flags |
-| `crates/tools` | `mdm-tools` | Video pages through yt-dlp and ffmpeg, image galleries through gallery-dl (run as separate programs); while a network adapter is chosen, their connections go through a proxy of MDM's on 127.0.0.1 that binds them to it (`relay.rs`); each runs in a folder it can write, also its TEMP (`workdir.rs`) |
-| `crates/crash` | `mdm-crash` | Crash and freeze reports: the monitor process, out-of-process minidumps, symbolicated stacks, the report's text and the release logs ([crash-reports.md](crash-reports.md)) |
-| `crates/torrent` | `mdm-torrent` | BitTorrent and magnet links through librqbit |
-| `crates/labserver` | `mdm-labserver` | An HTTP Range server with a request log and fault injection, and an FTP/FTPS server with its own faults, for tests and benchmarks |
+| `crates/engine` | `odm-engine` | Downloads one file over HTTP(S) or FTP(S): probe, segment planner, connection workers, resume state, per-host limits, speed limiter, checksums, proxy scripts |
+| `crates/app` | `odm-app` | The desktop app (`orbitdownloadmanager.exe`, egui): list, categories, queues, scheduler, dialogs, tray, settings |
+| `crates/cli` | `odm-cli` | Headless downloads with progress (`get`, `resume`), videos, torrents and the automation API's commands: a library the app's program runs (`orbitdownloadmanager --cli …`), and `orbitdownloadmanager-cli`, a small launcher that starts it with the same arguments, terminal and exit code |
+| `crates/mcp` | `odm-mcp` | The MCP server (`orbitdownloadmanager-mcp`): AI assistants list, add and control the running app's downloads through the automation API |
+| `crates/remote` | `odm-remote` | The remote control (#141): the HTTPS server a paired phone or computer on the local network uses (its page, pairing codes, device tokens, the self-signed certificate); every request becomes an automation API command the app answers |
+| `crates/nmhost` | `odm-nmhost` | The browser's native messaging host: takes captured downloads from the extension and hands them to the app |
+| `crates/ipc` | `odm-ipc` | The single-instance channel (a token-protected local socket), the data folder, and the capture rules shared by the app and the host |
+| `crates/debrid` | `odm-debrid` | Debrid accounts (#44): the services' official APIs (Real-Debrid, AllDebrid, Premiumize, TorBox, Mega-Debrid) turn a file host's link into a direct one the engine downloads |
+| `crates/cnl` | `odm-cnl` | Click'n'Load 2 (#37): the listener on 127.0.0.1:9666 that reads a link site's posts into packages for Link grabber, with limits on what it takes |
+| `crates/extract` | `odm-extract` | Archive extraction (#37): zip, tar, gz and xz in process; 7z and RAR through an installed 7-Zip, run as its own program; in place through HatchZip when asked |
+| `crates/geo` | `odm-geo` | Where a download's server is (#140): an IP-to-country range table built from DB-IP's Lite data (`tools/geo/build.py`), looked up on this computer only, and the countries' flags |
+| `crates/tools` | `odm-tools` | Video pages through yt-dlp and ffmpeg, image galleries through gallery-dl (run as separate programs); while a network adapter is chosen, their connections go through a proxy of ODM's on 127.0.0.1 that binds them to it (`relay.rs`); each runs in a folder it can write, also its TEMP (`workdir.rs`) |
+| `crates/crash` | `odm-crash` | Crash and freeze reports: the monitor process, out-of-process minidumps, symbolicated stacks, the report's text and the release logs ([crash-reports.md](crash-reports.md)) |
+| `crates/torrent` | `odm-torrent` | BitTorrent and magnet links through librqbit |
+| `crates/labserver` | `odm-labserver` | An HTTP Range server with a request log and fault injection, and an FTP/FTPS server with its own faults, for tests and benchmarks |
 | `extension/` | — | The Chromium (MV3) and Firefox extension |
 | `docs/` | — | The user guide and tutorials, this file, the benchmark data; the website makes the guide its help pages, which Help opens |
 
@@ -37,7 +37,7 @@ Download
  │                       part is split in half (planner.rs, tested by random simulation)
  ├─ Worker × N           one HTTP/1.1 connection each, reused across segments; slow ones
  │                       are dropped and their part re-split
- │    └─ writes at its offset into <name>.mdm.part (created sparse)
+ │    └─ writes at its offset into <name>.odm.part (created sparse)
  ├─ HostLimits           learns how many connections each server accepts
  ├─ Limiter (shared)     per-download and global token buckets
  ├─ State                segment table saved atomically (craft-atomic) for crash-safe resume
@@ -71,7 +71,7 @@ toolbar, key and IPC commands into actions. Each dialog is its own module and re
 `Outcome` (open, closed, done with a value). Windows-only calls are confined to `win32.rs` and
 sounds, show in folder, the crash handler); every other file is safe, portable Rust. Fonts come from the system:
 Windows' Fonts folder, macOS's system fonts, fontconfig on Linux (`theme.rs`). The interface language's
-script fonts load at start; text in another script gets its font the first time it shows: from MDM's
+script fonts load at start; text in another script gets its font the first time it shows: from ODM's
 lists of the system's fonts for each script, then, on Windows and macOS, from the system's own fallback
 (DirectWrite's, CoreText's, through fontique: `egui_system_font_provider`) for what the lists don't
 name; Linux asks fontconfig for any letter. On Windows, Latin,
@@ -98,7 +98,7 @@ light and a dark palette, metrics, control styles and an icon style (`palette.rs
   accent).
 - **Control styles.** `palette::Controls` names each control's shape (text boxes, check boxes,
   buttons, progress bars, scroll bars, the focus mark, the title bar); the style themes (Metro,
-  Adwaita, Breeze, Luna, Aero, Aqua, Emerald) pick theirs, and on Windows MDM then draws the
+  Adwaita, Breeze, Luna, Aero, Aqua, Emerald) pick theirs, and on Windows ODM then draws the
   title bar itself (the `caption.*` roles).
 - **Theme files.** `themefile.rs` reads TOML or JSON from the data folder's `themes` (one file,
   or `<id>/theme.toml` with icons beside it). A file names only what it changes; the rest comes
@@ -124,7 +124,7 @@ tried them, #206). View → Draw with picks one, from the next start. One code p
 every system (`crates/app/src/renderer.rs`): when the chosen one can't start, the other one is
 tried, so the windows always open. A watched start with the system's API leaves a marker until
 its first frame is drawn: a start that ends before it (a crash inside the driver), one whose
-first frame doesn't come within 10 seconds (MDM then starts again with OpenGL), or a graphics
+first frame doesn't come within 10 seconds (ODM then starts again with OpenGL), or a graphics
 card lost twice in 10 minutes is remembered with its reason, which the menu shows.
 
 View → Interface size (`scale.rs`, #262) is egui's zoom factor over the display's own scale:
@@ -136,37 +136,37 @@ scrolls.
 The download list and settings are saved atomically to the data folder (`downloads.json`):
 `%APPDATA%\orbitdownloadmanager\` on Windows, `~/.local/share/orbitdownloadmanager` on Linux,
 `~/Library/Application Support/orbitdownloadmanager` on macOS, a `data` folder beside a portable
-copy, or `MDM_DATA_DIR` (`mdm_ipc::data_dir`). The browser host reads the same file for the
+copy, or `ODM_DATA_DIR` (`odm_ipc::data_dir`). The browser host reads the same file for the
 capture rules, so a change in Options applies to the next captured download.
 
 Sign-in secrets (debrid accounts, Sites Logins' and the proxy's passwords) live in the system's
 keychain (`secrets.rs`, #44): Windows Credential Manager (`win32.rs`), the Secret Service on Linux
 reference in their place, written only once the keychain has confirmed the secret; without a
-keychain (or with a locked one, never unlocked for MDM) the secret stays in the settings as
+keychain (or with a locked one, never unlocked for ODM) the secret stays in the settings as
 before.
 
 A download's server location (#140) is the country of the address it connected to, looked up in
-`mdm-geo`'s table on this computer (`countries.rs` names it in the interface language); the
+`odm-geo`'s table on this computer (`countries.rs` names it in the interface language); the
 release job builds the table again from the month's data (`tools/geo/build.py --release`).
 
 ## Browser integration
 
 ```
-page ──► extension ──native messaging──► mdm-nmhost ──ipc──► app
+page ──► extension ──native messaging──► odm-nmhost ──ipc──► app
 ```
 
 The extension asks the host which file types to take, checks each download against them, and
 cancels the browser's download only after the app has accepted it; otherwise the browser keeps
 it, and the extension says why.
 
-A message to the host is at most 1 MB (`mdm_ipc::MAX_MESSAGE`; the host refuses more, and the
+A message to the host is at most 1 MB (`odm_ipc::MAX_MESSAGE`; the host refuses more, and the
 browser lets a host answer no more than that either). A page's links past it go in parts, each
 measured as the widest browser writes it (`wireSize` in `background.js`) and carrying the page's
-referrer and cookies and its place (`mdm_ipc::LinksPart`); the host hands each over as it comes,
+referrer and cookies and its place (`odm_ipc::LinksPart`); the host hands each over as it comes,
 and the app keeps them (`linkparts.rs`) until the last is in, then opens Link grabber with the
 whole list.
 
-The host serves only MDM's own extension. Its IDs are in one place, `mdm_ipc::extension`
+The host serves only ODM's own extension. Its IDs are in one place, `odm_ipc::extension`
 (`crates/ipc/src/extension.rs`): the unpacked copy's (`UNPACKED_ID`, from the manifest's public
 key), the Chrome Web Store's (`STORE_ID`, signed with the store's own key: `pack.ps1` leaves the
 manifest's key out of the store's copy), the Firefox add-on's (`FIREFOX_ID`) and its
@@ -177,7 +177,7 @@ offers the store's copy (Add to Chrome, Add to Firefox) before the unpacked one.
 ## Remote control
 
 ```
-phone ──HTTPS (paired token)──► mdm-remote ──ipc::Sink──► app (answer, remote_add)
+phone ──HTTPS (paired token)──► odm-remote ──ipc::Sink──► app (answer, remote_add)
 ```
 
 `--headless` (`headless.rs`, #157) runs the same `App` without eframe: a loop calls its
@@ -186,7 +186,7 @@ channel, and never its `ui`; commands are added as the remote control adds them 
 See [headless mode on Windows](server.md).
 
 The server runs on the app's Tokio runtime, one listener per local network address. Each request
-is checked (`Host`, `Origin`, token), turned into an `mdm_ipc::Command` marked `remote` (a field
+is checked (`Host`, `Origin`, token), turned into an `odm_ipc::Command` marked `remote` (a field
 no request line can set) and handed to the app through the same channel as the command line's;
 the app answers it on its next frame, as it answers the automation API. Its page is built in
 (`crates/remote/web`) and its texts come from the app's catalogs (`remote.rs`).
@@ -199,13 +199,13 @@ The app uses English source strings through `crate::i18n`. No translation catalo
 ## Pictures
 
 The help pages' pictures (`docs/images/help/`) come from one list, `tools/shots/shots.toml`:
-`tools/shots/make.py` opens each window through MDM's own `/show <window>` command line in a test
+`tools/shots/make.py` opens each window through ODM's own `/show <window>` command line in a test
 instance off the screen, crops and annotates it from the window's accessibility tree, and writes
 lossless WebP; `make.py check` (CI) keeps the list, the pages and the files in step. The
 published ones are taken on GitHub's Windows runner (`docs-shots.yml`).
 
 ## Tests and benchmarks
 
-`cargo test` runs unit tests and end-to-end downloads against `mdm-labserver` with injected
+`cargo test` runs unit tests and end-to-end downloads against `odm-labserver` with injected
 faults (slow, dropped and refused connections, servers without ranges, changing files).
 `tools/bench` runs the published speed comparison; its raw data is in `docs/bench/`.

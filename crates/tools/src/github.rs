@@ -3,7 +3,7 @@
 //!
 //! GitHub's API answers 60 requests an hour for each internet address without an account. On a
 //! network many people share (a mobile carrier's or an internet provider's shared address, a
-//! campus, an office), others use them up, and the API refuses MDM: "403 rate limit exceeded".
+//! campus, an office), others use them up, and the API refuses ODM: "403 rate limit exceeded".
 //! github.com's own pages aren't limited that way: `<repo>/releases/latest` redirects to the
 //! latest release's page (`<repo>/releases/tag/<tag>`), and each of its files is at
 //! `<repo>/releases/download/<tag>/<name>`. The API is asked first (it lists the files, with
@@ -96,7 +96,7 @@ pub fn file_at(raw: &str, repo: &str, tag: &str, path: &str) -> String {
 }
 
 /// The latest release's tag of `repo` on GitHub's pages at `web`: where `releases/latest`
-/// redirects. `client` follows no redirect ([`mdm_engine::hop_client`], or a client built with
+/// redirects. `client` follows no redirect ([`odm_engine::hop_client`], or a client built with
 /// `redirect::Policy::none()`): each hop is read here, up to [`HOPS`], on `web`'s server only, so
 /// the release's page itself is never downloaded. A client that follows them works too (the tag is
 /// then read from where it ended).
@@ -184,7 +184,7 @@ struct ApiAsset {
 /// there shows when it is downloaded). When the pages fail too, the API's refusal is the error
 /// (the pages' failure is logged).
 pub(crate) async fn latest_release(
-    net: &mdm_engine::Options,
+    net: &odm_engine::Options,
     api: &str,
     web: &str,
     repo: &str,
@@ -210,8 +210,8 @@ pub(crate) async fn latest_release(
     tracing::info!("{repo}: looking for its latest release on {page} instead (#1337)");
     let found = async {
         let url = url::Url::parse(&page).map_err(|e| Error::BadRelease(e.to_string()))?;
-        let hops = mdm_engine::hop_client(net, &url).map_err(|error| match error {
-            mdm_engine::Error::Adapter(a) => Error::Adapter(a),
+        let hops = odm_engine::hop_client(net, &url).map_err(|error| match error {
+            odm_engine::Error::Adapter(a) => Error::Adapter(a),
             error => Error::Download {
                 host: url.host_str().unwrap_or_default().to_owned(),
                 error,
@@ -353,18 +353,18 @@ mod tests {
         }
     }
 
-    const MDM: &str = "mthlpbs/Orbit-Download-Manager";
+    const ODM: &str = "mthlpbs/Orbit-Download-Manager";
     const ZIP: &str = "MisterDownloadManager-9.9.9-x64.zip";
     const SETUP: &str = "MisterDownloadManager-9.9.9-setup.exe";
 
     /// A release on the fake GitHub: its repository, its tag, its files as (name, fixture).
     type FakeRelease<'a> = (&'a str, &'a str, &'a [(&'a str, &'a str)]);
 
-    /// A lab server whose fake GitHub (`mdm_labserver`'s `github`) has `releases`; its API
+    /// A lab server whose fake GitHub (`odm_labserver`'s `github`) has `releases`; its API
     /// refuses every request for its rate limit.
     async fn fake_github(
         releases: &[FakeRelease<'_>],
-    ) -> (mdm_labserver::LabServer, tempfile::TempDir) {
+    ) -> (odm_labserver::LabServer, tempfile::TempDir) {
         let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
         let dir = tempfile::tempdir().unwrap();
         for (repo, tag, files) in releases {
@@ -375,7 +375,7 @@ mod tests {
                 std::fs::copy(fixtures.join(fixture), root.join(tag).join(name)).unwrap();
             }
         }
-        let lab = mdm_labserver::LabServer::start(mdm_labserver::Config {
+        let lab = odm_labserver::LabServer::start(odm_labserver::Config {
             files: Some(dir.path().to_owned()),
             ..Default::default()
         })
@@ -386,38 +386,38 @@ mod tests {
 
     /// #1337 end to end: GitHub's API refuses for its rate limit, so the latest release is found
     /// on the pages (the tag `releases/latest` redirects to), and its file is downloaded and
-    /// checked as Update now checks it, against the release's list signed by MDM's key; a file
+    /// checked as Update now checks it, against the release's list signed by ODM's key; a file
     /// that isn't the one the list names is still refused. yt-dlp's real signed list is fetched
     /// the same way and passes yt-dlp's key.
     #[tokio::test]
     async fn a_rate_limited_api_gives_way_to_the_release_pages() {
-        let mdm_files: &[(&str, &str)] = &[
-            ("SHA256SUMS.txt", "mdm-SHA256SUMS.txt"),
-            ("SHA256SUMS.txt.sig", "mdm-SHA256SUMS.txt.sig"),
+        let odm_files: &[(&str, &str)] = &[
+            ("SHA256SUMS.txt", "odm-SHA256SUMS.txt"),
+            ("SHA256SUMS.txt.sig", "odm-SHA256SUMS.txt.sig"),
             (ZIP, ZIP),
             // Not what the signed list says it is.
-            (SETUP, "mdm-SHA256SUMS.txt"),
+            (SETUP, "odm-SHA256SUMS.txt"),
         ];
         let ytdlp_files: &[(&str, &str)] = &[
             ("SHA2-256SUMS", "SHA2-256SUMS"),
             ("SHA2-256SUMS.sig", "SHA2-256SUMS.sig"),
         ];
         let (lab, _dir) = fake_github(&[
-            (MDM, "v9.9.9", mdm_files),
+            (ODM, "v9.9.9", odm_files),
             ("yt-dlp/yt-dlp", "2026.10.26", ytdlp_files),
         ])
         .await;
-        let net = crate::net(mdm_engine::Proxy::None);
-        let api = lab.url(&format!("/gh/api/repos/{MDM}/releases/latest"));
+        let net = crate::net(odm_engine::Proxy::None);
+        let api = lab.url(&format!("/gh/api/repos/{ODM}/releases/latest"));
         let web = lab.url("/gh/web");
         let names = ["SHA256SUMS.txt", "SHA256SUMS.txt.sig", ZIP, SETUP];
-        let found = latest_release(&net, &api, &web, MDM, &names).await.unwrap();
+        let found = latest_release(&net, &api, &web, ODM, &names).await.unwrap();
         assert_eq!(found.tag, "v9.9.9");
         assert_eq!(
             found.files[2],
             (
                 ZIP.to_owned(),
-                format!("{web}/{MDM}/releases/download/v9.9.9/{ZIP}")
+                format!("{web}/{ODM}/releases/download/v9.9.9/{ZIP}")
             )
         );
         // The API first, then the release's page by its redirect, never the page itself.
@@ -425,8 +425,8 @@ mod tests {
         assert_eq!(
             paths,
             [
-                format!("/gh/api/repos/{MDM}/releases/latest"),
-                format!("/gh/web/{MDM}/releases/latest"),
+                format!("/gh/api/repos/{ODM}/releases/latest"),
+                format!("/gh/web/{ODM}/releases/latest"),
             ]
         );
         // Downloaded and checked as Update now does: the signed list, then the file.
@@ -472,7 +472,7 @@ mod tests {
             &client,
             &url("SHA2-256SUMS"),
             &url("SHA2-256SUMS.sig"),
-            crate::signed_by_mdm,
+            crate::signed_by_odm,
         )
         .await;
         assert!(matches!(other, Err(Error::BadSignature)), "{other:?}");
@@ -484,7 +484,7 @@ mod tests {
     #[tokio::test]
     async fn when_the_pages_fail_too_the_rate_limit_is_the_error() {
         let (lab, _dir) = fake_github(&[]).await;
-        let net = crate::net(mdm_engine::Proxy::None);
+        let net = crate::net(odm_engine::Proxy::None);
         let api = lab.url("/gh/api/repos/x/y/releases/latest");
         let err = latest_release(&net, &api, &lab.url("/gh/web"), "x/y", &["a"])
             .await
@@ -493,7 +493,7 @@ mod tests {
             err.network(),
             Some((
                 "127.0.0.1".to_owned(),
-                mdm_engine::fault::Fault::Status(403)
+                odm_engine::fault::Fault::Status(403)
             )),
             "{err:?}"
         );
@@ -509,13 +509,13 @@ mod tests {
             r#"{"tag_name":"v1.0.0","assets":[{"name":"a.zip","browser_download_url":"https://example.invalid/a.zip"}]}"#,
         )
         .unwrap();
-        let lab = mdm_labserver::LabServer::start(mdm_labserver::Config {
+        let lab = odm_labserver::LabServer::start(odm_labserver::Config {
             files: Some(dir.path().to_owned()),
             ..Default::default()
         })
         .await
         .unwrap();
-        let net = crate::net(mdm_engine::Proxy::None);
+        let net = crate::net(odm_engine::Proxy::None);
         let web = lab.url("/gh/web");
         let found = latest_release(&net, &lab.url("/files/latest.json"), &web, "x/y", &["b"])
             .await

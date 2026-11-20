@@ -2,10 +2,10 @@
 
 [← Back to docs index](README.md)
 
-The same list is in MDM under **Help → Keyboard shortcuts**, and the menus show each command's
+The same list is in ODM under **Help → Keyboard shortcuts**, and the menus show each command's
 keys beside it. On a Mac, **⌘** (Command) takes the place of **Ctrl**: **⌘N** adds a download.
 
-Everything can be done from the keyboard, and MDM works with screen readers (such as
+Everything can be done from the keyboard, and ODM works with screen readers (such as
 Narrator and NVDA on Windows): its windows, dialogs and menus tell them what each control is
 and its state, and the download list reads each download's name, status and size. The
 **Categories** pane reads as a tree (each category with its count, open or shut, selected or
@@ -14,7 +14,7 @@ it with **NVDA+End**), and the menu bar and every right-click menu as menus whos
 run from there. **Tab** goes round the toolbar, the **Categories** tree and the download list;
 in each, the screen reader says the button, category or download the keys are on, and follows
 them as the arrows move.
-On Linux, screen readers (Orca) don't read MDM's windows yet; the keyboard works there as
+On Linux, screen readers (Orca) don't read ODM's windows yet; the keyboard works there as
 everywhere.
 
 ## Adding and finding

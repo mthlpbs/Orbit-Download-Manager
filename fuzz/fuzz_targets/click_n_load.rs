@@ -1,4 +1,4 @@
-//! What a web page posts to Click'n'Load (`mdm_cnl`: any page can post to it): the key in its
+//! What a web page posts to Click'n'Load (`odm_cnl`: any page can post to it): the key in its
 //! `jk` script, its `crypted` links opened with that key, and the links in what they decrypt to.
 //!
 //! The input's first line is `jk`; the rest is `crypted` as posted, and also, encrypted here the
@@ -32,8 +32,8 @@ fn crypted(key: [u8; 16], plain: &[u8]) -> String {
 fuzz_target!(|data: &[u8]| {
     let text = String::from_utf8_lossy(data);
     let (jk, rest) = text.split_once('\n').unwrap_or((&text, ""));
-    let _ = mdm_cnl::key_of(jk);
-    let _ = mdm_cnl::decrypt(rest, jk);
+    let _ = odm_cnl::key_of(jk);
+    let _ = odm_cnl::decrypt(rest, jk);
 
     let Some(key) = jk
         .as_bytes()
@@ -44,7 +44,7 @@ fuzz_target!(|data: &[u8]| {
     };
     let hex: String = key.iter().map(|b| format!("{b:02x}")).collect();
     let jk = format!("function f(){{ return '{hex}'; }}");
-    let links = mdm_cnl::decrypt(&crypted(key, rest.as_bytes()), &jk).expect("our own post opens");
+    let links = odm_cnl::decrypt(&crypted(key, rest.as_bytes()), &jk).expect("our own post opens");
     let mut seen = std::collections::HashSet::new();
     for link in &links {
         // Web links only, each once, none to this computer or its network by name.

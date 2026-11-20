@@ -1,4 +1,4 @@
-//! A debrid account's token never reaches a log (#44): MDM's own log at its most detailed
+//! A debrid account's token never reaches a log (#44): ODM's own log at its most detailed
 //! (every crate's `tracing` output, the HTTP client's included), the download's event log, its
 //! errors and debug dumps, while each service signs in, lists its hosts and unlocks a link
 //! downloaded end to end against the lab server's fakes.
@@ -7,9 +7,9 @@ use std::io::Write;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use mdm_debrid::{Account, Credential, Debrid, Http, ServiceKind, Services, check};
-use mdm_engine::{Destination, Download, Options, Request};
-use mdm_labserver::{Config, LabServer};
+use odm_debrid::{Account, Credential, Debrid, Http, ServiceKind, Services, check};
+use odm_engine::{Destination, Download, Options, Request};
+use odm_labserver::{Config, LabServer};
 use url::Url;
 
 /// The token: distinctive, so finding it anywhere is a leak.
@@ -86,9 +86,9 @@ async fn no_token_in_any_log() {
                 let s = dl.snapshot();
                 if !matches!(
                     s.state,
-                    mdm_engine::download::State::Probing
-                        | mdm_engine::download::State::Downloading
-                        | mdm_engine::download::State::Completing
+                    odm_engine::download::State::Probing
+                        | odm_engine::download::State::Downloading
+                        | odm_engine::download::State::Completing
                 ) {
                     break s;
                 }

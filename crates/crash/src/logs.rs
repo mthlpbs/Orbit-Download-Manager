@@ -1,7 +1,7 @@
-//! The log MDM keeps in release builds too: `<data>/logs/mdm.log`, rolled over at a size into
-//! `mdm.1.log` … `mdm.3.log` (the crash monitor keeps `monitor.log` the same way). Each line is
+//! The log ODM keeps in release builds too: `<data>/logs/odm.log`, rolled over at a size into
+//! `odm.1.log` … `odm.3.log` (the crash monitor keeps `monitor.log` the same way). Each line is
 //! handed to the log's own thread, which writes it at once. A report takes the last lines of
-//! MDM's: [`flush`] first, so the file has them all, or, when the disk didn't let them through in
+//! ODM's: [`flush`] first, so the file has them all, or, when the disk didn't let them through in
 //! time, the last lines the app kept in memory ([`recent`], sent with a panic or a freeze).
 //!
 //! The thread that logs never writes the file itself, nor waits for it (#513, #1354): while
@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 
 /// A log file grows to this, then rolls over.
 pub const MAX_BYTES: u64 = 2 * 1024 * 1024;
-/// Rolled-over files kept (`mdm.1.log` newest).
+/// Rolled-over files kept (`odm.1.log` newest).
 pub const KEEP: usize = 3;
 /// Lines waiting for the log's thread at most; a line logged while this many wait is dropped.
 pub const QUEUE: usize = 10_000;
@@ -33,7 +33,7 @@ pub fn dir(data: &Path) -> PathBuf {
 }
 
 /// The app's log; the monitor's is "monitor".
-pub const APP: &str = "mdm";
+pub const APP: &str = "odm";
 pub const MONITOR: &str = "monitor";
 
 fn current(dir: &Path, name: &str) -> PathBuf {
@@ -53,7 +53,7 @@ enum Msg {
 }
 
 /// The writer behind the log: hands each line to the log's thread, which appends it to
-/// `mdm.log`, rolling it over past [`MAX_BYTES`]. Writing never waits for the disk.
+/// `odm.log`, rolling it over past [`MAX_BYTES`]. Writing never waits for the disk.
 #[derive(Clone)]
 pub struct Rolling {
     shared: Arc<Shared>,
@@ -260,7 +260,7 @@ impl Inner {
             format!("{n} log lines were dropped")
         };
         let line = format!(
-            "{}  WARN {} log mdm_crash::logs: {lines} while the disk didn't answer\n",
+            "{}  WARN {} log odm_crash::logs: {lines} while the disk didn't answer\n",
             chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.6fZ"),
             self.name,
         );
@@ -307,7 +307,7 @@ impl Write for Rolling {
 static LOG: std::sync::OnceLock<Rolling> = std::sync::OnceLock::new();
 
 /// Wait, up to `within`, until every line logged so far is in the file: before a report reads
-/// the log's end, and as MDM ends (lines still on their way would be lost with the process).
+/// the log's end, and as ODM ends (lines still on their way would be lost with the process).
 /// True when they are, or when there is no log.
 pub fn flush(within: Duration) -> bool {
     LOG.get().is_none_or(|log| log.flush_within(within))
@@ -326,19 +326,19 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Rolling {
     }
 }
 
-/// Start logging into `<data>/logs`: MDM's own crates at `info`, everything else (egui, winit,
-/// the network stack) at `warn`; `MDM_LOG` overrides it with an `EnvFilter` (e.g.
-/// `MDM_LOG=debug`). Returns false when the folder can't be written (MDM runs on without a log).
+/// Start logging into `<data>/logs`: ODM's own crates at `info`, everything else (egui, winit,
+/// the network stack) at `warn`; `ODM_LOG` overrides it with an `EnvFilter` (e.g.
+/// `ODM_LOG=debug`). Returns false when the folder can't be written (ODM runs on without a log).
 pub fn init(data: &Path, name: &'static str) -> bool {
     use tracing_subscriber::EnvFilter;
     let Ok(writer) = Rolling::new(dir(data), name) else {
         return false;
     };
     let _ = LOG.set(writer.clone());
-    let filter = std::env::var("MDM_LOG")
+    let filter = std::env::var("ODM_LOG").or_else(|_| std::env::var("MDM_LOG"))
         .ok()
         .and_then(|f| EnvFilter::try_new(f).ok())
-        .unwrap_or_else(|| EnvFilter::new("warn,minidump=error,minidump_processor=error,minidump_unwind=error,breakpad_symbols=error,mdm=info,mdm_app=info,orbitdownloadmanager=info,mdm_engine=info,mdm_torrent=info,mdm_crash=info,mdm_tools=info,mdm_ipc=info"));
+        .unwrap_or_else(|| EnvFilter::new("warn,minidump=error,minidump_processor=error,minidump_unwind=error,breakpad_symbols=error,odm=info,odm_app=info,orbitdownloadmanager=info,odm_engine=info,odm_torrent=info,odm_crash=info,odm_tools=info,odm_ipc=info"));
     tracing_subscriber::fmt()
         .with_writer(writer)
         .with_ansi(false)
@@ -349,7 +349,7 @@ pub fn init(data: &Path, name: &'static str) -> bool {
         .is_ok()
 }
 
-/// The last `n` lines of the log (across the roll-over: the end of `mdm.1.log` when `mdm.log`
+/// The last `n` lines of the log (across the roll-over: the end of `odm.1.log` when `odm.log`
 /// is short).
 pub fn tail(data: &Path, n: usize) -> Vec<String> {
     let dir = dir(data);
@@ -390,7 +390,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let mut w = Rolling::new(dir(tmp.path()), APP).unwrap();
         let line = "x".repeat(1023) + "\n";
-        // Past the size: the first lines move to mdm.1.log.
+        // Past the size: the first lines move to odm.1.log.
         for _ in 0..(MAX_BYTES / 1024 + 10) {
             w.write_all(line.as_bytes()).unwrap();
         }
@@ -600,7 +600,7 @@ mod tests {
 
     /// The count of lines in a "… dropped" line of the log's own.
     fn dropped_in(line: &str) -> Option<usize> {
-        let (_, said) = line.split_once("  WARN mdm log mdm_crash::logs: ")?;
+        let (_, said) = line.split_once("  WARN odm log odm_crash::logs: ")?;
         if said == "1 log line was dropped while the disk didn't answer" {
             return Some(1);
         }
@@ -622,7 +622,7 @@ mod tests {
         assert_eq!(disk.text(), "in pieces\ntwo\r\nlines\n");
     }
 
-    /// A count with no line after it is written by a flush (MDM ending, a report).
+    /// A count with no line after it is written by a flush (ODM ending, a report).
     #[test]
     fn a_flush_writes_the_count_too() {
         let disk = Held::new(false);

@@ -11,7 +11,7 @@ pub enum SnoozeFor {
     HalfHour,
     Hour,
     EightHours,
-    /// Until MDM starts again: never saved.
+    /// Until ODM starts again: never saved.
     Restart,
 }
 
@@ -30,8 +30,8 @@ impl SnoozeFor {
         crate::i18n::mark("For 1 hour"),
         // i18n: Snooze menu of the Download complete window: show no Download complete window for this long
         crate::i18n::mark("For 8 hours"),
-        // i18n: Snooze menu of the Download complete window: show no Download complete window until MDM is started again
-        crate::i18n::mark("Until MDM restarts"),
+        // i18n: Snooze menu of the Download complete window: show no Download complete window until ODM is started again
+        crate::i18n::mark("Until ODM restarts"),
     ];
 
     /// Its length in seconds; none for `Restart`.
@@ -50,13 +50,13 @@ impl SnoozeFor {
 pub enum Until {
     /// Unix seconds (the wall clock, so "until 14:30" holds across the computer's sleep).
     At(i64),
-    /// Until MDM restarts.
+    /// Until ODM restarts.
     Restart,
 }
 
 /// Download complete snoozed, or not. The "Show download complete dialog" setting stays as it is;
 /// a snooze ends by itself. A timed one is saved (it holds across a restart until its time), one
-/// "until MDM restarts" is not.
+/// "until ODM restarts" is not.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Snooze(Option<Until>);
 
@@ -91,7 +91,7 @@ impl Snooze {
         self.0.filter(|_| self.active(now))
     }
 
-    /// What is saved: a timed snooze's end; nothing for one until MDM restarts.
+    /// What is saved: a timed snooze's end; nothing for one until ODM restarts.
     pub fn saved(&self) -> Option<i64> {
         match self.0 {
             Some(Until::At(t)) => Some(t),
@@ -331,7 +331,7 @@ mod tests {
         assert_eq!(back.until(200), Some(Until::At(3700)));
         // Read back after its time: over.
         assert!(!Snooze::from_saved(s.saved(), 3700).active(3700));
-        // Until MDM restarts: never saved, so the next start isn't snoozed.
+        // Until ODM restarts: never saved, so the next start isn't snoozed.
         s.start(SnoozeFor::Restart, 100);
         assert!(s.active(i64::MAX));
         assert!(!s.expire(i64::MAX));

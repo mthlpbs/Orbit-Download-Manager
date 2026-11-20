@@ -19,10 +19,11 @@
   // whose listeners died with it while its button stayed on the page, frozen where it was, shown
   // if it was then: two buttons over the video (#336, seen in full screen). Any button already
   // on the page is such a copy's: it goes.
-  const prev = globalThis.__mdmVideoButton;
+  const prev = globalThis.__odmVideoButton;
   if (prev && typeof prev === "object" && prev.alive()) return;
   if (prev && typeof prev.teardown === "function") prev.teardown();
-  for (const old of document.querySelectorAll("mdm-video-button")) old.remove();
+  globalThis.__mdmVideoButton?.teardown?.();
+  for (const old of document.querySelectorAll("odm-video-button, mdm-video-button")) old.remove();
   const ext = globalThis.browser ?? globalThis.chrome;
 
   // A video worth a button: big enough to be content, not a short muted looping clip (an
@@ -35,15 +36,37 @@
   // (#741: 1.5 s, it was 2.6); gone at once when the pointer leaves the video.
   const IDLE_MS = 1500;
   const INSET = 8;
+  const BUTTON_SIZE = 30;
   const DRAG_PX = 4;
-  // Our app icon (extension/icons/icon-48.png, as data: no extension file is exposed to pages).
-  const LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAM70lEQVR4nM1aC1RVVRr+zgW8ICCgKOIL0EktNdF8oAvFR6k5lTo+KnN8ja9yOWo6TaUzCk4vs3zU5GpMnSy1prEB1lSuMjG1UcBRCHxgJigIyEsQed3Xme/fl0sQj4voNPOt9bP3Off8+3zf//9773PPRUMjCA4e5YvKykm6pk2GrofqPIWfEZqmJbHJ0HQ9Gu7uMRkZR4p5XA8arR66dQxbxwFW6Lruy8P/OcilmFy2XM09GcnDOtBoNQjuPDxUt+m7dUach/93oJAkzWgcXTsbNQKqycfpdzHq3l5t+RcovVXEv3cHFFFMESEOEUqA1LteVRWn30Hke90zGKMjpqJzYBACAgJhdDUCVkC30SxARXklcnMycfHydziV8hUuZSbTq2WgiKQrOScGsAsloFvgsC2cqMvZvW1Mn7oCY8dMRJs23gDJgrNdWl3IO4wCaloxq46SG/k4khCDmOO76NAiRHJOrNeCO4YF24B03CYGDRqHhQtXw8+HxHVGgqbTwMEU2VpmI2mVDbY2Cy+y8CKaZrXhRlEedn3xJpIvn+RFzQezoEpJu93ot/Hxx6JFURgyeAAMzJ+B59hwCP4hLyEsrY2tEJZjaUWETvI6iYPERQDMNGmtViSePYqtn71E5+aD956nBXUMS+e9g9EMCPmoyN3o3NkfLvQW03heTOcgKso0RZ6mSLPVzeyzbGB2COBJIS9CpDXzmOeyC64g8pMXcbOihIM1A5oWo3HN58jOIeQjI3ehc6f2cHWBMgMFSBakhMQUWZrZZEVeTgGyr12DlaQDO3SCP/01Gy92kLZY7WLY10hejmG2IPN6OqJiI1FScZODNg2WUVKzBbzxZiy6OMi7MvrS0kSEIk8uEvGSGzex/6O9iP3yA/UBP2KGNEwIn4EZ42fC29iGZHmxEkLS0q8mr5uZKorPYiZWHniens7RLAGLF72GiIiRirCbgzxbZexL+Qj5vNxivPr6eqRciKdXfdwXMgAvzI+Ep5sHCVcTrzabyQTNZGNWKMRixuFzcdh+Yg+9moZTAeHh07Bo4SpFXMg6SKuWJmJk0t4sKcPa9WuQej6eJxrHvUH3I2rBy3ADHUlcl8iTMEjekQWNImCyYPPxHTiW8W96NQ6nArZsPoh2fj6KrBvv6cJWCaBJX+YAN0B8+P5HeP9v2+jhHDMiZmLWg0+RrAU2ISzkreybpE/yFKBRVEFpPhbERNKjcTQp4KGxczHzycWKrDISVi1NIm8w0DTgek4+Zi9+TNV7cyBz4t0V7yLAux0jTfIkLJGXqEtfyIPHGufI1zdP4VTZ9zBVmVFWVo7rufkoLCzmKHY0KWDTa18w+r6KsIO8LJ1CXkwE8HEXe/ftx4cH3qKHc7Rt6wtfvzaY+sBUjPjFMBK2l5FGkxKCkKcIEaNRRFFZEZ459hZat/aguaNzl0A+5Vfi9KlUjsb7NyZg7KjZeGL604q0kBfCriQsrRJB0xh9s6kK85dNw43iAnrVh6dXawR08Ec7fz/4t2+LGzdKuPsWw1Jpw8apUZwLBkachElet0rU2RfyFKLOs6y2J8fin1d+nAuDh/THhF+OwoZ1WxsXsOQ3mzEwNAxKQLUJaYcAA8lLBtLOX8DqDfPp8eMwEuWAwPYk3g42m478/ELkXS9AUVGJmi92aNg6Jwo92nZlxJkFISzkGXWNx4wMWwrh8TdZKXj1TDR97Ojbrxd+9/xizHnq2cYFbH4lDp5MmRAXE9IOE+IuFCAZiP38AHZ+vAnebby4QwcgsFMAnzwrkMtazc8rZN1WcLSGMS/8cZbSeHvkGWlFXFo5phhlFhPKq8ox5dBWetjxzLLZaNXKDVve2NmwgB5BoVi1bLuKtpRNbQESeUdr4+L/3r5NKDFnscxccC0rFznZeaioqOQozjEk5H6smfg0XGw2GEhWykhKR+aArEaa1cS+VZ1bFr8faSU5COneFes3rFTRFzQo4OExS/DI+Dk1xEWEQfokLcfSanz8tFoq8c7+DTidkojSm7foeXvo2jYQ26b9HkZwUCFfJ/LVQmyV8Gp/DclVZ3Ew+yZmrVqLaZOW0NuOBgVMmbgKD3IDc6km7RAiJpE3GHRuQzpMpjIOOAE2eY5oAQyaAX+fvxEeHK2GMGte456gBPGcp38WAgacgqtHJYpcg/DEHxOQls1rq9GwgHHPYuyI6YpwbRFC3oWRN9BcNBuqTLfw6+cmUkq9IZoF2Q8OzH0FrTUOXk1YJi5TaxfCY5+gTHQYEM+rgSv5VizdUYiUqyytajQoYNWCvyK4Sy9VOkqEmEYBEnkSd5GWzw9Xs3/A6jfnt5A+b07bOe15dG7towhLBuSxWpMViCJ8RwTBZ2gbWOM/QJXlGvafvo4/HyxFacWPGW9QwMq5uxHStTfJ2iMvrSIt5KtNspCZfQmrty28MwFTVqOLh081eUaeUffu2x5+43qiLD4DpZ+nwMVYgauWHMz7Jo5C6t6tQQHzZ0QhtMdDNRlwRN7VYCcv0RcBUkKzoyZTQL0hmgUpoegZa9Qc4DceePcj8ZHBqLpcgJLPUqEXlXKnt8DALxl7r6Vi+w9n6FUX9QREjBqKLp5jMaTPo3BliFTkq4m70qQ10KSVSTz7lV9xEtcZotkwcCOJfXIt2g/qAo8QX9iKylFy6Dz0AhJnRjSbWZHnOot9mWfxzqUketVFHQHjH47AkcMnMKL/U3g0fBGJ63bSBqs9+oy8TGIRZODKY7VW4Ln3fovMgkx63x4GDuqLBXNmYMzQwShLyELpiXTYbpTCIOu+LKcsJQd5XbNgR8Z32HP5PD3rokbA6LHDcfxoIndyM1+z9MWz0/+iSLsKeRHxEzNQDJ/C8OonUTidfpojOEePXwRh0pRxGMks53GXTj+Zhojr7eDGjUwRlqhbadx9a5PXXaxYkhiHc8WFHKUulID7+tyDcm7/GelZPGXHxoVforXRCDeKcNGsNHvkXfjN3SHAwP6nJz/Gvm8/okfD6H1vD4waMwyjaV7enjh6JB6xMYdw/uz3mNdnBGbdM4S7btPky1lKE76O4Wj1oXXvGq6PGz8SR7+Jx63SMp6yY87YdRjaM0KRdQhwZd+g+mxJXibYucwUrPvHn+ihEgmjsRWGDR+oMvrA4H583NCRcPIMvjx4DAnxtWtYwzsjZ6I3Xz/ay6Zh8jrLOC4vE+vPJNCnPlQGXt+8BufPXcKuHR/zlB3hvR/BzBHLFVkpJXv9i1kVeQN4Q6be4GHG3iv70Te0F/r07YkuXToi/mQS0i78gMOH/oXvL6ZztPrw9fDE/hGzuQJxLWqCvI39rRe+Q3RGw+MoAWzxwtqlKt0SpYtp6cjKzMGSES/Bz5NfaDgPPLwBd1qr1vxq6a7DM7AVPNq5wVplRUrqORxPTURifDISE5I5mnPM6xmG2cF8OabIs4QaIV9gKcP0Q4fo0TBqBAjCmPoxTH1gpw4wuhvRrUMwOngFoqLADFejBsstC8xlZpiLTagqNKEyvwJalQk5fEpcFrOeRVQzVJNgzLEn/Al0c/NiFhsnrzNw286nIjo9A42hjoCGsHHSTrT39lMlY2DNSxlJq0kZsZXl1OBiwfuJnyI6LY4ezjEjuD+Wdh+sSqcp8gXmcsz46jA9GodTAYO6DcfSsOUUYCZ5Psjxhhpv4CLkKUIJsVm4J5jw4tG3cbEwi16No5dPR7zd/2EYq8dqjLzOefdycjK+zrxGr8bhVIBgVugcPBQylssoCXPtd+WNFXnezJ4FndE045a5FFEJHyKtqOGN7V6Sf63vg/Dll2xn5L/IuopNSan0ahrNEiB4aVQkgrw7wlVKibWuMSP2smIJUYRGQtIWV5Zgz8U4fJWdwqvsQ0vNj+/YE4tCHoC/Wyte1zT5q5WlmHfoGD2dQwsKDEtiAPuz3yS8WnniDyylYE5qRZ5kHeQlG0JKSkn6Nn6ezdchV8ryeN6C7q390M3Di2XHa2jOyK84Fo8SLg7OwEepZPl9IJqvCibx2Cm8uIauC1uKEM/2JNIweZkTKhtsDSw3uU6OZdOT6+4WeQWNr9f5C81cG7Cbh83GytDHERHQr5ok7S6QP5qXi8iE5j1TOcAn/XlasPzAV1mZoQM+PNdshPp3x/L7HkMAsyKEW0pelso3UlIRn5vHUZsPjW/yNXf3YLb8ka9j2HoA62i3jenBQ/FY1wEU4nFb5GWHjb2agQ8uXuIoLYL9Rz52FJo7mRtDL59ADPTrhPC23Thp28CT30Nrky/XTUgvL8a3hdk4kpuNzFul9GoZZPJeyTkZyi5qBLS0lJqCTysj/zLXfH96t6CRvGZ0H5VR+4duB5SIqsojd5KJ/ya0n5AX1BHggMwJfrDibmbjTkAuJeQi/+yxHj8BP2sYkg2+iJ9s07TJGvTgnzsrGqPN/T6Djyny7zbRtaNeG/8ByPkQBgG77Z8AAAAASUVORK5CYII=";
-
+  // BEGIN VIDEO ICONS
+  // Generated by tools/icon/build_overlay_icons.mjs.
+  const VIDEO_ICONS = {
+    logo: "<svg width=\"128\" height=\"128\" viewBox=\"0 0 128 128\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g clip-path=\"url(#ORBIT_ICON_clip0_82_1366)\"><path d=\"M17.6408 45.2696C19.2304 41.3352 25.6392 39.5352 35.4573 40.2657C45.2754 40.9963 57.6985 44.1974 69.9937 49.165C82.2889 54.1326 93.4491 60.4597 101.019 66.7544C108.589 73.0491 111.949 78.7958 110.359 82.7303\" stroke-width=\"4\" stroke-linecap=\"round\" stroke=\"white\" stroke-opacity=\"0.38\"/><path d=\"M64 25C85.54 25 103 42.46 103 64C103 85.54 85.54 103 64 103C42.46 103 25 85.54 25 64C25 42.46 42.46 25 64 25ZM64 43C52.4 43 43 52.4 43 64C43 75.6 52.4 85 64 85C75.6 85 85 75.6 85 64C85 52.4 75.6 43 64 43Z\" fill-rule=\"evenodd\" clip-rule=\"evenodd\" fill=\"url(#ORBIT_ICON_paint0_linear_82_1366)\"/><path d=\"M110.359 82.7303C108.77 86.6648 102.361 88.4647 92.5428 87.7342C82.7247 87.0037 70.3016 83.8025 58.0064 78.8349C45.7111 73.8673 34.551 67.5402 26.981 61.2455C19.411 54.9508 16.0512 49.2041 17.6409 45.2697\" stroke-width=\"4.4\" stroke-linecap=\"round\" stroke=\"white\"/><path d=\"M110.4 94.8C117.027 94.8 122.4 89.4275 122.4 82.8C122.4 76.1726 117.027 70.8 110.4 70.8C103.772 70.8 98.3999 76.1726 98.3999 82.8C98.3999 89.4275 103.772 94.8 110.4 94.8Z\" fill=\"#FFB24A\" fill-opacity=\"0.22\"/><g filter=\"url(#ORBIT_ICON_filter0_d_82_1366)\"><path d=\"M110.4 89.6C114.156 89.6 117.2 86.5555 117.2 82.8C117.2 79.0445 114.156 76 110.4 76C106.645 76 103.6 79.0445 103.6 82.8C103.6 86.5555 106.645 89.6 110.4 89.6Z\" fill=\"#FFB24A\"/></g></g><defs><filter id=\"ORBIT_ICON_filter0_d_82_1366\" x=\"91.6001\" y=\"64\" width=\"37.6001\" height=\"37.6\" filterUnits=\"userSpaceOnUse\" color-interpolation-filters=\"sRGB\"><feFlood flood-opacity=\"0\" result=\"BackgroundImageFix\"/><feColorMatrix in=\"SourceAlpha\" type=\"matrix\" values=\"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0\" result=\"hardAlpha\"/><feOffset/><feGaussianBlur stdDeviation=\"6\"/><feColorMatrix type=\"matrix\" values=\"0 0 0 0 1 0 0 0 0 0.7 0 0 0 0 0.29 0 0 0 0.9 0\"/><feBlend mode=\"normal\" in2=\"BackgroundImageFix\" result=\"effect1_dropShadow_82_1366\"/><feBlend mode=\"normal\" in=\"SourceGraphic\" in2=\"effect1_dropShadow_82_1366\" result=\"shape\"/></filter><linearGradient id=\"ORBIT_ICON_paint0_linear_82_1366\" x1=\"34\" y1=\"26\" x2=\"94\" y2=\"102\" gradientUnits=\"userSpaceOnUse\"><stop stop-color=\"#CDD3FF\"/><stop offset=\"0.42\" stop-color=\"#AE7BF8\"/><stop offset=\"0.72\" stop-color=\"#EC5CB6\"/><stop offset=\"1\" stop-color=\"#FF9271\"/></linearGradient><clipPath id=\"ORBIT_ICON_clip0_82_1366\"><rect width=\"128\" height=\"128\" fill=\"white\"/></clipPath></defs></svg>",
+    audio: "<svg preserveAspectRatio=\"none\" overflow=\"visible\" style=\"display: block;\" width=\"16.02\" height=\"16.02\" viewBox=\"0 0 16.02 16.02\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M6.0075 12.015V3.3375L14.0175 2.0025V10.68\" stroke-width=\"1.335\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#7A748C\"/><path d=\"M6.0075 12.015C6.0075 13.121 5.11095 14.0175 4.005 14.0175C2.89905 14.0175 2.0025 13.121 2.0025 12.015C2.0025 10.909 2.89905 10.0125 4.005 10.0125C5.11095 10.0125 6.0075 10.909 6.0075 12.015Z\" stroke-width=\"1.335\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#7A748C\"/><path d=\"M14.0175 10.68C14.0175 11.786 13.121 12.6825 12.015 12.6825C10.909 12.6825 10.0125 11.786 10.0125 10.68C10.0125 9.57405 10.909 8.6775 12.015 8.6775C13.121 8.6775 14.0175 9.57405 14.0175 10.68Z\" stroke-width=\"1.335\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#7A748C\"/></g></svg>",
+    chevron: "<svg preserveAspectRatio=\"none\" overflow=\"visible\" style=\"display: block;\" width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M4.5 6.75L9 11.25L13.5 6.75\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#7A748C\"/></g></svg>",
+    close: "<svg preserveAspectRatio=\"none\" overflow=\"visible\" style=\"display: block;\" width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M5 5L13 13M13 5L5 13\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/></g></svg>",
+    cookie: "<svg preserveAspectRatio=\"none\" overflow=\"visible\" style=\"display: block;\" width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M15.5 9.2C15.4604 10.4677 15.0507 11.696 14.3216 12.7337C13.5924 13.7715 12.5756 14.5732 11.3964 15.0402C10.2173 15.5072 8.92724 15.619 7.6853 15.3618C6.44337 15.1047 5.30379 14.4898 4.40698 13.593C3.51017 12.6962 2.89532 11.5566 2.63818 10.3147C2.38103 9.07276 2.49284 7.78273 2.95981 6.60355C3.42679 5.42437 4.22853 4.40757 5.26625 3.67842C6.30398 2.94928 7.53234 2.53964 8.8 2.5C8.69836 2.87395 8.6973 3.26812 8.79693 3.64261C8.89655 4.0171 9.09333 4.35864 9.36735 4.63265C9.64136 4.90667 9.9829 5.10345 10.3574 5.20307C10.7319 5.3027 11.126 5.30164 11.5 5.2C11.2374 5.46264 11.029 5.77445 10.8869 6.11761C10.7447 6.46077 10.6716 6.82857 10.6716 7.2C10.6716 7.95015 10.9696 8.66957 11.5 9.2C12.0304 9.73043 12.7499 10.0284 13.5 10.0284C14.2501 10.0284 14.9696 9.73043 15.5 9.2Z\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#7A748C\"/><path d=\"M6.5 7.5H6.51M7 11.5H7.01M10.5 11H10.51\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#7A748C\"/></g></svg>",
+    download: "<svg preserveAspectRatio=\"none\" overflow=\"visible\" style=\"display: block;\" width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M9 11.25V2.25\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"white\"/><path d=\"M15.75 11.25V14.25C15.75 14.6478 15.592 15.0294 15.3107 15.3107C15.0294 15.592 14.6478 15.75 14.25 15.75H3.75C3.35218 15.75 2.97064 15.592 2.68934 15.3107C2.40804 15.0294 2.25 14.6478 2.25 14.25V11.25\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"white\"/><path d=\"M5.25 7.5L9 11.25L12.75 7.5\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"white\"/></g></svg>",
+    hide: "<svg preserveAspectRatio=\"none\" overflow=\"visible\" style=\"display: block;\" width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M10.6 13.2C10.1 13.4 9.6 13.5 9 13.5C4.9 13.5 2.5 9 2.5 9C2.5 9 4.9 4.5 9 4.5C13.1 4.5 15.5 9 15.5 9C15.5 9 14.7 10.5 13.2 11.8M2.5 9C2.5 9 3.2 7.7 4.5 6.5\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/><path d=\"M3 3L15 15\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/></g></svg>",
+    more: "<svg preserveAspectRatio=\"none\" overflow=\"visible\" style=\"display: block;\" width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M9.75 9C9.75 9.41421 9.41421 9.75 9 9.75C8.58579 9.75 8.25 9.41421 8.25 9C8.25 8.58579 8.58579 8.25 9 8.25C9.41421 8.25 9.75 8.58579 9.75 9Z\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/><path d=\"M15 9C15 9.41421 14.6642 9.75 14.25 9.75C13.8358 9.75 13.5 9.41421 13.5 9C13.5 8.58579 13.8358 8.25 14.25 8.25C14.6642 8.25 15 8.58579 15 9Z\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/><path d=\"M4.5 9C4.5 9.41421 4.16421 9.75 3.75 9.75C3.33579 9.75 3 9.41421 3 9C3 8.58579 3.33579 8.25 3.75 8.25C4.16421 8.25 4.5 8.58579 4.5 9Z\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/></g></svg>",
+    settings: "<svg preserveAspectRatio=\"none\" overflow=\"visible\" style=\"display: block;\" width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M15 5.25H8.25\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/><path d=\"M10.5 12.75H3.75\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/><path d=\"M15 12.75C15 13.9926 13.9926 15 12.75 15C11.5074 15 10.5 13.9926 10.5 12.75C10.5 11.5074 11.5074 10.5 12.75 10.5C13.9926 10.5 15 11.5074 15 12.75Z\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/><path d=\"M7.5 5.25C7.5 6.49264 6.49264 7.5 5.25 7.5C4.00736 7.5 3 6.49264 3 5.25C3 4.00736 4.00736 3 5.25 3C6.49264 3 7.5 4.00736 7.5 5.25Z\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/></g></svg>",
+    site: "<svg preserveAspectRatio=\"none\" overflow=\"visible\" style=\"display: block;\" width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g clip-path=\"url(#ORBIT_ICON_clip0_0_61)\"><path d=\"M16.5 9C16.5 13.1421 13.1421 16.5 9 16.5C4.85786 16.5 1.5 13.1421 1.5 9C1.5 4.85786 4.85786 1.5 9 1.5C13.1421 1.5 16.5 4.85786 16.5 9Z\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/><path d=\"M9 1.5C7.07418 3.52212 6 6.20756 6 9C6 11.7924 7.07418 14.4779 9 16.5C10.9258 14.4779 12 11.7924 12 9C12 6.20756 10.9258 3.52212 9 1.5Z\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/><path d=\"M1.5 9H16.5\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/></g><defs><clipPath id=\"ORBIT_ICON_clip0_0_61\"><rect width=\"18\" height=\"18\" fill=\"white\"/></clipPath></defs></svg>",
+    subtitles: "<svg preserveAspectRatio=\"none\" overflow=\"visible\" style=\"display: block;\" width=\"18\" height=\"18\" viewBox=\"0 0 18 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M5 4H13C14.3807 4 15.5 5.11929 15.5 6.5V11.5C15.5 12.8807 14.3807 14 13 14H5C3.61929 14 2.5 12.8807 2.5 11.5V6.5C2.5 5.11929 3.61929 4 5 4Z\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/><path d=\"M7.6 7.6C7.3357 7.38641 7.01634 7.252 6.67885 7.21232C6.34136 7.17263 5.99953 7.22929 5.69289 7.37574C5.38626 7.52218 5.12734 7.75244 4.94608 8.03988C4.76482 8.32731 4.66863 8.66019 4.66863 9C4.66863 9.33981 4.76482 9.67269 4.94608 9.96012C5.12734 10.2476 5.38626 10.4778 5.69289 10.6243C5.99953 10.7707 6.34136 10.8274 6.67885 10.7877C7.01634 10.748 7.3357 10.6136 7.6 10.4M12.1 7.6C11.8357 7.38641 11.5163 7.252 11.1788 7.21232C10.8414 7.17263 10.4995 7.22929 10.1929 7.37574C9.88626 7.52218 9.62734 7.75244 9.44608 8.03988C9.26482 8.32731 9.16863 8.66019 9.16863 9C9.16863 9.33981 9.26482 9.67269 9.44608 9.96012C9.62734 10.2476 9.88626 10.4778 10.1929 10.6243C10.4995 10.7707 10.8414 10.8274 11.1788 10.7877C11.5163 10.748 11.8357 10.6136 12.1 10.4\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/></g></svg>",
+    video: "<svg preserveAspectRatio=\"none\" overflow=\"visible\" style=\"display: block;\" width=\"16.02\" height=\"16.02\" viewBox=\"0 0 16.02 16.02\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><g><path d=\"M10.68 8.6775L14.1664 11.0017C14.2166 11.0352 14.275 11.0544 14.3353 11.0573C14.3956 11.0601 14.4556 11.0466 14.5088 11.0181C14.562 10.9896 14.6065 10.9472 14.6375 10.8954C14.6686 10.8437 14.685 10.7844 14.685 10.7241V5.25323C14.685 5.1945 14.6695 5.13681 14.6401 5.08598C14.6107 5.03515 14.5684 4.99298 14.5175 4.96373C14.4666 4.93448 14.4088 4.91918 14.3501 4.91938C14.2914 4.91958 14.2338 4.93527 14.183 4.96487L10.68 7.00875\" stroke-width=\"1.335\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/><path d=\"M2.67 4.005H9.345C10.0823 4.005 10.68 4.6027 10.68 5.34V10.68C10.68 11.4173 10.0823 12.015 9.345 12.015H2.67C1.9327 12.015 1.335 11.4173 1.335 10.68V5.34C1.335 4.6027 1.9327 4.005 2.67 4.005Z\" stroke-width=\"1.335\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke=\"#A8A3B8\"/></g></svg>",
+  };
+  // END VIDEO ICONS
   const t = (key, ...subs) =>
     ext.i18n.getMessage(key, subs) || (FALLBACK[key] || key).replace(/\$(\d)/g, (_, n) => subs[n - 1] ?? "");
   const FALLBACK = {
     video_download: "Download video",
+    video_download_short: "Download",
     video_more: "More options",
+    video_choose_quality: "Choose download quality",
+    video_close_panel: "Close download panel",
+    video_more_qualities: "$1 more",
+    video_fewer_qualities: "Show fewer qualities",
+    video_download_audio: "Download audio",
+    video_never_site: "Never on $1",
     video_hide_here: "Hide on this video",
     video_settings: "Button settings...",
     video_sent: "Sent to Orbit Download Manager",
@@ -51,22 +74,22 @@
     video_drm: "Protected video",
     video_cant_save: "can't be saved",
     video_unnamed: "Can't tell which video this is: open its own page and try there",
-    video_open_post: "Open the post to download it",
+    video_open_post: "Orbit couldn't identify this video in the feed",
     video_open_post_button: "Open post",
-    video_drag_dots: "Drag the dots to move it along the edge",
+    video_drag_dots: "Drag to move the button along the edge",
     video_tip: "Download $1",
-    video_sending: "Sending to MDM...",
-    video_added: "Added to MDM",
+    video_sending: "Sending to Orbit...",
+    video_added: "Added to Orbit",
     video_show: "Show",
-    video_no_answer: "MDM didn't answer",
-    video_get_mdm: "Get MDM",
+    video_no_answer: "Orbit didn't answer",
+    video_get_odm: "Get Orbit",
     video_retry: "Retry",
     video_turn_on: "Turn on",
-    video_original: "original",
+    video_original: "Original",
     video_compatible: "Most compatible",
     video_default_quality: "Default",
     video_use_site_cookies: "Use site cookies",
-    video_all_qualities: "All qualities and subtitles...",
+    video_all_qualities: "All qualities & subtitles",
     video_looking: "Looking up the qualities…",
     video_no_choices: "No video to download here",
     video_playlist: "A list of videos: choose them in Orbit Download Manager",
@@ -258,7 +281,7 @@
       took = now() - asked;
       if (!alive() || !r || r.gone) return null;
       if (r.late) return { state: "late" };
-      // Another MDM chosen meanwhile: the window, as for a click.
+      // Another ODM chosen meanwhile: the window, as for a click.
       s = r.fallback ? { state: "use-window" } : r.lookup;
     }
   }
@@ -266,7 +289,7 @@
   // The background's answer to a lookup or to a choice, as a lookup's state: null when there is
   // nothing to show (the extension gone); "late" past the minute, "unnamed" for a video it can't
   // tell, "feed" for a video in a feed no post names (#689), and "use-window" for no lookups here
-  // (another MDM, an older one) or an answer that isn't one.
+  // (another ODM, an older one) or an answer that isn't one.
   function replyState(r) {
     if (r && r.gone) return null;
     if (r && r.late) return { state: "late" };
@@ -277,7 +300,7 @@
 
   // Whether what the tab played is worth asking for (#1092), after a look-up's state `s`: the page
   // found nothing (a feed no post names, a failure, no qualities), not a list, nor a look-up that
-  // didn't happen (busy, off, too late, another MDM) or that YouTube's player answers for.
+  // didn't happen (busy, off, too late, another ODM) or that YouTube's player answers for.
   function playedWanted(s) {
     const state = s && typeof s === "object" ? s.state : "";
     return state === "feed" || state === "failed" || (state === "ready" && !(Array.isArray(s.choices) && s.choices.length));
@@ -285,7 +308,7 @@
 
   // The app's word on what the look-up lacked, to show with its qualities (#852: YouTube without
   // a JavaScript runtime lists only some): its text, its link's words and the help page it
-  // opens, on MDM's own site only. Null when there is none (an app older than it) or it isn't one.
+  // opens, on ODM's own site only. Null when there is none (an app older than it) or it isn't one.
   function noticeOf(s) {
     const n = s && typeof s === "object" ? s.notice : null;
     if (!n || typeof n !== "object" || typeof n.text !== "string" || !n.text.trim()) return null;
@@ -359,25 +382,47 @@
   // The nearest container around the video that names its post: `read(node)` gives what a
   // container names, { sure, maybe } (Maps of an id to the address it stands for), `sure` the
   // post's or the video's own ids, `maybe` weaker ones (a link that may be the post's). The
-  // innermost container naming anything decides, and only when it names exactly one: one naming
-  // two has taken in the next post or the page's column, and a wrong video is worse than none.
-  // The walk ends at the page's column (a feed, role="feed") and at a container holding another
-  // video: from there up, what it names may be that one's (a post naming nothing next to one
-  // that names its own). A page that breaks a reader's expectations names nothing (never the
-  // page's own address instead).
-  function nearest(v, read) {
+  // innermost container with a reliable address decides. In a post, keep looking for its
+  // timestamp or explicit permalink before using a weaker link.
+  function nearest(v, read, card = null) {
+    let weak = null;
     try {
       for (let node = v, i = 0; node && i < 16; i += 1, node = upFrom(node)) {
         if (node.localName === "body" || node.localName === "html") break;
-        if (node !== v && (node.getAttribute?.("role") === "feed" || manyVideos(node))) break;
+        if (node !== v && (node.getAttribute?.("role") === "feed" ||
+            (!card && (node.localName === "main" || manyVideos(node))))) break;
         const { sure, maybe } = read(node);
         if (sure.size) return sure.size === 1 ? [...sure.values()][0] : null;
-        if (maybe.size) return maybe.size === 1 ? [...maybe.values()][0] : null;
+        if (maybe.size && !weak) weak = maybe;
+        if (node === card || (!card && weak)) break;
       }
     } catch {
-      // Nothing named.
+      return null;
+    }
+    return weak?.size === 1 ? [...weak.values()][0] : null;
+  }
+
+  function isPostCard(node) {
+    const role = node.getAttribute?.("role");
+    const kind = node.getAttribute?.("data-testid");
+    return node.localName === "article" || role === "article" || kind === "tweet" || kind === "quoteTweet" ||
+      (role === "link" && node.localName !== "a" && Boolean(node.querySelector?.('[data-testid="User-Name"]')));
+  }
+
+  function postCard(v) {
+    for (let node = upFrom(v), i = 1; node && i < 16; i += 1, node = upFrom(node)) {
+      if (node.getAttribute?.("role") === "feed" || node.localName === "main") break;
+      if (isPostCard(node)) return node;
     }
     return null;
+  }
+
+  function inNestedPost(link, scope, quotes = false) {
+    if (link === scope) return false;
+    for (let node = upFrom(link); node && node !== scope; node = upFrom(node)) {
+      if (isPostCard(node) || (quotes && node.localName !== "a" && node.getAttribute?.("role") === "link")) return true;
+    }
+    return false;
   }
 
   const decoded = (s) => {
@@ -395,7 +440,7 @@
     const own = node.localName === "a" ? [node] : [];
     for (const a of [...own, ...(node.querySelectorAll ? node.querySelectorAll(sel) : [])]) {
       const u = linkTo(a.getAttribute && a.getAttribute("href"));
-      if (u && /^https?:$/.test(u.protocol)) found.push({ u, time: Boolean(a.querySelector && a.querySelector("time")) });
+      if (u && /^https?:$/.test(u.protocol)) found.push({ u, a, time: Boolean(a.querySelector && a.querySelector("time")) });
     }
     return found;
   }
@@ -411,20 +456,17 @@
       // A site's own player in another page (an embed) is its video's page: its address holds
       // what the links around it may lack (a private video's key).
       if (site.embed && site.embed(url)) return location.href;
-      const found = nearest(v, (node) => site.read(node, url));
+      const found = nearest(v, (node) => site.read(node, url), site.postCards ? postCard(v) : null);
       if (found) return found;
       // The page's own, or the one video its address opens over it (Douyin's ?modal_id=).
       return site.own(url) ? location.href : (site.opened && site.opened(url)) || null;
     }
-    // Any other site: a player embedded in another page (its own frame), or the one video of its
-    // page, is its video's own page, as before.
-    if (framed() || (!inFeed(v) && document.querySelectorAll?.("video").length <= 1)) return location.href;
-    // A page of many videos: the post around this one, when one names it; else the page in
-    // general (an article with two players is still theirs to yt-dlp), but never a feed's
-    // (role="feed") or a page whose address is a feed's, a home's or a search's.
-    const found = nearest(v, (node) => genericRead(node, url));
-    if (found) return found;
-    return inFeed(v) || FEED_PATH.test(url.pathname) ? null : location.href;
+    if (framed()) return location.href;
+    const feed = inFeed(v) || FEED_PATH.test(url.pathname);
+    // Feed pages can reuse one player across posts. Resolve that player within its nearest card.
+    if (!feed && document.querySelectorAll?.("video").length <= 1) return location.href;
+    const found = nearest(v, (node) => genericRead(node, url), postCard(v));
+    return found || (feed ? null : location.href);
   }
 
   // A feed's, a home page's, a search's address: many videos, none of them the page's.
@@ -450,15 +492,20 @@
     const sure = new Map();
     const maybe = new Map();
     const here = `${url.origin}${url.pathname}${url.search}`;
-    for (const { u, time } of linksIn(node)) {
+    for (const { u, a, time } of linksIn(node)) {
       if (siteName(u.hostname) !== siteName(url.hostname)) continue;
+      if (inNestedPost(a, node)) continue;
       const address = `${u.origin}${u.pathname}${u.search}`;
       if (address === here) continue;
       if (time) sure.set(address, address);
-      else if (/\/(?:status|statuses|videos?|watch|posts?|p|reels?|comments|clips?|v)(?:\/|\?|$)/i.test(u.pathname + (u.search ? "?" : ""))) maybe.set(address, address);
+      else if (/\/(?:status|statuses|videos?|watch|posts?|p|reels?|comments|clips?|v)(?:\/|\?|$)/i.test(u.pathname + (u.search ? "?" : ""))) {
+        (a === node ? sure : maybe).set(address, address);
+      }
     }
-    const permalink = linkTo(node.getAttribute?.("data-permalink"));
-    if (permalink && siteName(permalink.hostname) === siteName(url.hostname)) sure.set(permalink.href, permalink.href);
+    const permalink = linkTo(node.getAttribute?.("data-permalink") || node.getAttribute?.("itemid"));
+    if (permalink && /^https?:$/.test(permalink.protocol) && siteName(permalink.hostname) === siteName(url.hostname)) {
+      sure.set(permalink.href, permalink.href);
+    }
     return { sure, maybe };
   }
 
@@ -489,6 +536,8 @@
 
   // The big sites with feeds: what names a post in their pages, the address yt-dlp reads it by
   // (its extractors' own address shapes), and their pages that are one video's own.
+  const X_STATUS = /^\/(?:(\w{1,15}|i\/web)\/status|statuses)\/(\d+)(?:\/video\/([1-9]\d*))?(?:\/|$)/;
+  const INSTAGRAM_POST = /^(?:\/[\w.]+)?\/(p|tv|reels?)\/(?!audio(?:\/|$))([\w-]{5,})(?:\/|$)/;
   const SITES = [
     {
       // A post's container carries its URN (data-urn, data-id); its links name it too. yt-dlp's
@@ -575,36 +624,52 @@
         (!/^\/watch\/?$/.test(u.pathname) || /^\d+$/.test(u.searchParams.get("v") || "")),
     },
     {
-      // A post's timestamp links to it (/<user>/status/<id>); other status links (a quoted post,
-      // its photos and its analytics) count only when there is no timestamp.
+      // The outer post's timestamp and any link wrapped around the selected player identify it.
       hosts: /^(?:x|twitter)\.com$/,
+      postCards: true,
       read(node) {
         const sure = new Map();
         const maybe = new Map();
-        for (const { u, time } of linksIn(node, 'a[href*="/status/"]')) {
-          const m = /^\/(\w{1,15}|i\/web)\/status\/(\d+)/.exec(u.pathname);
-          if (!m || !/(^|\.)(?:x|twitter)\.com$/.test(u.hostname)) continue;
-          (time ? sure : maybe).set(m[2], `${location.origin}/${m[1]}/status/${m[2]}`);
+        const add = (u, certain, media = false) => {
+          const m = u && /^https?:$/.test(u.protocol) && /^(?:x|twitter)\.com$/.test(siteName(u.hostname)) && X_STATUS.exec(u.pathname);
+          if (!m) return;
+          const [, user, id, index] = m;
+          const suffix = media && index ? `/video/${index}` : "";
+          (certain ? sure : maybe).set(id, `${location.origin}/${user || "i/web"}/status/${id}${suffix}`);
+        };
+        for (const { u, a, time } of linksIn(node, 'a[href*="/status/"], a[href*="/statuses/"]')) {
+          if (!inNestedPost(a, node, true)) add(u, time || a === node, a === node);
         }
+        add(linkTo(node.getAttribute?.("data-permalink")), true, true);
+        const id = node.getAttribute?.("data-tweet-id");
+        if (!sure.size && /^\d{10,}$/.test(id || "")) sure.set(id, `${location.origin}/i/web/status/${id}`);
         return { sure, maybe };
       },
-      own: (u) => /^\/(?:\w{1,15}|i\/web)\/status\/\d+|^\/i\/(?:broadcasts|spaces)\//.test(u.pathname),
+      own: (u) => X_STATUS.test(u.pathname) || /^\/i\/(?:broadcasts|spaces)\//.test(u.pathname),
     },
     {
       // A post's links (/p/<code>/, a reel's /reel/<code>/): its timestamp, its comments.
       hosts: /^instagram\.com$/,
+      postCards: true,
       embed: (u) => /\/embed\/?$/.test(u.pathname),
       read(node) {
         const sure = new Map();
-        for (const { u } of linksIn(node)) {
-          // Not a reel's sound (/reels/audio/<id>/, the other reels using it).
-          const m = /^(?:\/[\w.]+)?\/(p|tv|reels?)\/(?!audio\/)([\w-]{5,})/.exec(u.pathname);
-          if (!m || !/instagram\.com$/.test(u.hostname)) continue;
-          sure.set(m[2], `https://www.instagram.com/${m[1] === "tv" ? "p" : m[1].replace(/s$/, "")}/${m[2]}/`);
+        const maybe = new Map();
+        const add = (u, certain) => {
+          const m = u && /^https?:$/.test(u.protocol) && siteName(u.hostname) === "instagram.com" && INSTAGRAM_POST.exec(u.pathname);
+          if (!m) return;
+          const type = m[1].startsWith("reel") ? "reel" : "p";
+          (certain ? sure : maybe).set(m[2], `https://www.instagram.com/${type}/${m[2]}/`);
+        };
+        for (const { u, a, time } of linksIn(node)) {
+          if (!inNestedPost(a, node)) add(u, time || a === node);
         }
-        return { sure, maybe: new Map() };
+        add(linkTo(node.getAttribute?.("data-permalink") || node.getAttribute?.("itemid")), true);
+        const code = node.getAttribute?.("data-shortcode");
+        if (!sure.size && /^[\w-]{5,}$/.test(code || "")) sure.set(code, `https://www.instagram.com/p/${code}/`);
+        return { sure, maybe };
       },
-      own: (u) => /^(?:\/[\w.]+)?\/(?:p|tv|reels?)\/[\w-]{5,}|^\/stories\/[^/]+\/\d/.test(u.pathname),
+      own: (u) => INSTAGRAM_POST.test(u.pathname) || /^\/stories\/[^/]+\/\d/.test(u.pathname),
     },
     {
       // A post (shreddit-post, old Reddit's .thing) names its permalink in its attributes; its
@@ -877,10 +942,9 @@
   const ASK_MS = 5000;
   const answered = () => allowed !== null && Date.now() - askedAt < ASK_MS;
   let place = { x: 1, y: 0 }; // where on the edge: fractions of the room, top right by default
-  let chosen = false; // the user put it where it is (dragged it, on this site): theirs, never moved for a page's control
-  let auto = { v: null, at: null, t: 0 }; // the spot found for this video, kept for a moment
+  let auto = null; // the spot found for this video, kept for a moment
   const AUTO_MS = 400;
-  // Where it is on the screen, while the pointer is on it (#560): { v, left, top, w, end }.
+  // The current screen anchor. It stays steady while it still fits its player.
   let pinned = null;
   let video = null; // the video it is over
   // A video gone from under its button (#503): a hover-to-play preview (YouTube's thumbnails)
@@ -894,12 +958,14 @@
   let entered = null; // what download would send, taken as the pointer reached the button: { v, d, t }
   let lastMove = 0;
   let pointer = { x: -1, y: -1 };
+  let awaitingPointer = false;
   let menuOpen = false;
   let menuAbove = null;
   let dragging = null;
   let busy = false;
   let raf = 0;
   let scan = 0;
+  let previewTimer = 0;
   // Kept on screen while the keyboard is on it (not after a mouse click: that leaves focus too),
   // or on the video's player (its own controls).
   const keyboardOn = () =>
@@ -910,43 +976,39 @@
       focusedPlayer.contains(video) && focusedPlayer.matches(":focus-visible"));
 
   // ---- the button: a closed shadow tree the page's styles and scripts can't reach ----------
-  const root = document.createElement("mdm-video-button");
+  const root = document.createElement("odm-video-button");
   // Each with !important: a page's own rules can't hide or move it.
   for (const [k, v] of Object.entries({
     all: "initial", position: "fixed", "z-index": "2147483647", left: "0", top: "0", display: "none",
     contain: "layout style", opacity: "1", visibility: "visible", "pointer-events": "auto",
   })) root.style.setProperty(k, v, "important");
   const shadow = root.attachShadow({ mode: "closed" });
-  // It sits on the video like the player's own controls: dark frosted glass that reads over any
-  // frame (bright ones too), MDM's one blue for the action, and its own colour for each thing that
-  // stops it (green done, amber the user's step, red MDM's problem, grey can't by design). Start
-  // and end, never left and right: a right-to-left language mirrors it whole.
   const CSS = `
 :host { all: initial; }
 * { box-sizing: border-box; }
-.pill, .menu, .tip, .guide {
-  --go: #57cc5a; --go-hi: #47b94a; --go-ink: #08200b; --stamp: #1b7a26; --accent: #1b7a26;
-  --ok: #1b7a26; --warn: #8a5300; --err: #c42b1c; --warn-dot: #F7B500;
-  --bg: #fcfcfb; --bg2: #eef1f5; --bd: #c4ccd8; --tx: #111318; --tx2: #5f6676; --hov: rgba(87, 204, 90, .16);
-  --sh: 0 1px 2px rgba(17, 19, 24, .18), 0 6px 14px rgba(17, 19, 24, .18);
-  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
+[hidden] { display: none !important; }
+.pill, .menu, .extras, .tip, .guide {
+  color-scheme: dark;
+  --go: #ad7af7; --go-hi: #c299fa; --go-ink: #21143c; --accent: #e0c8ff;
+  --ok: #3dd68c; --warn: #ffd36b; --err: #ff9baa; --warn-dot: #ffb24a;
+  --bg: #1a1724; --bd: #ffffff24; --tx: #f4f2fa; --tx2: #c2bbd0; --hov: #ffffff14;
+  --glass: linear-gradient(#ffffff1a, #ffffff05), #161227;
+  --sh: inset 0 1px #ffffff17, 0 24px 60px -8px #05030f73;
+  --font: "Segoe UI", system-ui, sans-serif;
 }
-/* Windows (the system) in dark mode, not the page: MDM's navy board; the green stays. */
-@media (prefers-color-scheme: dark) {
-  .pill, .menu, .tip, .guide {
-    --accent: #7fe07f; --ok: #7fe07f; --warn: #ffd36b; --err: #ff99a4;
-    --bg: #0c1a33; --bg2: #081226; --bd: #2a3d63; --tx: #f2f5fb; --tx2: #b7c3da; --hov: rgba(87, 204, 90, .18);
-    --sh: 0 2px 4px rgba(0, 0, 0, .45), 0 8px 16px rgba(0, 0, 0, .45);
+@supports (backdrop-filter: blur(20px)) {
+  .pill, .menu, .extras {
+    /* Keep the tint readable even over a white frame. */
+    --glass: linear-gradient(#ffffff1a, #ffffff05), #161227cc;
+    backdrop-filter: blur(20px);
   }
+  .pill { backdrop-filter: blur(12px); }
 }
-[dir="rtl"] { --font: "Segoe UI", "Segoe UI Variable Text", system-ui, -apple-system, Roboto, "Noto Sans Arabic", "Noto Sans", sans-serif; }
-/* The tab: a light raised frame at the video's edge; the Download part in green, the arrow and
-   the close (hide on this video) beside it, each its own square button. */
 .pill {
-  display: inline-flex; align-items: stretch; gap: 3px; height: 30px; padding: 2px;
-  background: linear-gradient(var(--bg), var(--bg2)); border: 1px solid var(--bd); border-radius: 5px;
-  box-shadow: var(--sh); color: var(--tx);
-  font: 400 12px/1 var(--font); white-space: nowrap;
+  display: inline-flex; align-items: stretch; height: ${BUTTON_SIZE}px; min-width: ${BUTTON_SIZE}px;
+  background: var(--glass); border: 1px solid var(--bd); border-radius: 15px;
+  box-shadow: inset 0 1px #ffffff20, 0 6px 9px #0005; color: var(--tx);
+  font: 500 13px/1 var(--font); white-space: nowrap;
   opacity: 0; transform: translateY(-2px);
   transition: opacity .14s ease-out, transform .14s ease-out;
   user-select: none; -webkit-user-select: none; touch-action: none;
@@ -958,51 +1020,39 @@ button {
   all: unset; box-sizing: border-box; display: inline-flex; align-items: center;
   color: inherit; cursor: pointer; font: inherit;
 }
-.go { gap: 6px; padding-inline: 5px 9px; border-radius: 3px; cursor: grab; }
-.pill:not(.bare) .go { background: var(--go); color: var(--go-ink); box-shadow: inset 0 -1px 0 rgba(0, 0, 0, .14); }
-.pill:not(.bare) .go:hover { background: var(--go-hi); }
-.pill:not(.bare) .go .label { font-weight: 700; }
-.more, .x { width: 22px; justify-content: center; flex: none; color: var(--tx2);
-  border: 1px solid var(--bd); border-radius: 3px; background: var(--bg); }
-.more:hover, .x:hover, .more[aria-expanded="true"] { background: var(--hov); color: var(--tx); }
-.more svg, .x svg { width: 10px; height: 10px; }
+.go { flex: 1; min-width: 0; gap: 6px; padding-inline: 5px 7px; border-radius: 14px; cursor: grab; }
+.pill:not(.bare) .go:hover, .more:hover, .more[aria-expanded="true"] { background: var(--hov); }
+.more { position: relative; width: 28px; justify-content: center; flex: none; color: var(--tx2); border-radius: 0 14px 14px 0; }
+[dir="rtl"] .more { border-radius: 14px 0 0 14px; }
+.more::before { content: ""; position: absolute; inset-inline-start: 0; height: 14px; border-inline-start: 1px solid var(--bd); }
+.more svg { width: 14px; height: 14px; }
 .more[aria-expanded="true"] svg { transform: rotate(180deg); }
-/* The keyboard's ring: a dark one, outside the frame. */
-.pill:has(button:focus-visible) { outline: 2px solid var(--tx); outline-offset: 2px; }
-button:focus-visible { outline: none; }
-.more:focus-visible, .x:focus-visible, .act:focus-visible { box-shadow: 0 0 0 1px var(--tx) inset; }
-/* Its grip: there all along (the tab keeps its width: the arrow and ✕ never move from under the
-   pointer), seen while the pointer is on it. */
-.grip { display: grid; visibility: hidden; grid-template-columns: repeat(2, 2px); gap: 2px; align-content: center; padding-inline-start: 1px; }
-.grip i { display: block; width: 2px; height: 2px; border-radius: 1px; background: currentColor; opacity: .55; }
-.pill:not(.bare):hover .grip, .pill.dragging .grip { visibility: visible; }
-.pill.bare .grip { display: none; }
+button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid #e0c8ff; outline-offset: -2px; }
+.pill:not(:is(:hover, :focus-within, .expanded, .measuring, .dragging, .bare)) :is(.label, .chip, .more) { display: none; }
+.pill:not(:is(:hover, :focus-within, .expanded, .measuring, .dragging, .bare)) .go { padding-inline: 5px; }
 .icon { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex: none; }
 .icon > * { display: none; }
-.icon img { width: 18px; height: 18px; }
 .icon svg { width: 16px; height: 16px; }
+.icon .logo { width: 18px; height: 18px; }
 .pill[data-state="ready"] .icon .logo, .pill[data-state="looking"] .icon .logo,
 .pill[data-state="sending"] .icon .spin, .pill[data-state="sent"] .icon .i-sent,
 .pill[data-state="warn"] .icon .i-warn, .pill[data-state="err"] .icon .i-err,
 .pill[data-state="off"] .icon .i-off, .pill[data-state="drm"] .icon .i-drm { display: block; }
-.spin { width: 14px !important; height: 14px !important; border-radius: 50%; border: 2px solid rgba(8, 32, 11, .25); border-top-color: var(--go-ink);
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--bd); border-top-color: var(--accent);
   animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-.chip { font: 700 10.5px/15px var(--font); color: var(--go-ink); background: rgba(255, 255, 255, .55); border-radius: 3px; padding: 0 4px; }
-.chip.skel { width: 30px; height: 15px; padding: 0; background-size: 200% 100%;
-  background-image: linear-gradient(90deg, rgba(255, 255, 255, .3), rgba(255, 255, 255, .8), rgba(255, 255, 255, .3));
+.chip { flex: none; font: 500 12px/15px var(--font); color: var(--tx2); }
+.chip.skel { width: 30px; height: 12px; border-radius: 4px; background-size: 200% 100%;
+  background-image: linear-gradient(90deg, var(--hov), #fff4, var(--hov));
   animation: shimmer 1.4s linear infinite; }
 .chip:empty:not(.skel), .sub:empty, .label:empty, .acts:empty { display: none; }
-.label { font-weight: 600; }
+.label { overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 .sub { color: var(--tx2); }
-/* A state says what happened in its own colour, on the frame (the green is for Download and
-   arrived only). */
 .pill[data-state="sent"] .label { color: var(--ok); }
 .pill[data-state="warn"] .label { color: var(--warn); }
 .pill[data-state="err"] .label { color: var(--err); }
 .pill[data-state="off"] .label, .pill[data-state="drm"] .label { color: var(--tx2); }
-.pill[data-state="sending"] .go { background: var(--go); color: var(--go-ink); }
 .pill[data-state="sending"] .label { font-weight: 700; }
 .acts { display: inline-flex; align-items: center; gap: 2px; padding-inline-end: 4px; }
 .act { font: 600 11.5px/1 var(--font); color: var(--accent); padding: 4px 6px; border-radius: 4px; }
@@ -1011,16 +1061,14 @@ button:focus-visible { outline: none; }
 .act.fill:hover { background: var(--go-hi); }
 .pill.bare .go { cursor: default; padding-inline-end: 4px; }
 .pill.bare .more { display: none; }
-/* Small video, or words that wouldn't fit: the logo in green, the arrow, the close; a state keeps
-   its message and its main action. */
+/* Small players keep the mark and disclosure; status text remains visible. */
 .pill.compact .chip, .pill.compact .sub, .pill.compact .act:not(.fill) { display: none; }
 .pill.compact:not(.bare) .label { display: none; }
-.pill.compact:not(.bare) .go { padding-inline: 4px; }
 .pill.dragging { cursor: grabbing; transition: none; transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, .25), 0 16px 32px rgba(0, 0, 0, .3); }
 .pill.dragging .go { cursor: grabbing; }
 /* The hover tip: exactly what one click gets, and how to move it. */
-.tip { position: absolute; top: 36px; left: 0; max-width: 320px; width: max-content; padding: 6px 9px; border-radius: 6px;
+.tip { position: absolute; left: 0; max-width: calc(100vw - 16px); width: max-content; padding: 6px 9px; border-radius: 8px;
   pointer-events: none; background: var(--bg); color: var(--tx); border: 1px solid var(--bd); box-shadow: var(--sh);
   font: 400 11.5px/1.45 var(--font); white-space: normal; display: none; }
 .tip.on { display: block; }
@@ -1034,44 +1082,74 @@ button:focus-visible { outline: none; }
 .line.v { width: 0; border-inline-start: 1.5px dashed rgba(255, 255, 255, .75); }
 .snap { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%;
   border: 2px solid #fff; background: var(--go); }
-/* The list: paper white (MDM's navy board in dark mode), one line per quality. */
-.menu {
-  position: absolute; width: 318px; max-width: calc(100vw - 16px); padding: 4px; border-radius: 6px;
-  background: var(--bg); color: var(--tx); border: 1px solid var(--bd); box-shadow: var(--sh);
-  font: 400 12px/1.2 var(--font); display: none; white-space: nowrap;
-  overflow-y: auto; overscroll-behavior: contain;
+.menu, .extras {
+  position: absolute; max-width: calc(100vw - 16px); border: 1px solid var(--bd);
+  background: var(--glass); color: var(--tx); box-shadow: var(--sh);
+  font: 500 13px/1.25 var(--font); overscroll-behavior: contain; scrollbar-width: thin;
 }
-.menu.open { display: block; }
+.menu { width: 340px; padding: 10px; border-radius: 20px; display: none; overflow-y: auto; }
+.menu.open { display: flex; flex-direction: column; gap: 10px; }
+.menu > :not(.rows) { flex: none; }
 .menu.above { transform: translateY(calc(-100% - 6px)); }
-.menu:focus { outline: none; }
-.mh { display: flex; gap: 8px; align-items: center; padding: 6px 8px 7px; }
-.mh img { width: 18px; height: 18px; flex: none; }
-.mh .t { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
-.mh .s { display: block; color: var(--tx2); font-size: 11px; margin-top: 2px; }
-.hr { height: 1px; background: var(--bd); margin: 4px 2px; }
-.cap { font: 600 10.5px/1 var(--font); color: var(--tx2); padding: 6px 8px 2px; letter-spacing: .2px; text-transform: uppercase; }
-.cap[hidden] { display: none; }
-.note { padding: 6px 8px; color: var(--tx2); white-space: normal; }
-.note[hidden] { display: none; }
+.mh { display: flex; gap: 10px; align-items: center; padding: 4px 2px 0 4px; }
+.mh .tile { display: block; width: 34px; height: 34px; flex: none; border-radius: 8.5px; border: 1px solid #ffffff1a;
+  background: linear-gradient(135deg, #211c45, #0d0a1f); }
+.mh .heading { flex: 1; min-width: 0; }
+.mh :is(.t, .s), .rows :is(.q, .rest), .extra-label, .menu-cookies span, .confirm-label {
+  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mh .t { font-weight: 600; }
+.mh .s { color: var(--tx2); font-size: 11.5px; margin-top: 2px; }
+.glass-icon { display: block; flex: none; pointer-events: none; }
+.glass-button { flex: none; justify-content: center; width: 30px; height: 30px; border-radius: 10px; background: #ffffff0f; }
+.glass-button:hover, .glass-button[aria-expanded="true"] { background: #ffffff26; }
+.segments { display: flex; gap: 2px; padding: 3px; border-radius: 13px; background: #ffffff0f; }
+.segments button { justify-content: center; flex: 1; gap: 6px; min-width: 0; min-height: 32px;
+  border-radius: 10px; color: var(--tx2); font-size: 12.5px; }
+.segments button[aria-pressed="true"] { color: var(--tx); background: #ffffff21; box-shadow: inset 0 1px #ffffff1f; font-weight: 600; }
+.segments button:disabled { opacity: .5; cursor: default; }
+.segments .count { font-size: 11px; color: var(--tx2); }
+.divider { height: 1px; background: #ffffff14; }
+.note { padding: 4px 8px; color: var(--tx2); }
 .note .why { display: block; margin-top: 3px; font-size: 11px; overflow-wrap: anywhere; }
 .note.warn { color: var(--warn); }
 .note a { display: inline-block; margin-top: 3px; color: var(--accent); text-decoration: underline; }
-.rows { max-height: min(300px, 45vh); overflow: auto; overscroll-behavior: contain; }
-.menu button { position: relative; display: flex; width: 100%; height: 28px; gap: 8px; padding-inline: 8px; border-radius: 4px; cursor: default; }
-.menu button:hover { background: var(--hov); }
-.menu button.sel { background: var(--hov); }
-.menu button.sel::before { content: ""; position: absolute; inset-inline-start: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--go); }
-.menu .q { flex: 1; text-align: start; font-weight: 600; }
-.menu .f { color: var(--tx2); flex: 1; overflow: hidden; text-overflow: ellipsis; }
-.menu .z { color: var(--tx2); font-variant-numeric: tabular-nums; }
-.menu .default-tag { flex: none; padding: 1px 4px; color: var(--accent); border: 1px solid var(--bd); border-radius: 4px; font-size: 10px; }
-.menu .k { margin-inline-start: auto; padding-inline-start: 12px; color: var(--tx2); font-size: 11px; }
-.menu .top .lead { color: var(--accent); font-weight: 600; }
-.menu .top .f { color: var(--tx); }
-.menu .mi { width: 16px; display: flex; justify-content: center; color: var(--tx2); flex: none; }
-.menu .mi svg { width: 13px; height: 13px; }
-.menu .top .mi { color: var(--go); }
-.menu .top .mi svg { width: 14px; height: 14px; }
+.rows { display: grid; flex: 0 1 auto; gap: 2px; min-height: min(40px, 10vh); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.rows button, .extras button { display: flex; width: 100%; min-width: 0; gap: 10px; padding-inline: 11px; text-align: start; }
+.rows button { min-height: 40px; border: 1px solid transparent; border-radius: 12px; }
+.rows button:hover, .extras button:hover, .segments button:hover:not(:disabled) { background: var(--hov); }
+.rows button.sel { background: #ffffff21; border-color: var(--bd); box-shadow: inset 0 1px #ffffff1f; font-weight: 600; }
+.rows .radio { width: 16px; height: 16px; flex: none; border: 1.5px solid #9c94ad; border-radius: 50%; }
+.rows .sel .radio { border: 0; background: radial-gradient(circle, #fff 3px, transparent 3.5px), linear-gradient(135deg, #ad7af7, #ed5cb5); }
+.rows .z, .rows .rest { color: var(--tx2); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rows .z { margin-inline-start: auto; flex: none; }
+.rows .default-tag { flex: none; padding: 2px 6px; color: var(--ok); background: #3dd68c1f;
+  border-radius: 6px; font: 600 10.5px/1.3 var(--font); }
+.rows .show-more { min-height: 34px; color: var(--tx2); font-size: 12px; }
+.rows .show-more svg { margin-inline-start: auto; }
+.rows .show-more[aria-expanded="true"] svg { transform: rotate(180deg); }
+.confirm { display: flex; justify-content: center; gap: 8px; min-height: 44px; padding-inline: 12px;
+  border-radius: 14px; font-size: 14px; font-weight: 600; color: #fff; text-shadow: 0 0 2px #542050, 0 1px 2px #542050;
+  background: linear-gradient(90deg, #ad7af7, #ec5cb6 60%, #ff9170);
+  box-shadow: inset 0 1px #ffffff4d, 0 8px 24px -4px #ec5cb659; }
+.confirm:hover { filter: brightness(1.1); }
+.confirm:active { filter: brightness(.94); }
+.confirm-size { flex: none; font-size: 13px; font-weight: 500; }
+.footer, .menu-cookies { display: flex; align-items: center; gap: 8px; }
+.footer { padding-inline-start: 4px; }
+.footer .divider { width: 1px; height: 18px; }
+.menu-cookies { flex: 1; min-width: 0; gap: 8px; color: var(--tx2); cursor: pointer; }
+.menu-cookies input { appearance: none; position: relative; width: 36px; height: 20px; flex: none;
+  margin: 0; margin-inline-start: auto; border: 0; border-radius: 999px; background: #5a5468; cursor: pointer; }
+.menu-cookies input::before { content: ""; position: absolute; top: 2px; inset-inline-start: 2px; width: 16px;
+  height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0003; }
+.menu-cookies input:checked { background: #4468f0; }
+.menu-cookies input:checked::before { inset-inline-start: 18px; }
+.extras { display: grid; width: 260px; padding: 6px; gap: 2px; overflow-y: auto; border-radius: 16px; }
+.extras button { min-height: 36px; border-radius: 10px; }
+.extras .divider { margin: 4px 6px; }
+.extras kbd { margin-inline-start: auto; color: var(--tx2); background: #ffffff0f; padding: 2px 6px;
+  border: 1px solid var(--bd); border-radius: 6px; font: 600 10.5px/1.15 var(--font); }
 .menu .skrow { height: 24px; margin: 2px 8px; border-radius: 4px; background-size: 200% 100%;
   background-image: linear-gradient(90deg, var(--hov), rgba(127, 127, 127, .12), var(--hov));
   animation: shimmer 1.4s linear infinite; }
@@ -1091,15 +1169,16 @@ button:focus-visible { outline: none; }
     style.textContent = CSS;
     shadow.appendChild(style);
   }
-  // Its markup, fixed (the words go in as text): the tab, its tip, the drag's guide, its list.
-  const ICON = 'fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+  // Inlined, packaged SVGs render without a request from the page's origin.
+  const glassIcon = (name, className = "glass-icon", instance = name) => VIDEO_ICONS[name]
+    .replace("<svg ", `<svg class="${className}" aria-hidden="true" focusable="false" `)
+    .replaceAll("ORBIT_ICON_", `orbit-${instance}-`);
   shadow.innerHTML += `
 <div class="guide"></div>
 <div class="pill" part="pill" data-state="ready">
   <button class="go" type="button">
-    <span class="grip" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
     <span class="icon">
-      <img class="logo" alt="" draggable="false">
+      ${glassIcon("logo", "logo", "trigger-logo")}
       <span class="spin"></span>
       <svg class="i-sent" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="var(--ok)"/><path d="M4.6 8.2 7 10.5l4.4-4.6" stroke="#fff" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <svg class="i-warn" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="var(--warn-dot)"/><path d="M8 4.2v4.6" stroke="#1b1b1b" stroke-width="1.7" stroke-linecap="round"/><circle cx="8" cy="11.4" r="1" fill="#1b1b1b"/></svg>
@@ -1112,27 +1191,35 @@ button:focus-visible { outline: none; }
     <span class="chip"></span>
   </button>
   <span class="acts"></span>
-  <button class="more" type="button" aria-haspopup="menu" aria-expanded="false">
-    <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>
-  </button>
-  <button class="x" type="button">
-    <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-  </button>
+  <button class="more" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="orbit-quality-panel">${glassIcon("chevron")}</button>
 </div>
 <div class="tip" role="tooltip"><span class="what"></span><span class="how"></span></div>
-<span class="tpl" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v8M4.8 7.4 8 10.6l3.2-3.2M3 13.5h10"/></svg></span>
-<div class="menu" role="menu" tabindex="-1">
-  <div class="mh"><img alt="" draggable="false"><div><span class="t"></span><span class="s"></span></div></div>
-  <div class="hr"></div>
+<div class="menu" id="orbit-quality-panel" role="dialog">
+  <div class="mh">
+    ${glassIcon("logo", "tile", "panel-logo")}<div class="heading"><span class="t"></span><span class="s"></span></div>
+    <button type="button" class="glass-button panel-close">${glassIcon("close")}</button>
+  </div>
+  <div class="segments" aria-controls="orbit-quality-rows" hidden>
+    <button type="button" data-kind="video" aria-pressed="true">${glassIcon("video")}<span class="kind"></span><span class="count"></span></button>
+    <button type="button" data-kind="audio" aria-pressed="false">${glassIcon("audio")}<span class="kind"></span><span class="count"></span></button>
+  </div>
   <div class="note" role="status" hidden></div>
-  <div class="rows" role="group"></div>
-  <div class="hr"></div>
-  <button role="menuitem" data-act="window"><span class="mi"><svg viewBox="0 0 16 16" ${ICON} stroke-width="1.4"><path d="M2.5 4h11M2.5 8h11M2.5 12h7"/></svg></span><span></span></button>
-  <button role="menuitemcheckbox" aria-checked="true" data-act="cookies"><span class="mi" aria-hidden="true">✓</span><span></span></button>
-  <div class="hr"></div>
-  <button role="menuitem" data-act="hide"><span class="mi"><svg viewBox="0 0 16 16" ${ICON} stroke-width="1.4"><circle cx="8" cy="8" r="5.5"/><path d="M4.2 11.8l7.6-7.6"/></svg></span><span></span><span class="k">Esc</span></button>
-  <button role="menuitem" data-act="never"><span class="mi"><svg viewBox="0 0 16 16" ${ICON} stroke-width="1.4"><circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c2 2 2 9 0 11M8 2.5c-2 2-2 9 0 11"/></svg></span><span></span></button>
-  <button role="menuitem" data-act="settings"><span class="mi"><svg viewBox="0 0 16 16" ${ICON} stroke-width="1.4"><circle cx="8" cy="8" r="2"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4 5 11M11 5l1.4-1.4"/></svg></span><span></span></button>
+  <div class="rows" id="orbit-quality-rows" hidden></div>
+  <button type="button" class="confirm" hidden>${glassIcon("download")}<span class="confirm-label"></span><span class="confirm-size"></span></button>
+  <div class="divider"></div>
+  <div class="footer">
+    <label class="menu-cookies">${glassIcon("cookie")}<span></span><input type="checkbox" role="switch" checked></label>
+    <div class="divider"></div>
+    <button type="button" class="glass-button extra-toggle" aria-haspopup="menu" aria-expanded="false" aria-controls="orbit-video-options">${glassIcon("more")}</button>
+  </div>
+</div>
+<div class="extras" id="orbit-video-options" role="menu" hidden>
+  <button type="button" role="menuitem" data-act="window">${glassIcon("subtitles")}<span class="extra-label"></span></button>
+  <div class="divider" role="separator"></div>
+  <button type="button" role="menuitem" data-act="hide">${glassIcon("hide")}<span class="extra-label"></span><kbd>Esc</kbd></button>
+  <button type="button" role="menuitem" data-act="never">${glassIcon("site")}<span class="extra-label"></span></button>
+  <div class="divider" role="separator"></div>
+  <button type="button" role="menuitem" data-act="settings">${glassIcon("settings")}<span class="extra-label"></span></button>
 </div>`;
   const $ = (sel) => shadow.querySelector(sel);
   const pill = $(".pill");
@@ -1142,42 +1229,46 @@ button:focus-visible { outline: none; }
   const chip = $(".chip");
   const acts = $(".acts");
   const more = $(".more");
-  const closeX = $(".x");
   const tip = $(".tip");
   const guide = $(".guide");
   const menu = $(".menu");
   const note = $(".note");
   const rows = $(".rows");
-  const item = (act) => menu.querySelector(`[data-act="${act}"]`);
+  const segments = $(".segments");
+  const tabs = [...segments.querySelectorAll("button")];
+  const confirm = $(".confirm");
+  const panelClose = $(".panel-close");
+  const cookies = $(".menu-cookies input");
+  const extraToggle = $(".extra-toggle");
+  const extras = $(".extras");
+  const extraItems = [...extras.querySelectorAll("button")];
   const dir = ext.i18n.getMessage("@@bidi_dir") || "ltr";
-  for (const el of [pill, menu, tip]) el.dir = dir;
+  for (const el of [pill, menu, extras, tip]) el.dir = dir;
   const idleLabel = t("video_download");
-  $(".icon .logo").src = LOGO;
-  $(".mh img").src = LOGO;
-  more.title = t("video_more");
-  more.setAttribute("aria-label", t("video_more"));
-  closeX.title = t("video_hide_here");
-  closeX.setAttribute("aria-label", t("video_hide_here"));
+  for (const [button, key] of [[more, "video_choose_quality"], [panelClose, "video_close_panel"], [extraToggle, "video_more"]]) {
+    button.title = t(key);
+    button.setAttribute("aria-label", t(key));
+  }
   menu.setAttribute("aria-label", idleLabel);
-  item("window").lastElementChild.textContent = t("video_all_qualities");
-  item("cookies").lastElementChild.textContent = t("video_use_site_cookies");
-  item("hide").children[1].textContent = t("video_hide_here");
-  item("never").lastElementChild.textContent = ext.i18n.getMessage("video_never_site", [host]) || `Never on ${host}`;
-  item("settings").lastElementChild.textContent = t("video_settings");
+  extras.setAttribute("aria-label", t("video_more"));
+  const extraLabels = { window: "video_all_qualities", hide: "video_hide_here", never: "video_never_site", settings: "video_settings" };
+  for (const button of extraItems) {
+    button.querySelector(".extra-label").textContent = t(extraLabels[button.dataset.act], host);
+  }
+  $(".menu-cookies span").textContent = t("video_use_site_cookies");
+  for (const button of tabs) button.querySelector(".kind").textContent = t(`video_tab_${button.dataset.kind}`);
   $(".tip .how").textContent = t("video_drag_dots");
 
   // ---- the look-ups (#703): each video's qualities, asked as its button shows ---------------
   // By what the button sends for it (its address and its own file): one look-up each, kept for
   // the page's life (the app keeps its own ten minutes, and shares one between two askings). A
   // video that plays a plain file needs none: the browser says its picture's size, and it goes
-  // to MDM as a file.
+  // to ODM as a file.
   const looks = new Map();
   function setCookieMode(enabled) {
     if (useSiteCookies === enabled) return;
     useSiteCookies = enabled;
-    const button = item("cookies");
-    button.setAttribute("aria-checked", String(enabled));
-    button.firstElementChild.textContent = enabled ? "✓" : "";
+    cookies.checked = enabled;
     looks.clear();
     if (menuOpen && video) {
       startLook(describeNow(video), true);
@@ -1191,10 +1282,10 @@ button:focus-visible { outline: none; }
   // pass over the button doesn't count.
   const REST_MS = 200;
   // A private window's video is looked up only when the user asks: the click, or the menu's arrow
-  // (#1053). Neither the button showing nor the pointer resting on it sends its page to MDM.
+  // (#1053). Neither the button showing nor the pointer resting on it sends its page to ODM.
   const PRIVATE = Boolean(ext.extension?.inIncognitoContext);
-  // An answer that isn't a look-up's (no MDM, an older one, too many at once) is asked again after
-  // this; meanwhile a click goes to MDM's window, as it did before.
+  // An answer that isn't a look-up's (no ODM, an older one, too many at once) is asked again after
+  // this; meanwhile a click goes to ODM's window, as it did before.
   const LOOK_RETRY_MS = 15000;
   let lookTimer = 0;
   // A stream's manifest the page plays as its file (Safari's way, Chrome's own HLS): looked up.
@@ -1221,7 +1312,10 @@ button:focus-visible { outline: none; }
   }
   // What the button sends for a video, and its look-up's key: what it plays (its blob:) when
   // nothing names it (#1092: what the tab played for it may still be offered); none without that.
-  const lookKey = (d) => (d.url === null ? (d.blob ? `played ${d.blob}` : null) : `${d.url} ${d.src}`);
+  const lookKey = (d) => {
+    if (d.url === null) return d.blob ? `played ${d.blob}` : null;
+    return `${d.url} ${d.src || d.fallbackSrc || (d.post && d.blob) || ""}`;
+  };
   // What download sends for the video now ({v, d, key}), kept a moment (the DOM walk is not free).
   let current = null;
   function describeNow(v) {
@@ -1252,7 +1346,7 @@ button:focus-visible { outline: none; }
     const kept = looks.get(c.key);
     if (usable(kept) && !(byUser && kept.state === "busy")) return kept;
     const og = location.href === landedAt ? document.querySelector('meta[property="og:title"]')?.content : "";
-    const asked = { src: c.d.src, title: (og || document.title || "").trim(), url: c.d.url, at: c.d.at, useSiteCookies };
+    const asked = { src: c.d.src, title: c.d.title ?? (og || document.title || "").trim(), url: c.d.url, at: c.d.at, useSiteCookies };
     const l = { state: "pending", at: Date.now(), href: location.href, asked };
     looks.set(c.key, l);
     const alive = () => looks.get(c.key) === l && location.href === l.href;
@@ -1278,10 +1372,14 @@ button:focus-visible { outline: none; }
       if (r && r.show) l.show = String(r.show);
       if (r && r.post) l.post = String(r.post);
       let s = found;
-      // #1092: the page found nothing (a feed, a post yt-dlp can't read, a site it doesn't
-      // know): what the tab played for this video, when something fits it.
-      if (playedWanted(s) && alive()) {
-        const p = await playedLook(c.v, lookUp, alive);
+      // A feed post can be a carousel, or its extractor can fail even though the browser
+      // is playing the selected video. Try that player's source, then the tab's matched media.
+      if (!c.d.thumbnail && (playedWanted(s) || (c.d.post && s.state === "list")) && alive()) {
+        const sameMedia = () => alive() && c.v.isConnected && videoPage(c.v) === c.d.url &&
+          (!c.d.blob || c.v.currentSrc === c.d.blob);
+        const p = c.d.fallbackSrc || sameMedia()
+          ? await playedLook(c.v, lookUp, c.d.fallbackSrc ? alive : sameMedia, c.d.fallbackSrc)
+          : null;
         if (p) {
           if (p.show) l.show = p.show;
           // The page's look-up's words go with it.
@@ -1324,8 +1422,10 @@ button:focus-visible { outline: none; }
   // its turn (its qualities); "several" when more than one fits and none is clearly this one (said,
   // never guessed). `played`: what it is, for the window too. Null: nothing fits. `lookUp`:
   // startLook's.
-  async function playedLook(v, lookUp, alive) {
-    const r = await within(send({ type: "video-played", ...playedFacts(v) }), LOOKUP_MS);
+  async function playedLook(v, lookUp, alive, src) {
+    const r = src
+      ? { played: { url: src, stream: STREAM.test(src), ext: fileType(src) } }
+      : await within(send({ type: "video-played", ...playedFacts(v) }), LOOKUP_MS);
     if (r && Number(r.several) > 0) return { state: "several" };
     const p = r && r.played;
     if (!p || typeof p.url !== "string" || !/^https?:/i.test(p.url) || !alive()) return null;
@@ -1340,8 +1440,8 @@ button:focus-visible { outline: none; }
         size: Number(p.size) || 0,
       };
     }
-    const { r: again, s } = await lookUp({ played: p.url }, Date.now() + LOOKUP_MS);
-    return { ...s, played: p.url, ...(again && again.show ? { show: String(again.show) } : {}) };
+    const { r: again, s } = await lookUp(src ? { src } : { played: p.url }, Date.now() + LOOKUP_MS);
+    return { ...s, src, played: p.url, ...(again && again.show ? { show: String(again.show) } : {}) };
   }
 
   // The look-up starts once the button stayed a moment over the same video.
@@ -1391,7 +1491,7 @@ button:focus-visible { outline: none; }
   );
 
   // ---- what it shows ------------------------------------------------------------------------
-  // `status`: what happened after a click (sending, sent, the user's step, MDM's problem, off),
+  // `status`: what happened after a click (sending, sent, the user's step, ODM's problem, off),
   // shown instead of the quality until it ends: {state, text, sub, acts: [[name, words]], …}.
   let status = null;
   let statusTimer = 0;
@@ -1419,7 +1519,7 @@ button:focus-visible { outline: none; }
     const look = lookOf(c);
     const state = status ? status.state : c && c.d.drm ? "drm" : look && look.state === "pending" ? "looking" : "ready";
     pill.dataset.state = state;
-    let text = idleLabel;
+    let text = t("video_download_short");
     let small = "";
     let buttons = [];
     if (state === "drm") {
@@ -1439,7 +1539,7 @@ button:focus-visible { outline: none; }
       ...buttons.map(([name, words]) => {
         const b = document.createElement("button");
         b.type = "button";
-        // The one way on that matters most is green ("Retry", "Open post").
+        // Give the main recovery action more emphasis.
         b.className = name === "retry" || name === "post" ? "act fill" : "act";
         b.dataset.act = name;
         b.textContent = words;
@@ -1450,19 +1550,69 @@ button:focus-visible { outline: none; }
     pill.classList.toggle("bare", bare);
     pill.classList.toggle("acting", buttons.length > 0);
     if (bare && menuOpen) closeMenu();
-    go.setAttribute("aria-label", [text, small.replace(/^· /, ""), quality && quality.text].filter(Boolean).join(", "));
+    go.setAttribute("aria-label", [bare ? text : idleLabel, small.replace(/^· /, ""), quality && quality.text].filter(Boolean).join(", "));
     $(".tip .what").textContent = bare ? [text, small].filter(Boolean).join(" ") : tipFor(look, t, lang);
-    // Its width with its words: compact or not follows from it and the video's.
-    const was = pill.classList.contains("compact");
-    pill.classList.remove("compact");
-    fullWidth = pill.offsetWidth;
-    if (was) pill.classList.add("compact");
+    // Measure the expanded trigger even when it is showing only the mark.
+    if (!menuOpen) {
+      const was = pill.classList.contains("compact");
+      pill.classList.remove("compact");
+      pill.classList.add("measuring");
+      fullWidth = pill.offsetWidth;
+      pill.classList.remove("measuring");
+      if (was) pill.classList.add("compact");
+    }
     if (video) position();
   }
 
   // ---- which video ----------------------------------------------------------------------------
   const videos = document.getElementsByTagName("video");
   const audios = document.getElementsByTagName("audio");
+  const YOUTUBE_THUMBNAIL = "ytd-thumbnail, yt-thumbnail-view-model, a#thumbnail, a.yt-lockup-view-model__content-image, a.yt-lockup-view-model-wiz__content-image, a.ytLockupViewModelContentImage";
+  const YOUTUBE_COLLECTION = "ytd-playlist-renderer, ytd-grid-playlist-renderer, ytd-compact-playlist-renderer, ytd-radio-renderer, ytd-compact-radio-renderer";
+  const YOUTUBE_PREVIEW = "ytd-video-preview, #inline-preview-player";
+  const YOUTUBE_PREVIEW_LINK = "a.ytdVideoPreviewMediaContainerLink[href]";
+
+  // A YouTube card can keep its poster or play a muted loop instead of exposing a usable player.
+  // Its thumbnail link still identifies the one video the user is pointing at.
+  function youtubeThumbnailUrl(anchor) {
+    if (!onYouTube || anchor.localName !== "a" || anchor.origin !== location.origin || anchor.pathname !== "/watch") return null;
+    const id = new URLSearchParams(anchor.search).get("v");
+    if (!/^[\w-]{11}$/.test(id || "")) return null;
+    // YouTube adds radio and playlist parameters to individual music videos too.
+    // Collection cards have their own renderers or stacked thumbnails.
+    if (anchor.closest(YOUTUBE_COLLECTION) || anchor.querySelector("yt-collection-thumbnail-view-model")) return null;
+    return `https://www.youtube.com/watch?v=${id}`;
+  }
+
+  function youtubeThumbnail(el) {
+    if (!onYouTube) return null;
+    const thumbnail = el?.closest(YOUTUBE_THUMBNAIL);
+    const anchor = thumbnail?.closest("a[href]") || thumbnail?.querySelector("a[href]");
+    return anchor && youtubeThumbnailUrl(anchor) ? anchor : null;
+  }
+
+  function youtubeThumbnailAt(hit, x, y) {
+    const thumbnail = youtubeThumbnail(hit);
+    if (thumbnail) return thumbnail;
+    const preview = hit?.closest(YOUTUBE_PREVIEW);
+    if (!preview) return null;
+    const link = preview.querySelector(YOUTUBE_PREVIEW_LINK);
+    const url = link && youtubeThumbnailUrl(link);
+    // The floating preview intercepts pointer hits before its media is ready. Prefer the
+    // card underneath so Orbit keeps its anchor if YouTube closes the preview.
+    for (const el of document.elementsFromPoint(x, y)) {
+      const card = youtubeThumbnail(el);
+      if (card && (!url || youtubeThumbnailUrl(card) === url)) return card;
+    }
+    return url ? link : null;
+  }
+
+  function mediaRect(element) {
+    const rect = element.getBoundingClientRect();
+    // The preview's own link can have no height while its positioned player paints
+    // in the full-size media container.
+    return rect.height === 0 && element.matches?.(YOUTUBE_PREVIEW_LINK) ? element.parentElement.getBoundingClientRect() : rect;
+  }
 
   // When each player began to load what it plays (#1092): a feed's player loads the next video
   // while this one plays, and what came in between is this one's (playedFacts). Unknown (0) for
@@ -1498,7 +1648,8 @@ button:focus-visible { outline: none; }
 
   function eligible(v) {
     if (!v.isConnected || isDismissed(v)) return false;
-    const r = v.getBoundingClientRect();
+    if (v.localName === "a" && !youtubeThumbnailUrl(v)) return false;
+    const r = mediaRect(v);
     const audio = v instanceof HTMLAudioElement;
     if (audio ? !v.controls || r.width < MIN_W || r.height < MIN_AUDIO_H : r.width < MIN_W || r.height < MIN_H) {
       return false;
@@ -1512,10 +1663,21 @@ button:focus-visible { outline: none; }
   // The topmost eligible video under (x, y): players lay their controls over the video, so the
   // video itself rarely gets the pointer's events.
   function videoAt(x, y) {
+    if (onYouTube) {
+      const under = document.elementFromPoint(x, y);
+      if (under === root && video && eligible(video)) return video;
+      const thumbnail = youtubeThumbnailAt(under, x, y);
+      if (thumbnail && eligible(thumbnail)) {
+        const r = visibleVideoRect(thumbnail, mediaRect(thumbnail));
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return thumbnail;
+      }
+    }
     let best = null;
     for (const v of [...videos, ...audios, ...shadowVideos()]) {
       const r = v.getBoundingClientRect();
       if (x < r.left || x > r.right || y < r.top || y > r.bottom || !eligible(v)) continue;
+      const visible = visibleVideoRect(v, r);
+      if (x < visible.left || x > visible.right || y < visible.top || y > visible.bottom) continue;
       if (!best || r.width * r.height < best.r.width * best.r.height) best = { v, r };
     }
     return best && best.v;
@@ -1524,26 +1686,95 @@ button:focus-visible { outline: none; }
   // ---- placing it -------------------------------------------------------------------------
   // `place` is where it sits in the room the video leaves around it: x and y from 0 to 1, one of
   // them 0 or 1 (on an edge).
+  function bounds(left, top, right, bottom) {
+    return { left, top, right, bottom, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
+  }
+
+  function positionedAncestor(element, css) {
+    return css.position === "absolute" ? element.offsetParent : null;
+  }
+
+  function visibleVideoRect(v, rect) {
+    let left = Math.max(0, rect.left);
+    let top = Math.max(0, rect.top);
+    let right = Math.min(innerWidth, rect.right);
+    let bottom = Math.min(innerHeight, rect.bottom);
+    let containingBlock = positionedAncestor(v, getComputedStyle(v));
+    for (let parent = upFrom(v); parent && parent !== document.documentElement; parent = upFrom(parent)) {
+      const css = getComputedStyle(parent);
+      if (Number(css.opacity) < 0.05) return bounds(0, 0, 0, 0);
+      // A positioned video can paint through an overflow wrapper between it and its containing block.
+      if (containingBlock && parent !== containingBlock) continue;
+      containingBlock = positionedAncestor(parent, css);
+      if (css.display === "contents") continue;
+      if (parent === document.body) {
+        const html = getComputedStyle(document.documentElement);
+        // With a visible root overflow, body overflow is applied to the viewport.
+        if (html.overflowX === "visible" && html.overflowY === "visible") continue;
+      }
+      const clipX = /^(auto|scroll|hidden|clip)$/.test(css.overflowX);
+      const clipY = /^(auto|scroll|hidden|clip)$/.test(css.overflowY);
+      if (!clipX && !clipY) continue;
+      const r = parent.getBoundingClientRect();
+      if (clipX) {
+        left = Math.max(left, r.left);
+        right = Math.min(right, r.right);
+      }
+      if (clipY) {
+        top = Math.max(top, r.top);
+        bottom = Math.min(bottom, r.bottom);
+      }
+    }
+    return bounds(left, top, right, bottom);
+  }
+
   function rects() {
-    let r = held ? held.r : (lastRect = video.getBoundingClientRect());
-    const w = pill.offsetWidth || 150;
-    const h = pill.offsetHeight || 30;
+    const original = held ? held.r : (lastRect = mediaRect(video));
+    let r = visibleVideoRect(video, original);
+    if (!menuOpen) pill.classList.toggle("compact", compactFor(compactAlways, r.width, fullWidth, INSET));
+    const w = pill.offsetWidth || BUTTON_SIZE;
+    const h = pill.offsetHeight || BUTTON_SIZE;
     const miniplayer = held ? held.miniplayer : onYouTube && Boolean(video.closest("ytd-miniplayer, .ytp-player-minimized"));
     // Leave space for the miniplayer's top row of controls even when those controls are hidden.
     if (miniplayer) {
-      const controlsHeight = 48;
-      r = new DOMRect(r.left, r.top + controlsHeight, r.width, r.height - controlsHeight);
+      r = bounds(r.left, Math.max(r.top, original.top + 48), r.right, r.bottom);
     }
-    return { r, w, h, miniplayer, roomX: Math.max(0, r.width - w - 2 * INSET), roomY: Math.max(0, r.height - h - 2 * INSET) };
+    const insetX = Math.min(INSET, Math.max(0, (r.width - w) / 2));
+    const insetY = Math.min(INSET, Math.max(0, (r.height - h) / 2));
+    return { r, w, h, miniplayer, insetX, insetY, roomX: Math.max(0, r.width - w - 2 * insetX), roomY: Math.max(0, r.height - h - 2 * insetY) };
   }
 
-  // Is a control of the page under this spot (a viewport rectangle)? What counts is something
-  // on top of the video that the user clicks and that is much smaller than the video: a button,
-  // a small link, a watch-later or menu button on a preview (#421); a link or layer over the
-  // whole video isn't one. On the video itself, and below it, is nothing to cover.
-  function onControl(b, video, videoRect) {
-    const area = (x) => Math.max(0, x.width) * Math.max(0, x.height);
-    const small = (el) => area(el.getBoundingClientRect()) < area(videoRect) / 5;
+  const CONTROL = "button, [role=button], [role=slider], a[href], input, select, [onclick], .ytp-progress-bar, .ytp-time-display";
+  const PLAYER = "ytd-video-preview, ytd-miniplayer, .ytp-player-minimized, .html5-video-player, #inline-preview-player";
+  const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+
+  function visibleControl(el, css = getComputedStyle(el)) {
+    return css.visibility === "visible" && css.pointerEvents !== "none" && Number(css.opacity) > 0.05 &&
+      el.checkVisibility?.({ opacityProperty: true }) !== false;
+  }
+
+  function playerControls(v, r) {
+    const parent = upFrom(v);
+    const scope = v.closest?.(PLAYER) || (parent && upFrom(parent)) || parent;
+    if (!scope || scope === document.body || scope === document.documentElement) return [];
+    const controls = [];
+    for (const el of scope.querySelectorAll(CONTROL)) {
+      if (el.contains(v)) continue;
+      const box = el.getBoundingClientRect();
+      if (box.width <= 0 || box.height <= 0 || box.width * box.height >= r.width * r.height / 3 || !overlaps(box, r)) continue;
+      if (visibleControl(el)) controls.push(box);
+    }
+    return controls;
+  }
+
+  // Check controls in the player by their full rectangles. Hit-test as well for page controls
+  // painted over the video from outside its player.
+  function onControl(b, videoRect, controls) {
+    if (controls.some((control) => overlaps(b, control))) return true;
+    const small = (el) => {
+      const box = el.getBoundingClientRect();
+      return box.width * box.height < videoRect.width * videoRect.height / 3;
+    };
     const points = [
       [(b.left + b.right) / 2, (b.top + b.bottom) / 2],
       [b.left + 4, b.top + 4],
@@ -1555,85 +1786,72 @@ button:focus-visible { outline: none; }
       for (const el of document.elementsFromPoint(x, y)) {
         if (el === root) continue;
         if (el === video || el.contains(video)) break;
-        const control = el.closest("button, [role=button], a[href], input, select, [onclick]");
-        if (control && !control.contains(video) && small(control)) return true;
-        if (small(el) && getComputedStyle(el).cursor === "pointer") return true;
+        const control = el.closest(CONTROL);
+        if (control && !control.contains(video) && small(control) && visibleControl(control)) return true;
+        const parent = upFrom(el);
+        const css = getComputedStyle(el);
+        if (small(el) && css.cursor === "pointer" && visibleControl(el, css) &&
+            (!parent || getComputedStyle(parent).cursor !== "pointer")) return true;
       }
     }
     return false;
   }
 
-  // Where it goes now: the place the user gave it, else the default corner, or the next corner
-  // free of the page's own controls (a thumbnail's watch-later button at the top right, #421).
-  // Over the same video it only ever goes on to the next corner, never back to one it left: a
-  // hover-to-play preview (YouTube's thumbnails, #560) shows its sound and captions buttons while
-  // the pointer is over the video and hides them as the pointer reaches the button, so going back
-  // when they hide, then away again when they show, kept the button jumping from under the pointer.
-  const CORNERS = [{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }];
-  function spot(r, w, h, roomX, roomY) {
-    if (chosen) return place;
-    // Still while its menu is open: the player's own controls come and go as the pointer moves
-    // over the video, and the menu's rows would move away from under it.
-    if (menuOpen && auto.v === video && auto.at) return auto.at;
+  // Try the saved or default spot, then keep close to the upper-right corner if it is
+  // obstructed. Hold the successful placement while the pointer is on the button.
+  const ANCHORS = [
+    { x: 1, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 },
+    { x: 0.5, y: 0 }, { x: 0, y: 0.5 }, { x: 1, y: 0.5 }, { x: 0.5, y: 1 },
+  ];
+  function spot(r, w, h, roomX, roomY, insetX, insetY) {
     const now = Date.now();
-    const same = auto.v === video;
-    if (same && now - auto.t < AUTO_MS) return auto.at;
-    const order = [place, ...CORNERS];
-    const from = same ? Math.max(0, order.indexOf(auto.at)) : 0;
-    let at = same ? auto.at : place;
-    for (const c of order.slice(from)) {
-      const left = r.left + INSET + c.x * roomX;
-      const top = r.top + INSET + c.y * roomY;
-      if (!onControl({ left, top, right: left + w, bottom: top + h }, video, r)) {
-        at = c;
-        break;
-      }
+    const same = auto?.v === video;
+    if (same && auto.w === w && auto.h === h && now - auto.t < AUTO_MS &&
+        r.left === auto.r.left && r.top === auto.r.top && r.right === auto.r.right && r.bottom === auto.r.bottom) return auto.at;
+    const controls = playerControls(video, r);
+    const near = [];
+    if (place.x === 1 && place.y === 0) {
+      const right = r.right - insetX;
+      const top = r.top + insetY;
+      const corner = bounds(right - w, top, right, top + h);
+      const blockers = controls.filter((box) => overlaps(box, corner));
+      const left = blockers.length ? right - Math.min(...blockers.map((box) => box.left)) + 4 : 48;
+      const down = blockers.length ? Math.max(...blockers.map((box) => box.bottom)) - top + 4 : 48;
+      if (left <= Math.min(roomX, 80)) near.push({ x: 1 - left / roomX, y: 0 });
+      if (down <= Math.min(roomY, 64)) near.push({ x: 1, y: down / roomY });
     }
-    auto = { v: video, at, t: now };
+    const order = new Set([same && root.matches(":hover") && auto.at, place, ...near, ...ANCHORS]);
+    const at = [...order].find((c) => {
+      if (!c) return false;
+      const left = r.left + insetX + c.x * roomX;
+      const top = r.top + insetY + c.y * roomY;
+      return !onControl(bounds(left, top, left + w, top + h), r, controls);
+    }) || place;
+    auto = { v: video, at, t: now, w, h, r };
     return at;
   }
 
   function position() {
     if (!video) return;
-    // A small video, one its words wouldn't fit, or Compact chosen in Options: the round button
-    // and its menu only.
-    const vr = held ? held.r : video.getBoundingClientRect();
-    if (!menuOpen) pill.classList.toggle("compact", compactFor(compactAlways, vr.width, fullWidth, INSET));
-    const { r, w, h, miniplayer, roomX, roomY } = rects();
-    // The pointer on it (or its menu open): it stays where it is, whatever the video does
-    // meanwhile. A preview that grows while the pointer is over it and shrinks back when the
-    // pointer goes (#560) would otherwise take the button from under the pointer. Grown or
-    // shrunk itself meanwhile (its grip shown, its words changed), it keeps its end at the
-    // video's edge it was put against.
-    if (!dragging && pinned && pinned.v === video && pinned.miniplayer === miniplayer && (menuOpen || root.matches(":hover"))) {
-      if (w !== pinned.w && pinned.end) {
-        pinned.left -= w - pinned.w;
-        root.style.setProperty("transform", `translate(${Math.round(pinned.left)}px, ${Math.round(pinned.top)}px)`, "important");
-      }
-      pinned.w = w;
-      if (menuOpen) placeMenu(pinned, h);
-      placeTip(pinned.left, w);
-      return;
-    }
-    // Held for a video gone (#503): where it was, not a corner found anew over what the page
-    // shows there now.
-    const at = dragging ? dragging.at : held && !chosen ? held.at : spot(r, w, h, roomX, roomY);
-    const left = r.left + INSET + at.x * roomX;
-    // In the part of the video on screen: one scrolled half out keeps its button in view.
-    const visTop = Math.max(r.top, 0) + INSET;
-    const visBottom = Math.min(r.bottom, innerHeight) - INSET - h;
-    const top = Math.min(Math.max(r.top + INSET + at.y * roomY, visTop), Math.max(visTop, visBottom));
+    const { r, w, h, miniplayer, roomX, roomY, insetX, insetY } = rects();
+    if (r.width < w || r.height < h) return false;
+    // A hover preview may shrink as the pointer moves onto Orbit. Keep the anchor during
+    // that change only while the entire button still fits in the same visible player.
+    const pinLeft = pinned && pinned.left + (pinned.w - w) * pinned.at.x;
+    const pinFits = pinned?.v === video && pinned.miniplayer === miniplayer &&
+      pinLeft >= r.left && pinLeft + w <= r.right && pinned.top >= r.top && pinned.top + h <= r.bottom;
+    const fixedMenu = menuOpen && pinFits;
+    const at = dragging?.at || held?.at || (fixedMenu ? pinned.at : spot(r, w, h, roomX, roomY, insetX, insetY));
+    const keep = !dragging && pinFits && (fixedMenu ||
+      (at.x === pinned.at.x && at.y === pinned.at.y && root.matches(":hover")));
+    const left = keep ? pinLeft : r.left + insetX + at.x * roomX;
+    const top = keep ? pinned.top : r.top + insetY + at.y * roomY;
     root.style.setProperty("transform", `translate(${Math.round(left)}px, ${Math.round(top)}px)`, "important");
-    pinned = { v: video, left, top, w, end: at.x > 0.5, miniplayer };
+    pinned = { v: video, left, top, w, at, end: at.x > 0.5, miniplayer };
     if (menuOpen) placeMenu(pinned, h);
-    placeTip(left, w);
-    if (dragging && dragging.moved) drawGuide(r, w, h, roomX, roomY, left, top);
-  }
-
-  // Which of its sides is nearer the video's middle: line up the tip with that side.
-  function towardEnd(left, w) {
-    const { r } = rects();
-    return left + w / 2 > r.left + r.width / 2;
+    placeTip();
+    if (dragging && dragging.moved) drawGuide(r, w, h, roomX, roomY, left, top, insetX, insetY);
+    return true;
   }
 
   // Anchor the menu to the pinned button even if a hover preview moves or the results arrive.
@@ -1641,7 +1859,9 @@ button:focus-visible { outline: none; }
     const gap = 6;
     const above = top - gap - INSET;
     const below = innerHeight - top - buttonHeight - gap - INSET;
-    if (menuAbove === null) menuAbove = above > below;
+    // Prefer below when there is room for the full-size design. Keep the opening side
+    // while the lookup or a tab switch changes the height.
+    if (menuAbove === null) menuAbove = below < 509 && above > below;
     menu.classList.toggle("above", menuAbove);
     menu.style.top = menuAbove ? "0" : `${buttonHeight + gap}px`;
     menu.style.maxHeight = `${Math.max(0, menuAbove ? above : below)}px`;
@@ -1649,22 +1869,44 @@ button:focus-visible { outline: none; }
     const preferred = end ? left + w - width : left;
     const x = Math.max(INSET, Math.min(preferred, innerWidth - INSET - width));
     menu.style.left = `${x - left}px`;
+    placeExtras();
   }
 
-  function placeTip(left, w) {
-    if (tip.classList.contains("on")) tip.style.left = towardEnd(left, w) ? `${w - tip.offsetWidth}px` : "0";
+  function placeExtras() {
+    if (extras.hidden || !pinned || !menu.offsetWidth) return;
+    const anchor = extraToggle.getBoundingClientRect();
+    const width = extras.offsetWidth;
+    const preferred = dir === "rtl" ? anchor.left : anchor.right - width;
+    const left = Math.max(INSET, Math.min(preferred, innerWidth - INSET - width));
+    const above = anchor.top - INSET - 6;
+    const below = innerHeight - anchor.bottom - INSET - 6;
+    const openAbove = above >= Math.min(extras.scrollHeight + 2, 186) || above > below;
+    extras.style.maxHeight = `${Math.max(0, openAbove ? above : below)}px`;
+    extras.style.left = `${left - Math.round(pinned.left)}px`;
+    const top = openAbove ? anchor.top - extras.offsetHeight - 6 : anchor.bottom + 6;
+    extras.style.top = `${top - Math.round(pinned.top)}px`;
+  }
+
+  function placeTip() {
+    if (!pinned || !tip.classList.contains("on")) return;
+    const { left, top, w, end } = pinned;
+    const preferred = end ? left + w - tip.offsetWidth : left;
+    const x = Math.max(INSET, Math.min(preferred, innerWidth - INSET - tip.offsetWidth));
+    const below = pill.offsetHeight + 6;
+    tip.style.left = `${x - left}px`;
+    tip.style.top = `${top + below + tip.offsetHeight <= innerHeight - INSET ? below : Math.max(INSET - top, -tip.offsetHeight - 6)}px`;
   }
 
   // While dragging: the edge it slides along (through the button's middle, from one end of the
   // video's edge to the other) and the spots it snaps to on it (its ends and its middle), from
   // the video's rectangle `r`, in the button's own coordinates (it sits at `left`, `top`).
-  function drawGuide(r, w, h, roomX, roomY, left, top) {
+  function drawGuide(r, w, h, roomX, roomY, left, top, insetX, insetY) {
     const edge = edgeOf(dragging.at);
     const across = edge === "top" || edge === "bottom";
-    const x0 = r.left + INSET - left;
-    const y0 = r.top + INSET - top;
+    const x0 = r.left + insetX - left;
+    const y0 = r.top + insetY - top;
     const at = across ? y0 + h / 2 + (edge === "bottom" ? roomY : 0) : x0 + w / 2 + (edge === "right" ? roomX : 0);
-    const len = across ? r.width - 2 * INSET : r.height - 2 * INSET;
+    const len = across ? r.width - 2 * insetX : r.height - 2 * insetY;
     const line = document.createElement("i");
     line.className = `line ${across ? "h" : "v"}`;
     Object.assign(line.style, across
@@ -1715,6 +1957,9 @@ button:focus-visible { outline: none; }
     if (video !== v) {
       video = v;
       held = null;
+      lastRect = null;
+      entered = null;
+      auto = null;
       closeMenu();
       tipOff();
       // What happened is about the video it was clicked on (off on the site is the site's).
@@ -1725,14 +1970,20 @@ button:focus-visible { outline: none; }
     if (!attach()) return hide(true);
     root.style.setProperty("display", "block", "important");
     const c = describeNow(v);
-    if (!PRIVATE && !usable(looks.get(c.key))) scheduleLook(v);
+    if (!PRIVATE && !c.d.thumbnail && !usable(looks.get(c.key))) scheduleLook(v);
     if (pill.dataset.key !== String(c.key) || !fullWidth) {
       pill.dataset.key = String(c.key);
       render();
     }
-    position();
-    if (!pill.classList.contains("shown")) requestAnimationFrame(() => pill.classList.add("shown"));
-    if (!raf) raf = requestAnimationFrame(tick);
+    if (!position()) return hide(true);
+    if (!raf) {
+      // Permission and lazy previews may become available after the pointer has stopped.
+      lastMove = Date.now();
+      raf = requestAnimationFrame(() => {
+        pill.classList.add("shown");
+        tick();
+      });
+    }
   }
 
   // `now`: at once and whatever has the focus (dismissed, the video gone).
@@ -1743,30 +1994,43 @@ button:focus-visible { outline: none; }
     lookingFor = null;
     resting.leave();
     tipOff();
+    pill.classList.remove("shown");
+    cancelAnimationFrame(raf);
+    raf = 0;
+    if (now || reduced) root.style.setProperty("display", "none", "important");
     if (now) {
       held = null;
       closeMenu();
       shadow.activeElement?.blur();
     }
-    pill.classList.remove("shown");
-    cancelAnimationFrame(raf);
-    raf = 0;
+    if (now || reduced) return;
     const was = video;
     setTimeout(() => {
       if (!pill.classList.contains("shown") && video === was) root.style.setProperty("display", "none", "important");
-    }, now || reduced ? 0 : 140);
+    }, 140);
   }
 
   // What the button sends for `v` (its rectangle `r`): see `download`.
   function describe(v, r) {
+    if (v.localName === "a") {
+      const card = v.closest("yt-lockup-view-model, ytd-rich-grid-media, ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer");
+      const title = card?.querySelector("#video-title, .yt-lockup-metadata-view-model-wiz__title, .yt-lockup-metadata-view-model__title")?.textContent.trim() || "";
+      // A thumbnail's own watch link is authoritative. A player underneath it could be
+      // previewing a different video, so send no player coordinates for this source.
+      return {
+        thumbnail: true, title, url: youtubeThumbnailUrl(v), href: v.href, src: "", blob: "", at: null,
+        drm: Boolean(v.querySelector("video")?.mediaKeys),
+      };
+    }
     const url = videoPage(v);
-    // Its own plain file (not a stream the page assembles, blob:). Not beside a post a big site's
-    // reader knows (#689): the app would take the file over the post, its title and qualities.
+    // Keep the player's HTTP source for when the post lookup can't offer this video.
     const file = /^https?:/i.test(v.currentSrc || "") ? v.currentSrc : "";
-    const post = Boolean(url) && url !== location.href && SITES.some((s) => s.hosts.test(siteName(host)));
+    const post = !onYouTube && Boolean(url) && url !== location.href;
     return {
       drm: Boolean(v.mediaKeys),
       src: post ? "" : file,
+      fallbackSrc: post ? file : "",
+      post,
       // What a player fed by the page plays (a MediaSource's blob:): one per video it plays.
       blob: /^blob:/i.test(v.currentSrc || "") ? v.currentSrc : "",
       url,
@@ -1780,40 +2044,46 @@ button:focus-visible { outline: none; }
   function hold() {
     const now = Date.now();
     const d = entered && entered.v === video && now - entered.t < 1000 ? entered.d : describe(video, lastRect);
-    return { r: lastRect, at: chosen ? place : (auto.v === video && auto.at) || place, miniplayer: pinned?.miniplayer, d, since: now };
+    return { r: lastRect, at: pinned?.at || auto?.at || place, miniplayer: pinned?.miniplayer, d, since: now };
   }
 
-  // While shown: follow the video (scrolling, layout) and fade when the pointer rests (IDLE_MS)
-  // or at once when it leaves the video.
+  // While shown: follow the video's layout and fade when the pointer leaves it.
+  // Players also fade on idle; a hovered YouTube thumbnail keeps its card action available.
   function tick() {
     raf = 0;
-    if (!video || allowed === false) return hide(true);
+    if (!video || (allowed === false && status?.state !== "off")) return hide(true);
     if (hideFullscreen && document.fullscreenElement) return hide(true);
+    const thumbnail = video.localName === "a";
+    if (thumbnail && current?.v === video && current.d.href !== video.href &&
+        current.d.url !== youtubeThumbnailUrl(video)) return hide(true);
     const onButton = root.matches(":hover");
     if (!video.isConnected || !eligible(video)) {
       if (!held && lastRect && !isDismissed(video)) held = hold();
       const r = held && held.r;
       const over =
         r && pointer.x >= r.left && pointer.x <= r.right && pointer.y >= r.top && pointer.y <= r.bottom;
-      if (!held || !(onButton || menuOpen || dragging || keyboardOn() || (over && Date.now() - held.since < HOLD_MS))) {
+      if (!held || !(menuOpen || status || dragging || keyboardOn() || ((onButton || over) && Date.now() - held.since < HOLD_MS))) {
         const was = held;
         held = null;
         video = null;
         // Left after it was held: it fades, as when the pointer leaves a video.
         return was ? hide() : hide(true);
       }
-      position();
+      if (!position()) return hide(true);
       raf = requestAnimationFrame(tick);
       return;
     }
     held = null;
-    const r = video.getBoundingClientRect();
+    const r = mediaRect(video);
     const over =
       pointer.x >= r.left && pointer.x <= r.right && pointer.y >= r.top && pointer.y <= r.bottom;
-    if (!onButton && !menuOpen && !dragging && !keyboardOn() && (!over || Date.now() - lastMove > IDLE_MS)) {
+    // The confirmation button may sit outside the video, so keep the download feedback
+    // visible for its own duration even after the picker closes.
+    if (!onButton && !menuOpen && !status && !dragging && !keyboardOn() &&
+        (!over || (!thumbnail && Date.now() - lastMove > IDLE_MS))) {
       return hide();
     }
-    position();
+    if (!position()) return hide(true);
     raf = requestAnimationFrame(tick);
   }
 
@@ -1822,17 +2092,29 @@ button:focus-visible { outline: none; }
   // player's controls shown on pause or play), and that brought the button back.
   function onMove(e) {
     if (e.clientX === pointer.x && e.clientY === pointer.y) return;
+    clearTimeout(previewTimer);
     pointer = { x: e.clientX, y: e.clientY };
+    awaitingPointer = false;
     lastMove = Date.now();
     if (!scan) scan = requestAnimationFrame(look);
   }
 
   function look() {
     scan = 0;
-    if (dragging || never || (allowed === false && answered())) return;
+    if (awaitingPointer || dragging || never || (allowed === false && answered())) return;
     // Kept on its video while its menu is open (pointerTarget).
     const v = pointerTarget(videoAt(pointer.x, pointer.y), video, menuOpen);
-    if (!v) return;
+    if (!v) {
+      // Some hover players mount after the pointer stops. Briefly check that preview without
+      // rearming the overlay for unrelated page changes or for a scroll.
+      if (onYouTube && !menuOpen && Date.now() - lastMove < IDLE_MS &&
+          document.elementFromPoint(pointer.x, pointer.y)?.closest(YOUTUBE_PREVIEW)) {
+        clearTimeout(previewTimer);
+        previewTimer = setTimeout(look, 125);
+      }
+      return;
+    }
+    clearTimeout(previewTimer);
     if (!answered()) return void ask().then(() => allowed && look());
     show(v);
   }
@@ -1859,10 +2141,7 @@ button:focus-visible { outline: none; }
         placed = true;
         try {
           const { positions } = await ext.storage.local.get({ positions: {} });
-          if (positions[host]) {
-            place = snap(positions[host]);
-            chosen = true;
-          }
+          if (positions[host]) place = snap(positions[host]);
         } catch {
           // Default spot.
         }
@@ -1879,7 +2158,7 @@ button:focus-visible { outline: none; }
     tipTimer = setTimeout(() => {
       if (dragging || menuOpen || !root.matches(":hover") || pill.classList.contains("bare")) return;
       tip.classList.add("on");
-      if (pinned) placeTip(pinned.left, pill.offsetWidth);
+      placeTip();
     }, TIP_MS);
   }
   function tipOff() {
@@ -1915,9 +2194,9 @@ button:focus-visible { outline: none; }
     return Promise.race([promise, late]).finally(() => clearTimeout(timer));
   };
 
-  // The click: the best quality its look-up found, started by MDM at once (while the look-up
+  // The click: the best quality its look-up found, started by ODM at once (while the look-up
   // runs, as soon as it ends); the video's own plain file as a file. `row`: a quality of its menu
-  // instead. `toWindow`: "All qualities and subtitles…", MDM's Download video window, which is
+  // instead. `toWindow`: "All qualities and subtitles…", ODM's Download video window, which is
   // also where a click goes when nothing was found (no look-ups here, yt-dlp missing, a list, an
   // error: the window says so and offers what to do).
   async function download(row, toWindow = false) {
@@ -1929,10 +2208,11 @@ button:focus-visible { outline: none; }
       // Asked now, not kept: one <video> plays many videos at the same address (a feed's
       // previews). A video gone from under the button: what it played then (#503).
       const d = held ? held.d : describe(video, video.getBoundingClientRect());
+      if (d.thumbnail && (!d.url || d.url !== current?.d.url)) return hide(true);
       // Encrypted (DRM): no tool can save it; it says so rather than send it.
       if (d.drm) return render();
       const og = location.href === landedAt ? document.querySelector('meta[property="og:title"]')?.content : "";
-      const title = (og || document.title || "").trim();
+      const title = d.title ?? (og || document.title || "").trim();
       const j = { video, src: video.currentSrc || "", href: location.href, asked: { src: d.src, title, url: d.url, at: d.at, useSiteCookies }, row, toWindow };
       const c = { v: video, d, key: lookKey(d) };
       let l = lookOf(c);
@@ -1946,10 +2226,7 @@ button:focus-visible { outline: none; }
       // A file the tab played, found as the look-up ended (#1092).
       if (l.file) return await useWindow(playedJob(j, l), { direct: true, words: qualityName(l, t) });
       const a = lookupAction(l, t);
-      if (a.act === "flash") return showFlash(a, l);
-      // The post a video in a feed sits in, which can't be looked up from here (#689): opening
-      // the post is the user's step ("Open post"; the menu's "All qualities…" still has the window).
-      if (a.act !== "offer" && l.post && l.state === "failed") return showFlash({ kind: "warn", text: t("video_open_post") }, l);
+      if (a.act === "flash" && !(d.post && l.state === "several")) return showFlash(a, l);
       if (a.act !== "offer") return await useWindow(playedJob(j, l));
       const choices = l.choices;
       const i = row && Number.isInteger(row.choice) ? row.choice : choices.indexOf(bestOf(l));
@@ -1963,10 +2240,11 @@ button:focus-visible { outline: none; }
   // own (`src`), a stream for the window.
   function playedJob(j, l) {
     if (!l || !l.played) return j;
-    return { ...j, asked: { ...j.asked, ...(l.file ? { src: l.played } : {}), played: l.played } };
+    const src = l.src || (l.file ? l.played : "");
+    return { ...j, asked: { ...j.asked, ...(src ? { src } : {}), played: l.played } };
   }
 
-  // A quality the look-up offered: MDM downloads it (its own choice of it, with what it looked the
+  // A quality the look-up offered: ODM downloads it (its own choice of it, with what it looked the
   // video up with) without its window. Only the token and the quality's number go.
   async function pick(j, l, i) {
     if (!l.token || l.picked || !(i >= 0 && i < Math.min(l.choices.length, 100))) return useWindow(playedJob(j, l));
@@ -1997,11 +2275,12 @@ button:focus-visible { outline: none; }
   }
 
   // The click as it always was: the app's Download video window for this video, once per click;
-  // or (`direct`) the video's own plain file, downloaded by MDM as a file at once.
+  // or (`direct`) the video's own plain file, downloaded by ODM as a file at once.
   async function useWindow(j, { direct = false, words = "" } = {}) {
     if (!firstWindow(j)) return;
     // Where the video is now, for the background to ask the page's player there.
-    const r = await send({ type: "video", ...j.asked, ...(direct ? { direct: true } : {}), at: middle(j.video, j.asked.at) });
+    const target = j.asked.at === null ? j.asked : { ...j.asked, at: middle(j.video, j.asked.at) };
+    const r = await send({ type: "video", ...target, ...(direct ? { direct: true } : {}) });
     if (r.gone) return;
     if (r.ok) {
       lastShow = r.show || "";
@@ -2011,11 +2290,11 @@ button:focus-visible { outline: none; }
     }
     if (r.why === "options") return offStatus();
     if (r.why === "unnamed" || r.why === "feed") return showFlash({ kind: "warn", text: t(r.why === "unnamed" ? "video_unnamed" : "video_open_post") }, null);
-    // MDM isn't there or didn't start: red, with the way to get it and another try.
-    setStatus({ state: "err", text: t("video_no_answer"), acts: [["get", t("video_get_mdm")], ["retry", t("video_retry")]], again: { row: j.row, toWindow: j.toWindow } }, 9000);
+    // ODM isn't there or didn't start: red, with the way to get it and another try.
+    setStatus({ state: "err", text: t("video_no_answer"), acts: [["get", t("video_get_odm")], ["retry", t("video_retry")]], again: { row: j.row, toWindow: j.toWindow } }, 9000);
   }
 
-  // A status's buttons: "Show", "Open post", "Get MDM", "Retry", "Turn on". Only the user's own.
+  // A status's buttons: "Show", "Open post", "Get Orbit", "Retry", "Turn on". Only the user's own.
   let lastShow = "";
   acts.addEventListener("click", async (e) => {
     if (!e.isTrusted) return;
@@ -2029,7 +2308,7 @@ button:focus-visible { outline: none; }
       send({ type: "open-post", url: s.post });
       endStatus(true);
     } else if (name === "get") {
-      send({ type: "get-mdm" });
+      send({ type: "get-odm" });
     } else if (name === "retry") {
       endStatus(true);
       download(s.again && s.again.row, Boolean(s.again && s.again.toWindow));
@@ -2043,22 +2322,35 @@ button:focus-visible { outline: none; }
   });
 
   // ---- the menu -------------------------------------------------------------------------------
-  // The video's qualities as its look-up found them, with the configured row marked.
-  // MDM's whole window, hiding and settings follow the list. Filled as it
-  // opens and again when the look-up ends.
+  // Each tab keeps its selection until the panel closes or its lookup changes.
+  const QUALITY_LIMIT = 6;
+  let panelLook = null;
+  let kind = "video";
+  const selected = { video: null, audio: null };
+  const expanded = { video: false, audio: false };
+
   function fillMenu() {
     const c = video ? describeNow(video) : null;
     const look = lookOf(c);
     const site = host.replace(/^www\./, "");
-    $(".mh .t").textContent = String((look && look.title) || document.title || "").slice(0, 200);
+    $(".mh .t").textContent = String((look && look.title) || c?.d.title || document.title || "").slice(0, 200);
     $(".mh .s").textContent = headerLine("", video && video.duration, site);
     rows.replaceChildren();
     note.hidden = true;
     note.classList.remove("warn");
     note.replaceChildren();
-    const best = bestOf(look);
+    const results = look?.state === "ready" && Array.isArray(look.choices) ? look : null;
+    if (panelLook !== results) {
+      panelLook = results;
+      kind = "video";
+      selected.video = selected.audio = null;
+      expanded.video = expanded.audio = false;
+    }
+    segments.hidden = true;
+    confirm.hidden = true;
     if (look && look.file) {
-      rows.append(fileRow(best));
+      rows.append(row(look, "file", false, true));
+      updateConfirm(look, "file");
     } else if (look && look.state === "pending") {
       say(t("video_looking"));
       for (let i = 0; i < 3; i += 1) {
@@ -2067,22 +2359,8 @@ button:focus-visible { outline: none; }
         s.setAttribute("aria-hidden", "true");
         rows.append(s);
       }
-    } else if (look && look.state === "ready" && Array.isArray(look.choices) && look.choices.length) {
-      const groups = groupChoices(look.choices, 100);
-      const primary = menuDefault(look);
-      for (const [kind, words] of [["video", "video_tab_video"], ["audio", "video_tab_audio"]]) {
-        const choices = groups[kind].filter((i) => i !== primary.hidden);
-        if (!choices.length) continue;
-        const cap = document.createElement("div");
-        cap.className = "cap";
-        cap.dataset.kind = kind;
-        cap.textContent = t(words);
-        rows.append(cap);
-        for (const i of choices) {
-          const isDefault = i === primary.marked;
-          rows.append(row(look.choices[i], isDefault ? primary.pick : i, isDefault));
-        }
-      }
+    } else if (results?.choices.length) {
+      showChoices(results);
       tell(noticeOf(look));
     } else if (look) {
       // What the look-up came to, in its words; the window does the rest.
@@ -2090,7 +2368,55 @@ button:focus-visible { outline: none; }
       if (a.act === "say" || a.act === "flash") say(a.text, a.detail);
       tell(noticeOf(look));
     }
+    rows.hidden = !rows.childElementCount;
     if (menuOpen) position();
+  }
+
+  function showChoices(look) {
+    const groups = groupChoices(look.choices, 100);
+    const primary = menuDefault(look);
+    for (const mode of ["video", "audio"]) {
+      groups[mode] = groups[mode].filter((i) => look.choices[i] && i !== primary.hidden);
+    }
+    if (!groups[kind].length) kind = kind === "video" ? "audio" : "video";
+    const choices = groups[kind];
+    if (!choices.length) return;
+    segments.hidden = false;
+    for (const tab of tabs) {
+      const mode = tab.dataset.kind;
+      tab.disabled = !groups[mode].length;
+      tab.setAttribute("aria-pressed", String(mode === kind));
+      tab.querySelector(".count").textContent = String(groups[mode].length);
+    }
+    const current = choices.includes(selected[kind]) ? selected[kind]
+      : choices.includes(primary.marked) ? primary.marked : choices[0];
+    selected[kind] = current;
+    const common = choices.slice(0, QUALITY_LIMIT);
+    if (!common.includes(current)) common[QUALITY_LIMIT - 1] = current;
+    const other = choices.filter((i) => !common.includes(i));
+    const visible = expanded[kind] ? choices : common;
+    rows.replaceChildren(...visible.map((i) => row(look.choices[i], i, i === primary.marked, i === current)));
+    if (other.length) {
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "show-more";
+      toggle.setAttribute("aria-expanded", String(expanded[kind]));
+      toggle.append(span("", expanded[kind] ? t("video_fewer_qualities") : t("video_more_qualities", String(other.length))));
+      if (!expanded[kind]) {
+        toggle.append(span("rest", other.map((i) => lineWords(look.choices[i], t).q).join(", ")));
+      }
+      toggle.append(more.querySelector("svg").cloneNode(true));
+      rows.append(toggle);
+    }
+    updateConfirm(look.choices[current], current === primary.marked ? primary.pick : current);
+  }
+
+  function updateConfirm(c, choice) {
+    const quality = qualityName(c, t);
+    $(".confirm-label").textContent = c.audio ? t("video_download_audio") : quality ? t("video_tip", quality) : idleLabel;
+    $(".confirm-size").textContent = choiceSize(c, lang);
+    confirm.dataset.choice = String(choice);
+    confirm.hidden = false;
   }
 
   // The menu's message (plain text), with the app's own words under it.
@@ -2136,50 +2462,30 @@ button:focus-visible { outline: none; }
     return s;
   };
 
-  // A quality's words on its line: "1080p", "MP4 · 60 fps"; the sound's "MP3", "320 kbps", and
-  // the sound as the site sends it "128 kbps · original" (just "original" when its rate isn't said).
+  // Keep technical details in each row's tooltip and distinguish the original audio with a tag.
   function lineWords(c, t) {
     if (c && c.audio === true) {
       const rate = Number(c.kbps) > 0 ? `${Math.round(c.kbps)} kbps` : /\bVBR\b/.test(String(c.label || "")) ? "VBR" : "";
-      return { q: String(c.ext || "").toUpperCase(), f: [rate, c.original === true ? t("video_original") : ""].filter(Boolean).join(" · ") };
+      return { q: [String(c.ext || "").toUpperCase(), rate].filter(Boolean).join(" · ") || t("video_tab_audio"), f: "" };
     }
     return { q: qualityName(c, t), f: qualityMeta(c, t) };
   }
 
-  // A plain file has no quality list.
-  function fileRow(c) {
+  function row(c, choice, isDefault, isSelected) {
     const b = document.createElement("button");
     b.type = "button";
-    b.setAttribute("role", "menuitem");
-    b.className = "top sel";
-    b.dataset.row = "file";
-    const mi = span("mi", "");
-    mi.append(arrowIcon.cloneNode(true));
-    b.append(mi, span("lead", t("video_download")), span("f", qualityName(c, t)), span("z", choiceSize(c, lang)));
-    return b;
-  }
-  const arrowIcon = $(".tpl svg");
-
-  function row(c, choice, isDefault) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.setAttribute("role", "menuitem");
+    b.setAttribute("aria-pressed", String(isSelected));
+    b.classList.toggle("sel", isSelected);
     b.dataset.choice = String(choice);
     const { q, f } = lineWords(c, t);
-    if (c && c.compatible === true) b.title = String(c.label ?? "").slice(0, 200);
-    b.append(span("q", c.audio && f ? `${q} · ${f}` : q));
-    if (isDefault) b.append(span("default-tag", t("video_default_quality")));
+    b.title = c.compatible ? String(c.label ?? "").slice(0, 200) : [q, f].filter(Boolean).join(" · ");
+    const radio = span("radio", "");
+    radio.setAttribute("aria-hidden", "true");
+    b.append(radio, span("q", q));
+    if (c.original) b.append(span("default-tag", t("video_original")));
+    else if (isDefault) b.append(span("default-tag", t("video_default_quality")));
     b.append(span("z", choiceSize(c, lang)));
     return b;
-  }
-
-  // The menu's items the arrows go through.
-  const menuItems = () => [...menu.querySelectorAll("button")];
-  function focusItem(b) {
-    if (!b) return;
-    b.focus();
-    // The line the arrows are on is the one Enter downloads.
-    if (rows.contains(b)) for (const r of rows.querySelectorAll("button")) r.classList.toggle("sel", r === b);
   }
 
   function openMenu() {
@@ -2188,46 +2494,85 @@ button:focus-visible { outline: none; }
     // Its look-up, when none was asked yet (the menu opened at once), or asked again when the app
     // was too busy for it before.
     if (video) startLook(describeNow(video), true);
+    panelLook = null;
     menuOpen = true;
-    fillMenu();
     menu.classList.add("open");
+    pill.classList.add("expanded");
+    pill.style.width = `${pill.offsetWidth}px`;
     more.setAttribute("aria-expanded", "true");
     lastMove = Date.now();
-    position();
-    focusItem(menuItems()[0]);
+    fillMenu();
+    (rows.querySelector(".sel") || panelClose).focus();
   }
 
   function closeMenu() {
     if (!menuOpen) return;
-    const back = menu.contains(shadow.activeElement);
+    const back = menu.contains(shadow.activeElement) || extras.contains(shadow.activeElement);
+    closeExtras(false);
     menuOpen = false;
     menuAbove = null;
     menu.classList.remove("open");
     more.setAttribute("aria-expanded", "false");
-    // The keyboard's focus back on its button, not lost with the menu.
-    if (back) more.focus();
+    if (back) (pill.classList.contains("bare") ? go : more).focus({ preventScroll: true });
+    pill.classList.remove("expanded");
+    pill.style.removeProperty("width");
   }
 
-  // An item of the menu, clicked or by key.
-  function runItem(b) {
-    if (!b) return;
-    if (b.dataset.choice !== undefined) return download({ choice: Number(b.dataset.choice) });
-    if (b.dataset.row !== undefined) return download();
-    run(b.dataset.act);
+  function openExtras() {
+    extras.hidden = false;
+    extraToggle.setAttribute("aria-expanded", "true");
+    placeExtras();
+    extraItems[0].focus();
+  }
+
+  function closeExtras(restoreFocus = true) {
+    if (extras.hidden) return;
+    extras.hidden = true;
+    extraToggle.setAttribute("aria-expanded", "false");
+    if (restoreFocus) extraToggle.focus();
   }
 
   menu.addEventListener("click", (e) => {
     if (!e.isTrusted) return;
-    runItem(e.target.closest("button"));
+    const button = e.target.closest("button");
+    if (!button) return;
+    if (button === panelClose) return closeMenu();
+    if (button === confirm) {
+      return confirm.dataset.choice === "file" ? download() : download({ choice: Number(confirm.dataset.choice) });
+    }
+    if (button === extraToggle) {
+      return extras.hidden ? openExtras() : closeExtras();
+    }
+    if (!panelLook) return;
+    if (button.dataset.kind) {
+      kind = button.dataset.kind;
+      rows.scrollTop = 0;
+      return fillMenu();
+    }
+    if (button.classList.contains("show-more")) {
+      expanded[kind] = !expanded[kind];
+      fillMenu();
+      rows.querySelector(".show-more")?.focus();
+      return;
+    }
+    if (button.dataset.choice !== undefined) {
+      selected[kind] = Number(button.dataset.choice);
+      fillMenu();
+      rows.querySelector(".sel")?.focus({ preventScroll: true });
+    }
+  });
+  cookies.addEventListener("change", (e) => {
+    if (e.isTrusted) setCookieMode(cookies.checked);
+  });
+  extras.addEventListener("click", (e) => {
+    if (e.isTrusted) {
+      const button = e.target.closest("button");
+      if (button) run(button.dataset.act);
+    }
   });
 
   async function run(act) {
     if (act === "window") return download(null, true);
-    if (act === "cookies") {
-      setCookieMode(useSiteCookies === false);
-      item("cookies").focus();
-      return;
-    }
     closeMenu();
     if (act === "hide") return hideHere();
     if (act === "never") {
@@ -2255,12 +2600,6 @@ button:focus-visible { outline: none; }
     if (!e.isTrusted) return;
     menuOpen ? closeMenu() : openMenu();
   });
-  // ✕: hidden on this video.
-  closeX.addEventListener("click", (e) => {
-    if (!e.isTrusted) return;
-    hideHere();
-  });
-
   // The pointer reached the button: what the video plays now, kept in case the page stops it for
   // that (a hover-to-play preview, #503).
   root.addEventListener("pointerenter", () => {
@@ -2269,54 +2608,52 @@ button:focus-visible { outline: none; }
     }
   });
 
-  // Keys (only the user's own, never ones a page script makes up): in the menu the arrows, Home
-  // and End move, Enter and Space pick, Escape closes it; on the button ↓ opens the menu and
-  // Escape hides it on this video. Each stops there: a key the button used is not the page's too
-  // (a player's Space and arrows would pause it and change its volume behind the menu).
+  // A player's keyboard shortcuts must not also handle keys used by the panel.
   shadow.addEventListener("keydown", (e) => {
     if (!e.isTrusted) return;
     const focused = shadow.activeElement;
-    const inMenu = menuOpen && focused && menu.contains(focused);
+    const inExtras = !extras.hidden && extras.contains(focused);
+    const inPanel = menuOpen && menu.contains(focused);
+    const arrows = ["ArrowDown", "ArrowUp", "Home", "End"];
     if (e.key === "Escape" && menuOpen) {
-      closeMenu();
-      more.focus();
-      e.preventDefault();
-      e.stopPropagation();
+      if (!extras.hidden) closeExtras();
+      else closeMenu();
     } else if (e.key === "Escape" && focused && pill.contains(focused)) {
       hideHere();
-      e.preventDefault();
-      e.stopPropagation();
-    } else if (inMenu && focused !== menu && (e.key === "Enter" || e.key === " ")) {
-      // The focused item, whatever the browser does with a key on a button.
-      runItem(focused);
-      e.preventDefault();
-      e.stopPropagation();
-    } else if (menuOpen && ["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
-      const items = menuItems();
-      focusItem(items[moveIn(items.indexOf(focused), items.length, e.key)]);
-      e.preventDefault();
-      e.stopPropagation();
+    } else if (inExtras && arrows.includes(e.key)) {
+      extraItems[moveIn(extraItems.indexOf(focused), extraItems.length, e.key)].focus();
+    } else if (inExtras && e.key === "Tab") {
+      closeExtras();
+      return;
+    } else if (inPanel && arrows.includes(e.key) && (rows.contains(focused) || focused === panelClose)) {
+      const items = [...rows.querySelectorAll("button")];
+      if (!items.length) return;
+      items[moveIn(items.indexOf(focused), items.length, e.key)].focus();
+    } else if (inPanel && focused === extraToggle && e.key === "ArrowDown") {
+      openExtras();
     } else if (!menuOpen && e.key === "ArrowDown" && (focused === go || focused === more)) {
       openMenu();
-      e.preventDefault();
-      e.stopPropagation();
+    } else {
+      if ((inPanel || inExtras) && (arrows.includes(e.key) || e.key === "Enter" || e.key === " ")) e.stopPropagation();
+      return;
     }
+    e.preventDefault();
+    e.stopPropagation();
   });
 
   // The main part: a click downloads, a drag moves it (and is not a click).
   // Only the user's own clicks and keys (never events a page script makes up).
   go.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0 || !video || !e.isTrusted) return;
+    if (e.button !== 0 || !video || !pinned || !e.isTrusted) return;
     tipOff();
-    const { r, roomX, roomY } = rects();
     dragging = {
       id: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
       // Where in the button it was taken.
-      dx: e.clientX - (r.left + INSET + (chosen ? place : auto.at || place).x * roomX),
-      dy: e.clientY - (r.top + INSET + (chosen ? place : auto.at || place).y * roomY),
-      at: chosen ? place : auto.at || place,
+      dx: e.clientX - pinned.left,
+      dy: e.clientY - pinned.top,
+      at: pinned.at,
       moved: false,
     };
     go.setPointerCapture(e.pointerId);
@@ -2330,11 +2667,11 @@ button:focus-visible { outline: none; }
       closeMenu();
       pill.classList.add("dragging");
     }
-    const { r, roomX, roomY } = rects();
+    const { r, roomX, roomY, insetX, insetY } = rects();
     const c = (n) => Math.min(1, Math.max(0, n));
     dragging.at = {
-      x: roomX ? c((e.clientX - dragging.dx - r.left - INSET) / roomX) : 0,
-      y: roomY ? c((e.clientY - dragging.dy - r.top - INSET) / roomY) : 0,
+      x: roomX ? c((e.clientX - dragging.dx - r.left - insetX) / roomX) : 0,
+      y: roomY ? c((e.clientY - dragging.dy - r.top - insetY) / roomY) : 0,
     };
     position();
   });
@@ -2346,14 +2683,17 @@ button:focus-visible { outline: none; }
     guide.classList.remove("on");
     if (!d.moved) {
       // A click: the quality one click gets (a status's own buttons do the rest).
-      if (e.type === "pointerup" && !pill.classList.contains("bare")) download();
+      if (e.type === "pointerup" && !pill.classList.contains("bare")) {
+        if (e.pointerType === "touch" || e.pointerType === "pen") openMenu();
+        else download();
+      }
       return;
     }
     place = snap(d.at);
-    chosen = true;
     // It snaps to its spot although the pointer is still on it (#560's pin is for a video
     // that changes under a still pointer, not for the user's own move).
     pinned = null;
+    auto = null;
     position();
     lastMove = Date.now();
     // Remembered per site, not in a private window (it would keep the site's name), and the
@@ -2382,15 +2722,59 @@ button:focus-visible { outline: none; }
   });
 
   // ---- wiring -----------------------------------------------------------------------------------
+  function dismissForScroll() {
+    awaitingPointer = true;
+    clearTimeout(previewTimer);
+    if (!video && !scan && !asking) return;
+    cancelAnimationFrame(scan);
+    scan = 0;
+    if (dragging) {
+      if (go.hasPointerCapture(dragging.id)) go.releasePointerCapture(dragging.id);
+      dragging = null;
+      pill.classList.remove("dragging");
+      guide.classList.remove("on");
+    }
+    video = null;
+    lastRect = null;
+    entered = null;
+    auto = null;
+    hide(true);
+  }
+
+  function onPageScroll(e) {
+    const target = e.target;
+    if (target === document || target === document.scrollingElement || target === globalThis) {
+      dismissForScroll();
+      return;
+    }
+    for (let parent = video; parent; parent = upFrom(parent)) {
+      if (parent === target) {
+        dismissForScroll();
+        return;
+      }
+    }
+  }
+
+  function onWheel(e) {
+    if (!e.isTrusted || e.ctrlKey || (!e.deltaX && !e.deltaY)) return;
+    // Wheel scrolling within the quality picker belongs to the picker.
+    if (menuOpen && (menu.matches(":hover") || (!extras.hidden && extras.matches(":hover")))) return;
+    pointer = { x: e.clientX, y: e.clientY };
+    dismissForScroll();
+  }
+
   // The extension updated or removed under this page: the button and its listeners go (a fresh
   // copy of this script comes with the new extension).
   function teardown() {
     looks.clear();
     clearTimeout(lookTimer);
+    clearTimeout(previewTimer);
     resting.leave();
     cancelAnimationFrame(raf);
     cancelAnimationFrame(scan);
     removeEventListener("pointermove", onMove, true);
+    removeEventListener("wheel", onWheel, true);
+    removeEventListener("scroll", onPageScroll, true);
     removeEventListener("keydown", onTab, true);
     removeEventListener("loadstart", onLoadStart, true);
     root.remove();
@@ -2398,11 +2782,18 @@ button:focus-visible { outline: none; }
     allowed = false;
     video = null;
   }
-  globalThis.__mdmVideoButton = { alive: () => Boolean(ext.runtime?.id), teardown };
+  globalThis.__odmVideoButton = { alive: () => Boolean(ext.runtime?.id), teardown };
   addEventListener("pointermove", onMove, { capture: true, passive: true });
+  addEventListener("wheel", onWheel, { capture: true, passive: true });
+  addEventListener("scroll", onPageScroll, { capture: true, passive: true });
   addEventListener("pointerdown", (e) => {
     if (menuOpen && !e.composedPath().includes(root)) closeMenu();
   }, { capture: true, passive: true });
+  // Inside the closed shadow tree the full event path is available.
+  shadow.addEventListener("pointerdown", (e) => {
+    if (!extras.hidden && !extras.contains(e.target) && !extraToggle.contains(e.target)) closeExtras(false);
+  });
+  menu.addEventListener("scroll", placeExtras);
   // A video with the keyboard's focus, or a player around one (its controls), gets the button
   // too, kept while the focus stays there; Tab goes from there to the button. Not the focus a
   // click gives (#741): a click that plays or pauses the video shows nothing.
@@ -2411,11 +2802,12 @@ button:focus-visible { outline: none; }
     const t = e.target;
     if (!t.matches(":focus-visible")) return;
     const v =
-      t instanceof HTMLMediaElement ? t : [...t.querySelectorAll("video, audio")].find(eligible) || null;
+      t instanceof HTMLMediaElement ? t : youtubeThumbnail(t) || [...t.querySelectorAll("video, audio")].find(eligible) || null;
     if (!v || !eligible(v)) return;
+    awaitingPointer = false;
     focusedPlayer = t;
     ask().then(() => {
-      if (!allowed) return;
+      if (!allowed || awaitingPointer || document.activeElement !== t) return;
       lastMove = Date.now();
       show(v);
     });

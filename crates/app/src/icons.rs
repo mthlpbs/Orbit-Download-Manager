@@ -313,7 +313,7 @@ impl Icon {
                     // the program's life, as its texture is (a few per theme).
                     let uri: &'static str = Box::leak(
                         format!(
-                            "bytes://mdm/toolbar/{}-{}-{}{}.svg",
+                            "bytes://odm/toolbar/{}-{}-{}{}.svg",
                             self.name(),
                             if enabled { "on" } else { "off" },
                             a.trim_start_matches('#'),

@@ -1,14 +1,14 @@
-//! #226: started with the session, MDM waits in the notification area. The real app, off the
-//! screens (MDM_OFFSCREEN), with a data folder of its own, started as its startup entry starts
-//! it (`/startup`), with its tray icon (MDM_TEST_TRAY: off-screen copies have none otherwise):
+//! #226: started with the session, ODM waits in the notification area. The real app, off the
+//! screens (ODM_OFFSCREEN), with a data folder of its own, started as its startup entry starts
+//! it (`/startup`), with its tray icon (ODM_TEST_TRAY: off-screen copies have none otherwise):
 //! the icon is shown and no window is, the list's clock runs, and a second launch by the user
 //! shows the window as always. On the way, the startup entry versions before 0.5.0 wrote (the
 //! program alone) is written again with `/startup`: on Windows a Run value of the test's own name
-//! (MDM_TEST_RUN_VALUE, deleted after; the user's own is never read nor written by an off-screen
+//! (ODM_TEST_RUN_VALUE, deleted after; the user's own is never read nor written by an off-screen
 //! copy), on Linux an autostart entry in a configuration folder of the test's own.
 //!
 //! It opens windows, which needs OpenGL or Direct3D, so it runs on request:
-//! `cargo test -p mdm-app --test startup_tray -- --ignored`.
+//! `cargo test -p odm-app --test startup_tray -- --ignored`.
 
 use std::path::Path;
 use std::process::{Child, Command};
@@ -52,13 +52,13 @@ fn wait_for(app: &mut Child, data: &Path, line: &str, wait: Duration) {
 /// The app's environment: off the screens, its own data folder, its tray icon, and (Windows) a
 /// Run value or (Linux) an autostart folder of the test's own.
 fn env<'a>(cmd: &'a mut Command, data: &Path, startup: &Startup) -> &'a mut Command {
-    cmd.env("MDM_DATA_DIR", data)
-        .env("MDM_OFFSCREEN", "1")
-        .env("MDM_TEST_TRAY", "1")
+    cmd.env("ODM_DATA_DIR", data)
+        .env("ODM_OFFSCREEN", "1")
+        .env("ODM_TEST_TRAY", "1")
         // A test's shell isn't asked where the icon is: say it is shown (app.rs tray_icon).
-        .env("MDM_TEST_TRAY_VISIBLE", "1");
+        .env("ODM_TEST_TRAY_VISIBLE", "1");
     #[cfg(windows)]
-    cmd.env("MDM_TEST_RUN_VALUE", &startup.name);
+    cmd.env("ODM_TEST_RUN_VALUE", &startup.name);
     #[cfg(unix)]
     cmd.env("XDG_CONFIG_HOME", &startup.config);
     cmd
@@ -248,7 +248,7 @@ fn a_start_with_the_session_waits_in_the_tray() {
         // uses; port 9 on this computer: nothing answers, nothing leaves it): Download File
         // Info opens (#145, #173).
         let status = env(&mut Command::new(APP), &data, &startup)
-            .args(["/d", "http://127.0.0.1:9/mdm-test-226.zip"])
+            .args(["/d", "http://127.0.0.1:9/odm-test-226.zip"])
             .status()
             .unwrap();
         assert!(status.success());

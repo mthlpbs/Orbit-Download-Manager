@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use mdm_labserver::{Config, Faults, LabServer, LogEntry, content};
+use odm_labserver::{Config, Faults, LabServer, LogEntry, content};
 
 async fn server(faults: &str) -> LabServer {
     LabServer::start(Config {
@@ -173,7 +173,7 @@ async fn a_refusal_shows_how_far_the_slots_responses_were_sent() {
         "{response:?}, {got} bytes received"
     );
     assert!(
-        r.held.contains(&mdm_labserver::Held::default()),
+        r.held.contains(&odm_labserver::Held::default()),
         "the test's slot"
     );
     // Other entries have none.
@@ -730,14 +730,14 @@ async fn hls_and_dash_without_their_endings_or_types() {
 /// The HLS video tracks and the audio track merge as yt-dlp merges a site's (its `[Merger]`:
 /// `-map 0:v:0 -map 1:a:0`, copied into MP4), and the result decodes: a video track that held
 /// only sound failed with "Error opening output files: Invalid argument". Ignored: it needs
-/// `MDM_TEST_FFMPEG` (ffmpeg's program).
+/// `ODM_TEST_FFMPEG` (ffmpeg's program).
 ///
-///   MDM_TEST_FFMPEG=…\ffmpeg.exe cargo test -p mdm-labserver --test http -- --ignored hls_tracks
+///   ODM_TEST_FFMPEG=…\ffmpeg.exe cargo test -p odm-labserver --test http -- --ignored hls_tracks
 #[tokio::test]
 #[ignore]
 async fn hls_tracks_merge_as_yt_dlp_merges_them() {
     use std::process::Command;
-    let ffmpeg = std::env::var("MDM_TEST_FFMPEG").expect("set MDM_TEST_FFMPEG");
+    let ffmpeg = std::env::var("ODM_TEST_FFMPEG").expect("set ODM_TEST_FFMPEG");
     let s = server("").await;
     let dir = tempfile::tempdir().unwrap();
     let joined = |track: &str| dir.path().join(format!("{track}.ts"));

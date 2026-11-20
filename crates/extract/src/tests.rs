@@ -47,7 +47,7 @@ fn no_staging(dest: &Path) {
     let left: Vec<_> = std::fs::read_dir(dest)
         .unwrap()
         .filter_map(|e| e.ok())
-        .filter(|e| e.file_name().to_string_lossy().starts_with(".mdm-extract-"))
+        .filter(|e| e.file_name().to_string_lossy().starts_with(".odm-extract-"))
         .collect();
     assert!(left.is_empty(), "staging left behind: {left:?}");
 }
@@ -492,7 +492,7 @@ fn external_7zip_goes_through_the_same_checks() {
 }
 
 /// Like [`run`], with HatchZip and in place as given (7-Zip as installed unless `no_7zip`),
-/// MDM's records of its runs in `runs`.
+/// ODM's records of its runs in `runs`.
 fn run_hz(
     archive: &Path,
     dest: &Path,
@@ -644,7 +644,7 @@ fn hatchzip_gets_its_paths_after_a_double_dash() {
     r.unwrap();
     let args = std::fs::read_to_string(t.path().join("-y.zip.args")).unwrap();
     let out = t.path().join("-y.hatchzip-out");
-    // It runs in its output folder, not in the folder MDM was started in (#845).
+    // It runs in its output folder, not in the folder ODM was started in (#845).
     let cwd = std::fs::read_to_string(t.path().join("-y.zip.cwd")).unwrap();
     assert_eq!(
         Path::new(cwd.trim()),
@@ -690,7 +690,7 @@ fn without_7zip_hatchzip_is_used_only_when_asked() {
 #[test]
 fn an_archive_hatchzip_cant_extract_in_place_is_extracted_as_usual() {
     // A solid RAR: HatchZip refuses before it touches anything, asking for --keep-archive (its
-    // own words, 0.1.10). Here a ZIP stands in for it, which MDM then extracts itself.
+    // own words, 0.1.10). Here a ZIP stands in for it, which ODM then extracts itself.
     let t = tempfile::tempdir().unwrap();
     let runs = tempfile::tempdir().unwrap();
     let a = t.path().join("solid.zip");
@@ -767,12 +767,12 @@ fn a_stop_partway_in_place_keeps_what_came_out() {
 
 #[cfg(unix)]
 #[test]
-fn a_run_mdm_started_is_finished_by_hatchzip() {
+fn a_run_odm_started_is_finished_by_hatchzip() {
     let t = tempfile::tempdir().unwrap();
     let runs = tempfile::tempdir().unwrap();
     let a = t.path().join("half.zip");
     zip_of(&a, &[("one.txt", b"1")], None);
-    // MDM starts it in place; HatchZip stops partway and keeps its progress beside the archive.
+    // ODM starts it in place; HatchZip stops partway and keeps its progress beside the archive.
     let stops = "printf x > \"$out/one.txt\"\n: > \"$archive.hatchzip\"";
     let (r, _) = run_hz(
         &a,
@@ -809,7 +809,7 @@ fn a_run_mdm_started_is_finished_by_hatchzip() {
 
 #[cfg(unix)]
 #[test]
-fn a_progress_file_mdm_didnt_write_starts_nothing() {
+fn a_progress_file_odm_didnt_write_starts_nothing() {
     // A download (or a torrent) that comes with HatchZip's progress file beside the archive.
     for in_place in [false, true] {
         let t = tempfile::tempdir().unwrap();

@@ -10,9 +10,10 @@
 //    to the app (message `link`); if the app doesn't take it, the click goes on as if never held.
 (() => {
   // One watcher per page: a copy cut off from the extension (after an update) gives way.
-  const prev = globalThis.__mdmPage;
+  const prev = globalThis.__odmPage;
   if (prev && typeof prev === "object" && prev.alive()) return;
   if (prev && typeof prev.stop === "function") prev.stop();
+  globalThis.__mdmPage?.stop?.(); // A tab that is still open from the previous extension.
   const ext = globalThis.browser ?? globalThis.chrome;
   const SAFARI = Boolean(ext.runtime.getManifest?.().browser_specific_settings?.safari);
   const FIREFOX = /^moz-extension:/i.test(ext.runtime.getURL?.("") || "");
@@ -81,7 +82,7 @@
     const name = a.getAttribute("download") || "";
     tell({ type: "link", url: a.href, ...(name ? { name } : {}) }).then((reply) => {
       if (reply && reply.taken) return;
-      // Not the app's (Options, an excluded site, MDM not running): the click as it was, its
+      // Not the app's (Options, an excluded site, ODM not running): the click as it was, its
       // Cmd/Shift/Ctrl too (a new tab or window stays one). This one isn't trusted, so `note`
       // leaves it alone.
       const keys = { ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey };
@@ -139,7 +140,7 @@
   // After the page's own listeners on the link and its document: a click bubbles to the window
   // last.
   addEventListener("click", follow, false);
-  globalThis.__mdmPage = {
+  globalThis.__odmPage = {
     alive: () => Boolean(ext.runtime?.id),
     stop: () => {
       removeEventListener("pointerdown", press, true);

@@ -210,7 +210,7 @@ fn set_aside_broken(db: &Path, len: usize, why: &str) {
         Ok(()) => tracing::warn!(
             "torrents: the saved torrent list {} could not be read ({len} bytes: {why}); kept as \
              {}, and the session starts with a new one. The download list's torrents are added \
-             again from MDM's own .torrent copies when they start",
+             again from ODM's own .torrent copies when they start",
             db.display(),
             aside.display()
         ),
@@ -225,7 +225,7 @@ fn set_aside_broken(db: &Path, len: usize, why: &str) {
 /// Before librqbit restores its saved torrents (`session.json` and a `<hash>.torrent` for each,
 /// in `dir`), take out the ones the name check refuses, and those saved without their .torrent
 /// (whose names it can't check): the app adds those again itself, through `add` and its own
-/// copy. The rest keep only the trackers MDM may contact (`trackers`, `proxied`), in the list and
+/// copy. The rest keep only the trackers ODM may contact (`trackers`, `proxied`), in the list and
 /// in their .torrent. Rewritten through a temporary file (`replace_file`). A list librqbit
 /// couldn't read is set aside (`set_aside_broken`, #1357); one that can't be opened is left to
 /// librqbit, whose error says why.
@@ -261,7 +261,7 @@ fn prepare_saved(dir: &Path, proxied: bool) {
             return false;
         };
         if let Some(filtered) = trackers::filter_torrent(&bytes, proxied).filter(|f| *f != bytes) {
-            let tmp = dir.join(format!("{hash}.torrent.mdm-tmp"));
+            let tmp = dir.join(format!("{hash}.torrent.odm-tmp"));
             let _ = replace_file(&file, &tmp, &filtered);
         }
         if let Some(list) = entry.get_mut("trackers").and_then(|t| t.as_array_mut()) {
@@ -277,7 +277,7 @@ fn prepare_saved(dir: &Path, proxied: bool) {
     let Ok(out) = serde_json::to_string(&doc) else {
         return;
     };
-    let _ = replace_file(&db, &dir.join("session.json.mdm-tmp"), out.as_bytes());
+    let _ = replace_file(&db, &dir.join("session.json.odm-tmp"), out.as_bytes());
 }
 
 /// The torrent's file names checked for this system (`names`); padding files are never written.
@@ -466,7 +466,7 @@ pub struct Config {
     /// LSD, UDP trackers, UPnP and incoming connections around it, so with a proxy those are off
     /// and UDP trackers dropped (`trackers`).
     pub proxy: Option<String>,
-    /// A blocklist MDM converted (`blocklist::convert`, P2P lines): peers in it are refused.
+    /// A blocklist ODM converted (`blocklist::convert`, P2P lines): peers in it are refused.
     pub blocklist: Option<PathBuf>,
     /// Tests: no trackers, local peers only, everything on loopback; no DHT unless
     /// `dht_bootstrap` names its nodes.
@@ -536,7 +536,7 @@ pub struct Lookup {
 /// What a lookup has got so far (`Lookup::status`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct LookupStatus {
-    /// The trackers asked (those MDM may contact, `trackers`).
+    /// The trackers asked (those ODM may contact, `trackers`).
     pub trackers: usize,
     /// Whether the DHT is asked (Torrent settings, no proxy).
     pub dht: bool,
@@ -651,7 +651,7 @@ fn bootstrap_nodes(cfg: &Config) -> Vec<String> {
 
 /// The file in the state folder that keeps the port picked when Torrent settings name none
 /// (#650): the next session listens on it again, so peers that learned it, and a router's or
-/// firewall's rule for it, still reach MDM.
+/// firewall's rule for it, still reach ODM.
 const PORT_FILE: &str = "listen-port";
 
 fn saved_port(state_dir: &Path) -> Option<u16> {
@@ -663,7 +663,7 @@ fn saved_port(state_dir: &Path) -> Option<u16> {
         .filter(|p| *p != 0)
 }
 
-/// Where the session listens, in MDM's log (#650): a listener on every address is one IPv6
+/// Where the session listens, in ODM's log (#650): a listener on every address is one IPv6
 /// socket that takes IPv4 too, which Windows' `netstat -p tcp` (IPv4 only) doesn't list.
 /// `saved_nodes`: the DHT started from the nodes the last session saved (`dht.json`). `utp`:
 /// asked to listen on uTP too (when its UDP port can't be had, librqbit's error is just before:
@@ -864,12 +864,12 @@ impl Torrents {
                 env!("CARGO_PKG_VERSION_MAJOR"),
                 env!("CARGO_PKG_VERSION_MINOR")
             )),
-            // Its HTTP clients (trackers, UPnP) with MDM's TLS setup: on a system without CA
+            // Its HTTP clients (trackers, UPnP) with ODM's TLS setup: on a system without CA
             // certificates librqbit's own can't be built and the session wouldn't start; with
-            // it, plain HTTP trackers work and HTTPS ones fail saying why (mdm_engine::tls).
-            configure_http_client: Some(Arc::new(mdm_engine::tls::configure)),
+            // it, plain HTTP trackers work and HTTPS ones fail saying why (odm_engine::tls).
+            configure_http_client: Some(Arc::new(odm_engine::tls::configure)),
             // The peers others name (trackers, the DHT, other peers), only at addresses on the
-            // internet: one on this computer or the local network would let a torrent make MDM
+            // internet: one on this computer or the local network would let a torrent make ODM
             // connect into the network it sits in, as a tracker there would (`trackers`). The
             // local network's peers come from local peer discovery, which isn't asked. A test's
             // session has its peers on loopback.
@@ -970,7 +970,7 @@ impl Torrents {
         lookup: Option<&Lookup>,
     ) -> Result<Meta, TorrentError> {
         let add = match src {
-            // Only the trackers MDM may contact (#40, `trackers`).
+            // Only the trackers ODM may contact (#40, `trackers`).
             Source::Magnet(m) => {
                 let m = trackers::filter_magnet(m, self.proxied);
                 if let Some(l) = lookup {
@@ -1729,7 +1729,7 @@ mod tests {
             Some(bound),
             "it listens on its address only"
         );
-        // Loopback trackers straight to the session: MDM's own `add` drops them (#40).
+        // Loopback trackers straight to the session: ODM's own `add` drops them (#40).
         let out = tmp.path().join("got");
         let added = leecher
             .session
@@ -1929,7 +1929,7 @@ mod tests {
             .unwrap();
         let out = tmp.path().join("out");
         let bad = if cfg!(windows) {
-            ["Q:mdm-test.bin", "x.bin:hidden", "NUL.txt"].as_slice()
+            ["Q:odm-test.bin", "x.bin:hidden", "NUL.txt"].as_slice()
         } else {
             ["tab\there.bin"].as_slice()
         };
@@ -2033,7 +2033,7 @@ mod tests {
                 tokio::time::sleep(Duration::from_millis(50)).await;
             }
         }
-        // RUST_LOG=mdm_torrent=warn shows the warning (the PR's log excerpt).
+        // RUST_LOG=odm_torrent=warn shows the warning (the PR's log excerpt).
         let _ = tracing_subscriber::fmt()
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
             .with_test_writer()
@@ -2124,7 +2124,7 @@ mod tests {
         }
     }
 
-    /// #40: a kept torrent keeps only the trackers MDM may contact, in session.json and in its
+    /// #40: a kept torrent keeps only the trackers ODM may contact, in session.json and in its
     /// .torrent (whose info, so its hash, stays the same); with a proxy, UDP ones go too.
     /// #40: a fixed port is the one listened on; with a proxy nothing listens (incoming
     /// connections would go around it). Nothing else of the network is on (no DHT, UPnP, LSD).
@@ -3010,7 +3010,7 @@ mod tests {
 
     /// #92: a magnet's file list comes through the DHT after nodes that are gone answered with
     /// an ICMP "port unreachable". On Windows that error makes the DHT socket's next receive
-    /// fail, and librqbit's DHT (9.0.1, in MDM 0.2.4) stopped for the rest of the session on it:
+    /// fail, and librqbit's DHT (9.0.1, in ODM 0.2.4) stopped for the rest of the session on it:
     /// a magnet the trackers didn't serve then never resolved. The lookup counts what it got.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn a_magnet_resolves_through_the_dht_after_unreachable_nodes() {
@@ -3081,7 +3081,7 @@ mod tests {
     }
 
     /// A peer on this computer that the DHT names is left alone: like a tracker there
-    /// (`trackers`), it would let a torrent make MDM connect into the network it sits in. A
+    /// (`trackers`), it would let a torrent make ODM connect into the network it sits in. A
     /// test's session (`offline`) is given the same peer by the same node, and asks it.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn a_peer_on_this_computer_that_the_dht_names_is_not_asked() {

@@ -4489,7 +4489,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-app"
+name = "odm-app"
 version = "26.11.20"
 dependencies = [
  "arboard",
@@ -4504,18 +4504,18 @@ dependencies = [
  "egui_extras",
  "egui_system_font_provider",
  "image",
- "mdm-cli",
- "mdm-cnl",
- "mdm-crash",
- "mdm-debrid",
- "mdm-engine",
- "mdm-extract",
- "mdm-geo",
- "mdm-ipc",
- "mdm-labserver",
- "mdm-remote",
- "mdm-tools",
- "mdm-torrent",
+ "odm-cli",
+ "odm-cnl",
+ "odm-crash",
+ "odm-debrid",
+ "odm-engine",
+ "odm-extract",
+ "odm-geo",
+ "odm-ipc",
+ "odm-labserver",
+ "odm-remote",
+ "odm-tools",
+ "odm-torrent",
  "open",
  "percent-encoding",
  "qrcodegen",
@@ -4543,16 +4543,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-cli"
+name = "odm-cli"
 version = "26.11.20"
 dependencies = [
  "anyhow",
  "clap",
  "ctrlc",
- "mdm-engine",
- "mdm-ipc",
- "mdm-tools",
- "mdm-torrent",
+ "odm-engine",
+ "odm-ipc",
+ "odm-tools",
+ "odm-torrent",
  "reqwest 0.13.5",
  "serde_json",
  "tempfile",
@@ -4562,7 +4562,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-cnl"
+name = "odm-cnl"
 version = "26.11.20"
 dependencies = [
  "aes",
@@ -4575,14 +4575,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-crash"
+name = "odm-crash"
 version = "26.11.20"
 dependencies = [
  "breakpad-symbols",
  "chrono",
  "crash-handler",
  "libc",
- "mdm-engine",
+ "odm-engine",
  "minidump",
  "minidump-processor",
  "minidump-unwind",
@@ -4600,14 +4600,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-debrid"
+name = "odm-debrid"
 version = "26.11.20"
 dependencies = [
  "bytes",
  "chrono",
  "futures",
- "mdm-engine",
- "mdm-labserver",
+ "odm-engine",
+ "odm-labserver",
  "reqwest 0.13.5",
  "serde",
  "serde_json",
@@ -4620,7 +4620,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-engine"
+name = "odm-engine"
 version = "26.11.20"
 dependencies = [
  "aes",
@@ -4638,7 +4638,7 @@ dependencies = [
  "httpdate",
  "hyper-util",
  "md-5",
- "mdm-labserver",
+ "odm-labserver",
  "network-interface",
  "percent-encoding",
  "proptest",
@@ -4671,12 +4671,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-extract"
+name = "odm-extract"
 version = "26.11.20"
 dependencies = [
  "flate2",
  "lzma-rust2",
- "mdm-engine",
+ "odm-engine",
  "tar",
  "tempfile",
  "tracing",
@@ -4684,7 +4684,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-geo"
+name = "odm-geo"
 version = "26.11.20"
 dependencies = [
  "lzma-rust2",
@@ -4693,7 +4693,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-ipc"
+name = "odm-ipc"
 version = "26.11.20"
 dependencies = [
  "craft-atomic",
@@ -4705,7 +4705,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-labserver"
+name = "odm-labserver"
 version = "26.11.20"
 dependencies = [
  "anyhow",
@@ -4734,10 +4734,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-mcp"
+name = "odm-mcp"
 version = "26.11.20"
 dependencies = [
- "mdm-ipc",
+ "odm-ipc",
  "rmcp",
  "schemars 1.2.3",
  "serde",
@@ -4748,25 +4748,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-nmhost"
+name = "odm-nmhost"
 version = "26.11.20"
 dependencies = [
  "chrono",
- "mdm-ipc",
+ "odm-ipc",
  "serde",
  "serde_json",
  "windows-sys 0.61.2",
 ]
 
 [[package]]
-name = "mdm-remote"
+name = "odm-remote"
 version = "26.11.20"
 dependencies = [
  "aws-lc-rs",
  "axum",
  "hex",
- "mdm-engine",
- "mdm-ipc",
+ "odm-engine",
+ "odm-ipc",
  "rcgen",
  "reqwest 0.13.5",
  "rustls",
@@ -4780,7 +4780,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-tools"
+name = "odm-tools"
 version = "26.11.20"
 dependencies = [
  "aws-lc-rs",
@@ -4789,9 +4789,9 @@ dependencies = [
  "craft-atomic",
  "futures",
  "hex",
- "mdm-engine",
- "mdm-ipc",
- "mdm-labserver",
+ "odm-engine",
+ "odm-ipc",
+ "odm-labserver",
  "percent-encoding",
  "reqwest 0.13.5",
  "rustix 1.1.6",
@@ -4810,14 +4810,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdm-torrent"
+name = "odm-torrent"
 version = "26.11.20"
 dependencies = [
  "anyhow",
  "flate2",
  "librqbit",
  "librqbit-dualstack-sockets",
- "mdm-engine",
+ "odm-engine",
  "serde_json",
  "tempfile",
  "thiserror 2.0.21",

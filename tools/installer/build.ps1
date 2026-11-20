@@ -1,7 +1,7 @@
 # Builds the Windows release for one processor into target/dist/ (-Arch x64, the default; arm64;
 # x86). The x64 files keep the names they had before there were others, so every copy installed
 # before finds its update (crates/tools/src/update.rs Install::assets_on):
-#   OrbitDownloadManager-<version>-setup.exe        the installer (tools/installer/mdm.iss)
+#   OrbitDownloadManager-<version>-setup.exe        the installer (tools/installer/odm.iss)
 #   OrbitDownloadManager-<version>-portable.zip     the same programs with a `data` folder (portable
 #                                                    mode: settings beside the exe, no registry)
 #   OrbitDownloadManager-<version>-x64.zip          the same programs, data in %APPDATA% as installed
@@ -11,11 +11,11 @@
 # Needs Inno Setup 6.3 or later (ISCC.exe on PATH, in $env:ISCC, or in its default folders), and
 # Rust's target for the processor (rustup target add aarch64-pc-windows-msvc / i686-pc-windows-msvc).
 # The programs are built in target/<Rust's target>/release.
-# Code signing: set $env:MDM_SIGN_COMMAND to a signtool command line with $f for the file, e.g.
+# Code signing: set $env:ODM_SIGN_COMMAND to a signtool command line with $f for the file, e.g.
 #   signtool sign /fd sha256 /tr http://timestamp.digicert.com /td sha256 /a $f
 # Inno Setup then signs the programs (in place, so the zip carries them signed too), the
 # installer and its uninstaller.
-param([switch]$InstallerOnly, [switch]$NoBuild, [string]$SignCommand = $env:MDM_SIGN_COMMAND,
+param([switch]$InstallerOnly, [switch]$NoBuild, [string]$SignCommand = $env:ODM_SIGN_COMMAND,
   [ValidateSet("x64", "arm64", "x86")][string]$Arch = "x64")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -31,13 +31,13 @@ if (-not $version) { throw "no version in Cargo.toml" }
 
 if (-not $NoBuild) {
   # The build machine's paths out of the programs (#25): panic locations and debug info say
-  # "cargo\..." for cargo's folder and "mdm\..." for this checkout (shorter, and no user name).
+  # "cargo\..." for cargo's folder and "odm\..." for this checkout (shorter, and no user name).
   # Encoded flags, as those paths may hold spaces. They replace .cargo/config.toml's, so its
   # C runtime built into the programs (#785: no VCRUNTIME140.dll from Windows) is repeated here.
   $cargoHome = if ($env:CARGO_HOME) { $env:CARGO_HOME } else { Join-Path $env:USERPROFILE ".cargo" }
-  $env:CARGO_ENCODED_RUSTFLAGS = "--remap-path-prefix=$cargoHome=cargo" + [char]0x1f + "--remap-path-prefix=$root=mdm" + [char]0x1f + "-Ctarget-feature=+crt-static"
+  $env:CARGO_ENCODED_RUSTFLAGS = "--remap-path-prefix=$cargoHome=cargo" + [char]0x1f + "--remap-path-prefix=$root=odm" + [char]0x1f + "-Ctarget-feature=+crt-static"
   try {
-    & cargo build --locked --release --target $target -p mdm-app -p mdm-nmhost -p mdm-cli -p mdm-mcp
+    & cargo build --locked --release --target $target -p odm-app -p odm-nmhost -p odm-cli -p odm-mcp
     if ($LASTEXITCODE) { throw "cargo build failed" }
   } finally {
     Remove-Item Env:CARGO_ENCODED_RUSTFLAGS
@@ -53,8 +53,8 @@ if (-not $iscc) { throw "Inno Setup 6 (ISCC.exe) not found" }
 
 New-Item -ItemType Directory -Force $dist | Out-Null
 $isccArgs = @("/Qp", "/DAppVersion=$version", "/DArch=$Arch", "/DBin=$bin")
-if ($SignCommand) { $isccArgs += @("/DSign", "/Smdmsign=$SignCommand") }
-& $iscc @isccArgs (Join-Path $PSScriptRoot "mdm.iss")
+if ($SignCommand) { $isccArgs += @("/DSign", "/Sodmsign=$SignCommand") }
+& $iscc @isccArgs (Join-Path $PSScriptRoot "odm.iss")
 if ($LASTEXITCODE) { throw "ISCC failed" }
 
 # The zips: the same programs; the portable one adds a `data` folder next to the exe, which
@@ -71,7 +71,7 @@ function New-Zip([string]$name, [bool]$portable) {
   }
   New-Item -ItemType Directory -Force (Join-Path $stage "extension") | Out-Null
   Copy-Item (Join-Path $root "target\extension\chromium") (Join-Path $stage "extension\chromium") -Recurse
-  Copy-Item (Join-Path $root "target\extension\mdm-firefox.xpi") (Join-Path $stage "extension")
+  Copy-Item (Join-Path $root "target\extension\odm-firefox.xpi") (Join-Path $stage "extension")
   Copy-Item (Join-Path $root "LICENSE") (Join-Path $stage "LICENSE.txt")
   Copy-Item (Join-Path $root "ATTRIBUTION.md") (Join-Path $stage "ATTRIBUTION.txt")
   if ($portable) {

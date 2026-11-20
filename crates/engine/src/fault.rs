@@ -1,4 +1,4 @@
-//! What stopped a request, in kinds a person can act on (#816): MDM's own requests (its helpers'
+//! What stopped a request, in kinds a person can act on (#816): ODM's own requests (its helpers'
 //! release lists and checksums, its updates) say which server they couldn't reach and why, not a
 //! bare "network error".
 

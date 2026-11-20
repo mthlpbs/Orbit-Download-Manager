@@ -1,13 +1,13 @@
 //! AllDebrid, Premiumize, TorBox and Mega-Debrid against the lab server's fakes (labserver `debrid`), end to end
-//! through MDM's engine, as `realdebrid.rs` does for Real-Debrid. The fake host `hoster.test`
+//! through ODM's engine, as `realdebrid.rs` does for Real-Debrid. The fake host `hoster.test`
 //! resolves nowhere: a download that completes came through the service's direct link.
 
 use std::sync::Arc;
 use std::time::Duration;
 
-use mdm_debrid::{Account, Credential, Debrid, Http, ServiceKind, Services, check, signin};
-use mdm_engine::{Destination, Download, Error, Options, Refusal, Request, ServiceFault};
-use mdm_labserver::{Config, LabServer, content, debrid::seed};
+use odm_debrid::{Account, Credential, Debrid, Http, ServiceKind, Services, check, signin};
+use odm_engine::{Destination, Download, Error, Options, Refusal, Request, ServiceFault};
+use odm_labserver::{Config, LabServer, content, debrid::seed};
 use url::Url;
 
 async fn lab() -> (LabServer, Arc<Http>) {
@@ -36,7 +36,7 @@ async fn account(http: &Arc<Http>, service: ServiceKind, token: &str) -> Debrid 
 async fn download(d: &Debrid, link: &str) -> Result<std::path::PathBuf, Error> {
     let url: Url = link.parse().unwrap();
     let dir = std::env::temp_dir().join(format!(
-        "mdm-debrid-svc-{}-{}",
+        "odm-debrid-svc-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -199,7 +199,7 @@ async fn premiumize_links_come_through_the_account() {
             }
         )
         .await,
-        Err(mdm_debrid::Fault::Service(ServiceFault::SignIn))
+        Err(odm_debrid::Fault::Service(ServiceFault::SignIn))
     ));
     // Premiumize signs in by its API key only.
     assert!(signin::start(&http, ServiceKind::Premiumize).await.is_err());
@@ -223,7 +223,7 @@ async fn torbox_links_come_through_the_account_once_it_has_the_file() {
     assert_eq!(free.premium, Some(false));
     assert!(matches!(
         check(&http, ServiceKind::TorBox, key("bad")).await,
-        Err(mdm_debrid::Fault::Service(ServiceFault::SignIn))
+        Err(odm_debrid::Fault::Service(ServiceFault::SignIn))
     ));
     // Or by its device code: the code shown, TorBox's page, then the key once allowed there.
     let code = signin::start(&http, ServiceKind::TorBox).await.unwrap();
@@ -267,7 +267,7 @@ async fn torbox_links_come_through_the_account_once_it_has_the_file() {
     for _ in 0..300 {
         seen = seen.or(dl.snapshot().at_service);
         tokio::time::sleep(Duration::from_millis(50)).await;
-        if dl.snapshot().state == mdm_engine::download::State::Done {
+        if dl.snapshot().state == odm_engine::download::State::Done {
             break;
         }
     }
@@ -317,7 +317,7 @@ async fn torbox_links_come_through_the_account_once_it_has_the_file() {
 async fn megadebrid_links_come_through_the_account_by_key_or_password() {
     let (lab, http) = lab().await;
     // An application's key: it works, and the API has no call that says whether its account is
-    // premium, so MDM doesn't claim it is.
+    // premium, so ODM doesn't claim it is.
     let info = check(
         &http,
         ServiceKind::MegaDebrid,
@@ -425,7 +425,7 @@ async fn megadebrid_links_come_through_the_account_by_key_or_password() {
             }
         )
         .await,
-        Err(mdm_debrid::Fault::Service(ServiceFault::SignIn))
+        Err(odm_debrid::Fault::Service(ServiceFault::SignIn))
     ));
     assert!(matches!(
         check(
@@ -436,7 +436,7 @@ async fn megadebrid_links_come_through_the_account_by_key_or_password() {
             }
         )
         .await,
-        Err(mdm_debrid::Fault::Service(ServiceFault::SignIn))
+        Err(odm_debrid::Fault::Service(ServiceFault::SignIn))
     ));
     // No torrents through Mega-Debrid yet: they go to an account that takes them.
     assert_eq!(d.torrent_account(), None);

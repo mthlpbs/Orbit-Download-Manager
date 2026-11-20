@@ -372,7 +372,7 @@
           ]
         },
         "checksum": {
-          "description": "The checksum the finished file must have, as the command line takes it (`sha256:…`, a\nbare hex value, …): `mdm_engine::verify::Hash` reads it.",
+          "description": "The checksum the finished file must have, as the command line takes it (`sha256:…`, a\nbare hex value, …): `odm_engine::verify::Hash` reads it.",
           "type": [
             "string",
             "null"
@@ -612,7 +612,7 @@
         },
         "startup": {
           "default": false,
-          "description": "`/startup` (beyond IDM): started with the session (Options → General → Launch on\nstartup, or the installer's \"Start when Windows starts\", #226): MDM starts in the\nnotification area, its window hidden. Changes nothing in a running app.",
+          "description": "`/startup` (beyond IDM): started with the session (Options → General → Launch on\nstartup, or the installer's \"Start when Windows starts\", #226): ODM starts in the\nnotification area, its window hidden. Changes nothing in a running app.",
           "type": "boolean"
         },
         "token": {
@@ -633,6 +633,17 @@
             "string",
             "null"
           ]
+        },
+        "video_cookies": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VideoCookies"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cookie source selected for a video session. Cookie values remain in request memory."
         },
         "video_direct": {
           "default": false,
@@ -768,7 +779,7 @@
         },
         "label": {
           "default": "",
-          "description": "What the menu shows (\"720p mp4\"), in MDM's language.",
+          "description": "What the menu shows (\"720p mp4\"), in ODM's language.",
           "type": "string"
         },
         "original": {
@@ -794,6 +805,41 @@
         }
       },
       "type": "object"
+    },
+    "VideoCookies": {
+      "oneOf": [
+        {
+          "enum": [
+            "site",
+            "none"
+          ],
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "browser": {
+              "properties": {
+                "browser": {
+                  "type": "string"
+                },
+                "profile": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "browser",
+                "profile"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "browser"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "VideoLookup": {
       "description": "The video the browser's quality menu asks about ([`Command::video_lookup`]).",
@@ -826,14 +872,27 @@
       "description": "The browser's quality menu (`video_lookup`, `video_poll`, `video_pick`): where a look-up is,\nor what became of a choice. Answered whatever the automation API's switch (the browser's\nhost asks, not a program).",
       "properties": {
         "choices": {
-          "description": "`ready`: the qualities to choose from, labelled in MDM's language; `video_pick` takes a\nplace in this list.",
+          "description": "`ready`: the qualities to choose from, labelled in ODM's language; `video_pick` takes a\nplace in this list.",
           "items": {
             "$ref": "#/$defs/VideoChoice"
           },
           "type": "array"
         },
+        "default_action_only": {
+          "description": "The primary button still uses the configured selector when it cannot be matched to\na quality on the page. That action is kept out of the extension's quality list.",
+          "type": "boolean"
+        },
+        "default_choice": {
+          "description": "The row used by the extension's primary download button.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "message": {
-          "description": "`failed` with [`lookup::ERROR`]: why, in MDM's words and language.",
+          "description": "`failed` with [`lookup::ERROR`]: why, in ODM's words and language.",
           "type": [
             "string",
             "null"
@@ -880,7 +939,7 @@
       "type": "object"
     },
     "VideoNotice": {
-      "description": "A word in the browser's quality menu on what the look-up lacked (#852), in MDM's language.",
+      "description": "A word in the browser's quality menu on what the look-up lacked (#852), in ODM's language.",
       "properties": {
         "link": {
           "default": "",
@@ -894,7 +953,7 @@
         },
         "url": {
           "default": "",
-          "description": "The help page it opens, on MDM's website.",
+          "description": "The help page it opens, on ODM's website.",
           "type": "string"
         }
       },

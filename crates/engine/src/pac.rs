@@ -26,7 +26,7 @@ pub enum Route {
     Proxy(String),
 }
 
-/// The routes for `url` under `script`: its answer's entries that MDM can use, in order (the
+/// The routes for `url` under `script`: its answer's entries that ODM can use, in order (the
 /// first is taken). Err if the script doesn't run.
 pub fn routes(script: &Arc<str>, url: &Url) -> Result<Vec<Route>, String> {
     use std::hash::{Hash, Hasher};
@@ -128,8 +128,8 @@ fn run(script: &str, url: &str, host: &str) -> Result<String, String> {
                 end.set((end.get() + start.elapsed()).min(last));
                 ip
             };
-            global.set("__mdmResolve", Function::new(ctx.clone(), lookup)?)?;
-            global.set("__mdmMyIp", Function::new(ctx.clone(), my_ip)?)?;
+            global.set("__odmResolve", Function::new(ctx.clone(), lookup)?)?;
+            global.set("__odmMyIp", Function::new(ctx.clone(), my_ip)?)?;
             ctx.eval::<(), _>(HELPERS)?;
             ctx.eval::<(), _>(script)?;
             global.get::<_, Value>("FindProxyForURL")
@@ -146,7 +146,7 @@ fn run(script: &str, url: &str, host: &str) -> Result<String, String> {
     })
 }
 
-/// `__mdmResolve(host)`: the host's first IPv4 address, or "".
+/// `__odmResolve(host)`: the host's first IPv4 address, or "".
 fn resolve(host: &str) -> String {
     (host, 0)
         .to_socket_addrs()
@@ -156,7 +156,7 @@ fn resolve(host: &str) -> String {
         .unwrap_or_default()
 }
 
-/// `__mdmMyIp()`: this computer's address on its network (the one a connection out would use;
+/// `__odmMyIp()`: this computer's address on its network (the one a connection out would use;
 /// nothing is sent), else 127.0.0.1.
 fn my_ip() -> String {
     crate::net::source_address(IpAddr::from([192, 0, 2, 1]))
@@ -175,11 +175,11 @@ function localHostOrDomainIs(host, hostdom) {
   host = String(host).toLowerCase(); hostdom = String(hostdom).toLowerCase();
   return host === hostdom || (host.indexOf('.') < 0 && hostdom.indexOf(host + '.') === 0);
 }
-function dnsResolve(host) { var a = __mdmResolve(String(host)); return a === '' ? null : a; }
+function dnsResolve(host) { var a = __odmResolve(String(host)); return a === '' ? null : a; }
 function isResolvable(host) { return dnsResolve(host) !== null; }
-function myIpAddress() { return __mdmMyIp(); }
+function myIpAddress() { return __odmMyIp(); }
 function dnsDomainLevels(host) { return String(host).split('.').length - 1; }
-function __mdmAddr(s) {
+function __odmAddr(s) {
   var p = String(s).split('.');
   if (p.length !== 4) return null;
   var n = 0;
@@ -191,11 +191,11 @@ function __mdmAddr(s) {
   }
   return n;
 }
-function convert_addr(ipchars) { var n = __mdmAddr(ipchars); return n === null ? 0 : n; }
+function convert_addr(ipchars) { var n = __odmAddr(ipchars); return n === null ? 0 : n; }
 function isInNet(host, pattern, mask) {
-  var ip = __mdmAddr(host) !== null ? host : dnsResolve(host);
+  var ip = __odmAddr(host) !== null ? host : dnsResolve(host);
   if (ip === null) return false;
-  var a = __mdmAddr(ip), p = __mdmAddr(pattern), m = __mdmAddr(mask);
+  var a = __odmAddr(ip), p = __odmAddr(pattern), m = __odmAddr(mask);
   if (a === null || p === null || m === null) return false;
   return ((a & m) >>> 0) === ((p & m) >>> 0);
 }
@@ -203,21 +203,21 @@ function shExpMatch(str, exp) {
   var re = String(exp).replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
   return new RegExp('^' + re + '$').test(String(str));
 }
-var __mdmDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-var __mdmMonths = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-function __mdmGmt(args) { return args.length > 0 && String(args[args.length - 1]).toUpperCase() === 'GMT'; }
-function __mdmIn(v, lo, hi) { return lo <= hi ? (v >= lo && v <= hi) : (v >= lo || v <= hi); }
+var __odmDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+var __odmMonths = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+function __odmGmt(args) { return args.length > 0 && String(args[args.length - 1]).toUpperCase() === 'GMT'; }
+function __odmIn(v, lo, hi) { return lo <= hi ? (v >= lo && v <= hi) : (v >= lo || v <= hi); }
 function weekdayRange() {
-  var a = Array.prototype.slice.call(arguments), gmt = __mdmGmt(a);
+  var a = Array.prototype.slice.call(arguments), gmt = __odmGmt(a);
   if (gmt) a.pop();
   var now = new Date(), d = gmt ? now.getUTCDay() : now.getDay();
-  var d1 = __mdmDays.indexOf(String(a[0]).toUpperCase());
-  var d2 = a.length > 1 ? __mdmDays.indexOf(String(a[1]).toUpperCase()) : d1;
+  var d1 = __odmDays.indexOf(String(a[0]).toUpperCase());
+  var d2 = a.length > 1 ? __odmDays.indexOf(String(a[1]).toUpperCase()) : d1;
   if (d1 < 0 || d2 < 0) return false;
-  return __mdmIn(d, d1, d2);
+  return __odmIn(d, d1, d2);
 }
 function timeRange() {
-  var a = Array.prototype.slice.call(arguments), gmt = __mdmGmt(a);
+  var a = Array.prototype.slice.call(arguments), gmt = __odmGmt(a);
   if (gmt) a.pop();
   a = a.map(function (x) { return parseInt(x, 10); });
   var now = new Date();
@@ -226,20 +226,20 @@ function timeRange() {
   var s = gmt ? now.getUTCSeconds() : now.getSeconds();
   var t = h * 3600 + m * 60 + s;
   if (a.length === 1) return h === a[0];
-  if (a.length === 2) return __mdmIn(h, a[0], a[1]);
-  if (a.length === 4) return __mdmIn(t, a[0] * 3600 + a[1] * 60, a[2] * 3600 + a[3] * 60 + 59);
-  if (a.length === 6) return __mdmIn(t, a[0] * 3600 + a[1] * 60 + a[2], a[3] * 3600 + a[4] * 60 + a[5]);
+  if (a.length === 2) return __odmIn(h, a[0], a[1]);
+  if (a.length === 4) return __odmIn(t, a[0] * 3600 + a[1] * 60, a[2] * 3600 + a[3] * 60 + 59);
+  if (a.length === 6) return __odmIn(t, a[0] * 3600 + a[1] * 60 + a[2], a[3] * 3600 + a[4] * 60 + a[5]);
   return false;
 }
 function dateRange() {
-  var a = Array.prototype.slice.call(arguments), gmt = __mdmGmt(a);
+  var a = Array.prototype.slice.call(arguments), gmt = __odmGmt(a);
   if (gmt) a.pop();
   var now = new Date();
   var cur = { d: gmt ? now.getUTCDate() : now.getDate(), m: gmt ? now.getUTCMonth() : now.getMonth(),
               y: gmt ? now.getUTCFullYear() : now.getFullYear() };
   // Each argument: a month name, a year (over 31) or a day.
   var parts = a.map(function (x) {
-    var i = __mdmMonths.indexOf(String(x).toUpperCase());
+    var i = __odmMonths.indexOf(String(x).toUpperCase());
     if (i >= 0) return { k: 'm', v: i };
     var n = parseInt(x, 10);
     return n > 31 ? { k: 'y', v: n } : { k: 'd', v: n };
@@ -255,7 +255,7 @@ function dateRange() {
     return x;
   };
   var half = parts.length / 2;
-  return __mdmIn(key(cur), key(end(parts.slice(0, half))), key(end(parts.slice(half))));
+  return __odmIn(key(cur), key(end(parts.slice(0, half))), key(end(parts.slice(half))));
 }
 function alert() {}
 "#;

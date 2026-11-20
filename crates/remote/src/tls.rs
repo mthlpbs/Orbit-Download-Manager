@@ -1,6 +1,6 @@
 //! The remote control's certificate and its HTTPS listener. A self-signed certificate is made
 //! once (`remote/cert.der`, its key `remote/key.der`, readable by the user only) and kept: its
-//! fingerprint, shown in Options, is how a device can tell it talks to this MDM the first time
+//! fingerprint, shown in Options, is how a device can tell it talks to this ODM the first time
 //! its browser warns about it, and the same certificate every time is what lets the browser
 //! remember that choice. It is made again only when it runs out (800 days, under the limit
 //! Apple's systems accept) or is deleted.
@@ -88,13 +88,13 @@ pub fn identity(dir: &Path, names: &[String]) -> Result<Identity, String> {
         Some(pair) => pair,
         None => {
             let (cert, key) = make(names)?;
-            mdm_ipc::private_write(&key_path, &key).map_err(|e| e.to_string())?;
-            mdm_ipc::private_write(&cert_path, &cert).map_err(|e| e.to_string())?;
+            odm_ipc::private_write(&key_path, &key).map_err(|e| e.to_string())?;
+            odm_ipc::private_write(&cert_path, &cert).map_err(|e| e.to_string())?;
             let made = serde_json::to_vec(&Made {
                 until: today() + VALID_DAYS,
             })
             .map_err(|e| e.to_string())?;
-            mdm_ipc::private_write(&made_path, &made).map_err(|e| e.to_string())?;
+            odm_ipc::private_write(&made_path, &made).map_err(|e| e.to_string())?;
             (cert, key)
         }
     };

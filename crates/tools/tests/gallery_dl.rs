@@ -1,54 +1,54 @@
-//! Real gallery-dl releases against the lab server, as MDM starts them (#236: a distribution's
-//! gallery-dl may be older than MDM's own copy). Each release MDM can drive is chosen, reads an
-//! address (and says when it can't), and saves a picture with MDM's User-Agent; one older than
+//! Real gallery-dl releases against the lab server, as ODM starts them (#236: a distribution's
+//! gallery-dl may be older than ODM's own copy). Each release ODM can drive is chosen, reads an
+//! address (and says when it can't), and saves a picture with ODM's User-Agent; one older than
 //! `gallery::OLDEST` is refused when chosen.
 //!
-//! Ignored: it needs `MDM_TEST_GALLERYDLS`, the programs separated as in PATH (`:` or `;`):
+//! Ignored: it needs `ODM_TEST_GALLERYDLS`, the programs separated as in PATH (`:` or `;`):
 //!
-//!   MDM_TEST_GALLERYDLS=$HOME/gdl/1.20.0/bin/gallery-dl:/usr/bin/gallery-dl \
-//!     cargo test -p mdm-tools --test gallery_dl -- --ignored --nocapture
+//!   ODM_TEST_GALLERYDLS=$HOME/gdl/1.20.0/bin/gallery-dl:/usr/bin/gallery-dl \
+//!     cargo test -p odm-tools --test gallery_dl -- --ignored --nocapture
 
 use std::time::{Duration, Instant};
 
-use mdm_labserver::{Config, LabServer};
-use mdm_tools::chosen::Helper;
-use mdm_tools::gallery::{Ask, GalleryJob, USER_AGENT};
-use mdm_tools::video::State;
+use odm_labserver::{Config, LabServer};
+use odm_tools::chosen::Helper;
+use odm_tools::gallery::{Ask, GalleryJob, USER_AGENT};
+use odm_tools::video::State;
 
 #[test]
 #[ignore]
-fn every_release_mdm_can_drive_saves_a_gallery() {
-    let list = std::env::var_os("MDM_TEST_GALLERYDLS").expect("set MDM_TEST_GALLERYDLS");
+fn every_release_odm_can_drive_saves_a_gallery() {
+    let list = std::env::var_os("ODM_TEST_GALLERYDLS").expect("set ODM_TEST_GALLERYDLS");
     let rt = tokio::runtime::Runtime::new().unwrap();
     let lab = rt.block_on(LabServer::start(Config::default())).unwrap();
     let mut rows = Vec::new();
     for exe in std::env::split_paths(&list) {
-        let asked = mdm_tools::chosen::ask(Helper::GalleryDl, &exe)
+        let asked = odm_tools::chosen::ask(Helper::GalleryDl, &exe)
             .unwrap_or_else(|e| panic!("{}: {e}", exe.display()));
         let v = asked.version.clone();
         let data = tempfile::tempdir().unwrap();
-        let chosen = mdm_tools::chosen::choose(data.path(), Helper::GalleryDl, &exe);
-        if mdm_tools::gallery::too_old(&v) {
+        let chosen = odm_tools::chosen::choose(data.path(), Helper::GalleryDl, &exe);
+        if odm_tools::gallery::too_old(&v) {
             assert!(
-                matches!(chosen, Err(mdm_tools::Error::TooOld { .. })),
+                matches!(chosen, Err(odm_tools::Error::TooOld { .. })),
                 "{v}: {chosen:?}"
             );
-            assert_eq!(mdm_tools::gallery::installed(data.path()), None);
+            assert_eq!(odm_tools::gallery::installed(data.path()), None);
             rows.push(format!("{v}: too old, refused when chosen"));
             continue;
         }
         let tool = chosen.unwrap_or_else(|e| panic!("{v}: {e}"));
         assert_eq!(
-            mdm_tools::gallery::installed(data.path()),
+            odm_tools::gallery::installed(data.path()),
             Some(tool.clone())
         );
         let picture = lab.url(&format!("/gen/64K/picture-{}.jpg", v.replace('.', "-")));
         assert!(
-            mdm_tools::gallery::handles(&tool, &picture).unwrap_or_else(|e| panic!("{v}: {e}")),
+            odm_tools::gallery::handles(&tool, &picture).unwrap_or_else(|e| panic!("{v}: {e}")),
             "{v} reads a picture's address"
         );
         assert!(
-            !mdm_tools::gallery::handles(&tool, &lab.url("/page"))
+            !odm_tools::gallery::handles(&tool, &lab.url("/page"))
                 .unwrap_or_else(|e| panic!("{v}: {e}")),
             "{v} says a page isn't one of its"
         );
@@ -92,14 +92,14 @@ fn every_release_mdm_can_drive_saves_a_gallery() {
             .unwrap_or_else(|| panic!("{v}: no request"));
         assert_eq!(get.user_agent.as_deref(), Some(USER_AGENT), "{v}");
         rows.push(format!(
-            "{v}: chosen, reads and refuses addresses, saved {} with MDM's User-Agent",
+            "{v}: chosen, reads and refuses addresses, saved {} with ODM's User-Agent",
             saved[0].file_name().to_string_lossy()
         ));
-        // #769: with MDM's engine, gallery-dl lists the file (1.26 and later) and the engine
+        // #769: with ODM's engine, gallery-dl lists the file (1.26 and later) and the engine
         // saves it under gallery-dl's name; gallery-dl then finds it there. An older one
         // downloads it itself, as before.
         lab.clear_log();
-        let engine = mdm_tools::streams::Engine {
+        let engine = odm_tools::streams::Engine {
             handle: rt.handle().clone(),
             opts: Default::default(),
         };
@@ -139,9 +139,9 @@ fn every_release_mdm_can_drive_saves_a_gallery() {
             "{v}: gallery-dl's own name"
         );
         let events: Vec<&str> = p.events.iter().map(|(_, e)| e.as_str()).collect();
-        let by_engine = mdm_tools::gallery::Accepts::of(&v).print;
+        let by_engine = odm_tools::gallery::Accepts::of(&v).print;
         assert_eq!(
-            events.iter().any(|e| e.starts_with("MDM saved 1 files")),
+            events.iter().any(|e| e.starts_with("ODM saved 1 files")),
             by_engine,
             "{v}: {events:?}"
         );
@@ -152,7 +152,7 @@ fn every_release_mdm_can_drive_saves_a_gallery() {
                 .find(|e| e.path.starts_with("/gen/64K/"))
                 .unwrap_or_else(|| panic!("{v}: no request"));
             assert_eq!(get.user_agent.as_deref(), Some(USER_AGENT), "{v}");
-            rows.push(format!("{v}: listed, saved by MDM's engine"));
+            rows.push(format!("{v}: listed, saved by ODM's engine"));
         }
     }
     for r in rows {

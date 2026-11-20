@@ -340,8 +340,8 @@ mod tests {
         );
         // A list 16 times as long costs about as much as 16 short lists (a square: 16 times as
         // much), on any machine; the long one under the cap, read to its end.
-        mdm_labserver::growth::assert_linear(
-            (MAX_ENTRIES - 1) / mdm_labserver::growth::SCALE,
+        odm_labserver::growth::assert_linear(
+            (MAX_ENTRIES - 1) / odm_labserver::growth::SCALE,
             |n| (lines(n, false), Mutex::new(Shared::default())),
             |(text, shared)| read(text.as_bytes(), &shared, 1),
         );

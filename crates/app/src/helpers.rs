@@ -1,7 +1,7 @@
 //! The first start's offer of the video helpers (user request 2026-11-01): yt-dlp finds a page's
 //! video, ffmpeg joins its picture and sound. Both are asked for once, explained, and downloaded
-//! on Yes (through MDM's own engine, checked against their publishers' signed checksums: see
-//! mdm_tools); Not now leaves them to Tasks → Download video from a page, which offers them again.
+//! on Yes (through ODM's own engine, checked against their publishers' signed checksums: see
+//! odm_tools); Not now leaves them to Tasks → Add video download, which offers them again.
 
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -28,7 +28,7 @@ struct State {
 
 struct Job {
     /// The current helper's bytes.
-    progress: Arc<mdm_tools::update::Progress>,
+    progress: Arc<odm_tools::update::Progress>,
     state: Arc<Mutex<State>>,
 }
 
@@ -39,19 +39,19 @@ pub struct Helpers {
 }
 
 /// Whether to offer the helpers at this start: never asked, and one of them is missing (ffmpeg
-/// counts only where MDM can install one, Windows; elsewhere the system's is used).
+/// counts only where ODM can install one, Windows; elsewhere the system's is used).
 pub fn worth_asking() -> bool {
-    let Some(dir) = mdm_tools::tools_dir() else {
+    let Some(dir) = odm_tools::tools_dir() else {
         return false;
     };
-    mdm_tools::installed(&dir).is_none()
-        || (cfg!(windows) && mdm_tools::ffmpeg::installed(&dir).is_none())
+    odm_tools::installed(&dir).is_none()
+        || (cfg!(windows) && odm_tools::ffmpeg::installed(&dir).is_none())
 }
 
 impl Helpers {
     pub fn new() -> Self {
         Helpers {
-            dir: mdm_tools::tools_dir(),
+            dir: odm_tools::tools_dir(),
             job: None,
         }
     }
@@ -63,11 +63,11 @@ impl Helpers {
             return;
         };
         let mut list = Vec::new();
-        if mdm_tools::installed(&dir).is_none() {
+        if odm_tools::installed(&dir).is_none() {
             list.push("yt-dlp");
         }
-        // ffmpeg: MDM's own on Windows (it has no build elsewhere, where the system's is used).
-        if cfg!(windows) && mdm_tools::ffmpeg::installed(&dir).is_none() {
+        // ffmpeg: ODM's own on Windows (it has no build elsewhere, where the system's is used).
+        if cfg!(windows) && odm_tools::ffmpeg::installed(&dir).is_none() {
             list.push("ffmpeg");
         }
         let job = Job {
@@ -86,9 +86,9 @@ impl Helpers {
                 }
                 state.lock().unwrap().current = Some((name, k + 1, total));
                 let res = if name == "ffmpeg" {
-                    mdm_tools::ffmpeg::install_latest(&dir, &net, Some(&progress)).await
+                    odm_tools::ffmpeg::install_latest(&dir, &net, Some(&progress)).await
                 } else {
-                    mdm_tools::install_latest(&dir, &net, Some(&progress)).await
+                    odm_tools::install_latest(&dir, &net, Some(&progress)).await
                 };
                 let mut s = state.lock().unwrap();
                 match res {
@@ -169,7 +169,7 @@ impl Helpers {
         let p = ui.painter().clone();
         let (ink, muted) = (winui::TEXT(), winui::MUTED());
         let w = 520.0;
-        // The banner: MDM's own logo, what this is for, in one line, and why now.
+        // The banner: ODM's own logo, what this is for, in one line, and why now.
         let extra = winui::banner(
             ui,
             &p,
@@ -188,7 +188,7 @@ impl Helpers {
         let ffmpeg_here = self
             .dir
             .as_deref()
-            .and_then(mdm_tools::ffmpeg::installed)
+            .and_then(odm_tools::ffmpeg::installed)
             .is_some();
         let rows: [(Icon, &str, String); 3] = [
             (
@@ -211,7 +211,7 @@ impl Helpers {
                     .to_owned()
                 } else {
                     crate::i18n::t(
-                        "Sites send their best quality as separate video and audio, and ffmpeg joins them. On this system MDM uses yours: install ffmpeg with your package manager.",
+                        "Sites send their best quality as separate video and audio, and ffmpeg joins them. On this system ODM uses yours: install ffmpeg with your package manager.",
                     )
                     .to_owned()
                 },
@@ -221,7 +221,7 @@ impl Helpers {
                 // i18n: a promise in the helpers window: the helpers are free, official and checked
                 "Free, official and checked",
                 crate::i18n::t(
-                    "Both are open source. MDM gets them from their official releases with its own downloader and checks each file's signature before it runs. About 100 MB, once.",
+                    "Both are open source. ODM gets them from their official releases with its own downloader and checks each file's signature before it runs. About 100 MB, once.",
                 )
                 .to_owned(),
             ),
@@ -362,9 +362,7 @@ impl Helpers {
         let later = if self.job.is_some() && running {
             crate::i18n::t("They keep downloading if you close this window.")
         } else if self.job.is_some() && !failed {
-            crate::i18n::t(
-                "All set: on a page with a video, use Tasks → Download video from a page.",
-            )
+            crate::i18n::t("All set: on a page with a video, use Tasks → Add video download.")
         } else if let Some(advice) = &advice {
             advice.as_str()
         } else if self.job.is_some() {
@@ -372,7 +370,7 @@ impl Helpers {
                 "Check your connection, then try again, or get them later from the video window.",
             )
         } else {
-            crate::i18n::t("Not now? Get them later from Tasks → Download video from a page.")
+            crate::i18n::t("Not now? Get them later from Tasks → Add video download.")
         };
         // Wrapped: the window grows by the lines past the first.
         let lines = winui::paragraph(
@@ -465,29 +463,29 @@ impl Helpers {
     }
 }
 
-// ---- Video helpers: MDM's own copies or the person's (#51) ------------------------------------
+// ---- Video helpers: ODM's own copies or the person's (#51) ------------------------------------
 
-use mdm_tools::chosen::Helper;
+use odm_tools::chosen::Helper;
 
 /// Helpers (Download video from a page or a gallery → Helpers...): for yt-dlp, ffmpeg and
-/// gallery-dl (#58), where MDM takes it from (its own copy, or a program of the person's), and the
+/// gallery-dl (#58), where ODM takes it from (its own copy, or a program of the person's), and the
 /// way to choose another: one copy of each for every program that uses them (#51).
 pub struct Programs {
-    preferences: mdm_tools::preferences::Preferences,
+    preferences: odm_tools::preferences::Preferences,
     tab: usize,
     config_editor: Option<(std::path::PathBuf, String)>,
     paths_only: bool,
     config_path: String,
     dir: Option<std::path::PathBuf>,
     /// The helpers as found (read again after each change, not every frame: it reads files).
-    found: [Option<mdm_tools::Installed>; 4],
+    found: [Option<odm_tools::Installed>; 4],
     last_detection: std::time::Instant,
     cookie_browser: String,
     cookie_profile: String,
     saved_cookies: Option<(String, String)>,
     /// A chosen program being checked (`--version`), and what it answered.
     checking: Option<(Helper, Answer)>,
-    /// MDM's own yt-dlp or gallery-dl being downloaded in place of the system's (#452, #571),
+    /// ODM's own yt-dlp or gallery-dl being downloaded in place of the system's (#452, #571),
     /// and how that went.
     installing: Option<(Helper, Answer)>,
     error: Option<String>,
@@ -517,14 +515,14 @@ impl Programs {
         if let Some(i) = winui::combo_light(
             ui,
             r(o, 212.0, 52.0, 275.0, 22.0),
-            &mdm_tools::preferences::QUALITIES,
+            &odm_tools::preferences::QUALITIES,
             self.preferences.quality.min(8),
             true,
             "default-video-quality",
         ) {
             self.preferences.quality = i;
         }
-        let ci = mdm_tools::preferences::CONTAINERS
+        let ci = odm_tools::preferences::CONTAINERS
             .iter()
             .position(|c| *c == self.preferences.container)
             .unwrap_or(0);
@@ -536,7 +534,7 @@ impl Programs {
             true,
             "default-video-container",
         ) {
-            self.preferences.container = mdm_tools::preferences::CONTAINERS[i].into();
+            self.preferences.container = odm_tools::preferences::CONTAINERS[i].into();
             if i == 2 && self.preferences.codec == 1 {
                 self.preferences.codec = 2;
             }
@@ -546,7 +544,7 @@ impl Programs {
             .collect();
         let names: Vec<&str> = ids
             .iter()
-            .map(|i| mdm_tools::preferences::CODECS[*i])
+            .map(|i| odm_tools::preferences::CODECS[*i])
             .collect();
         let selected = ids
             .iter()
@@ -677,7 +675,7 @@ impl Programs {
     pub fn paths() -> Self {
         let mut p = Self::new();
         p.paths_only = true;
-        if let Some(cookies) = mdm_tools::proc::browser_cookies() {
+        if let Some(cookies) = odm_tools::proc::browser_cookies() {
             p.cookie_browser = cookies.browser;
             p.cookie_profile = cookies.profile.unwrap_or_default();
         }
@@ -685,14 +683,14 @@ impl Programs {
     }
     pub fn new() -> Self {
         let mut p = Programs {
-            preferences: mdm_tools::preferences::Preferences::read(),
+            preferences: odm_tools::preferences::Preferences::read(),
             tab: 0,
             config_editor: None,
             paths_only: false,
-            config_path: mdm_tools::config::path()
+            config_path: odm_tools::config::path()
                 .map(|p| p.display().to_string())
                 .unwrap_or_default(),
-            dir: mdm_tools::tools_dir(),
+            dir: odm_tools::tools_dir(),
             found: Default::default(),
             last_detection: std::time::Instant::now(),
             cookie_browser: String::new(),
@@ -716,16 +714,16 @@ impl Programs {
             return;
         };
         self.found = [
-            mdm_tools::installed(dir),
-            mdm_tools::ffmpeg::installed(dir),
-            mdm_tools::deno::installed(dir),
-            mdm_tools::gallery::installed(dir),
+            odm_tools::installed(dir),
+            odm_tools::ffmpeg::installed(dir),
+            odm_tools::deno::installed(dir),
+            odm_tools::gallery::installed(dir),
         ];
     }
 
-    /// MDM's own yt-dlp or gallery-dl in place of the system's (#452, #571): downloaded and
-    /// checked as usual, from then on the one used (`mdm_tools::installed`,
-    /// `mdm_tools::gallery::installed`). It goes on if the window is closed.
+    /// ODM's own yt-dlp or gallery-dl in place of the system's (#452, #571): downloaded and
+    /// checked as usual, from then on the one used (`odm_tools::installed`,
+    /// `odm_tools::gallery::installed`). It goes on if the window is closed.
     fn install_own(
         &mut self,
         h: Helper,
@@ -738,13 +736,13 @@ impl Programs {
         let net = crate::settings::own_net();
         rt.spawn(async move {
             let res = if h == Helper::GalleryDl {
-                mdm_tools::gallery::install_latest(&dir, &net, None).await
+                odm_tools::gallery::install_latest(&dir, &net, None).await
             } else if h == Helper::Ffmpeg {
-                mdm_tools::ffmpeg::install_latest(&dir, &net, None).await
+                odm_tools::ffmpeg::install_latest(&dir, &net, None).await
             } else if h == Helper::Deno {
-                mdm_tools::deno::install_latest(&dir, &net).await
+                odm_tools::deno::install_latest(&dir, &net).await
             } else {
-                mdm_tools::install_latest(&dir, &net, None).await
+                odm_tools::install_latest(&dir, &net, None).await
             };
             *out.lock().unwrap() = Some(res.map(|_| ()).map_err(|e| crate::errors::tools(&e)));
             wake.request_repaint();
@@ -784,7 +782,7 @@ impl Programs {
                 let slot = Arc::new(Mutex::new(None));
                 let (out, wake) = (slot.clone(), ctx.clone());
                 std::thread::spawn(move || {
-                    let res = mdm_tools::chosen::choose(&dir, h, &path)
+                    let res = odm_tools::chosen::choose(&dir, h, &path)
                         .map(|_| ())
                         .map_err(|e| crate::errors::tools(&e));
                     *out.lock().unwrap() = Some(res);
@@ -858,7 +856,7 @@ impl Programs {
             );
             if matches!(out, Outcome::Done(())) {
                 let result = (|| -> std::io::Result<()> {
-                    mdm_tools::config::validate_text(text)?;
+                    odm_tools::config::validate_text(text)?;
                     if let Some(parent) = path.parent() {
                         std::fs::create_dir_all(parent)?;
                     }
@@ -866,7 +864,7 @@ impl Programs {
                     std::fs::write(&tmp, text.as_bytes())?;
                     std::fs::rename(tmp, &*path)?;
                     if let Some(dir) = &self.dir {
-                        mdm_tools::chosen::set_config_file(dir, Some(path))
+                        odm_tools::chosen::set_config_file(dir, Some(path))
                             .map_err(std::io::Error::other)?;
                     }
                     Ok(())
@@ -883,7 +881,7 @@ impl Programs {
         window(
             ctx,
             "video-helpers",
-            // i18n: window title: where MDM takes its helper programs (yt-dlp, ffmpeg, gallery-dl) from
+            // i18n: window title: where ODM takes its helper programs (yt-dlp, ffmpeg, gallery-dl) from
             if self.paths_only {
                 "yt-dlp settings"
             } else {
@@ -949,46 +947,46 @@ impl Programs {
             let found = self.found[i].as_ref();
             let chosen = self.dir.as_deref().and_then(|d| {
                 if h == Helper::Deno {
-                    mdm_tools::deno::explicit(d)
+                    odm_tools::deno::explicit(d)
                 } else {
-                    mdm_tools::chosen::chosen(d, h)
+                    odm_tools::chosen::chosen(d, h)
                 }
             });
             // One of the person's, maybe passed over (a gallery-dl too old, #236).
             let mine = chosen.is_some();
             let too_old = chosen
                 .as_ref()
-                .filter(|c| h == Helper::GalleryDl && mdm_tools::gallery::too_old(&c.version));
+                .filter(|c| h == Helper::GalleryDl && odm_tools::gallery::too_old(&c.version));
             let checking = self.checking.as_ref().is_some_and(|(c, _)| *c == h);
             let downloading = self.installing.as_ref().is_some_and(|(i, _)| *i == h);
-            // Whether MDM downloads a copy of its own on this system and processor: yt-dlp
+            // Whether ODM downloads a copy of its own on this system and processor: yt-dlp
             // almost everywhere, gallery-dl not on macOS nor Linux on ARM, ffmpeg on 64-bit
             // Windows only (BtbN builds none for 32-bit Windows).
             let has_own = match h {
-                Helper::YtDlp => mdm_tools::ytdlp_asset().is_some(),
-                Helper::GalleryDl => mdm_tools::gallery::asset().is_some(),
-                Helper::Ffmpeg => mdm_tools::ffmpeg::available(),
-                Helper::Deno => mdm_tools::deno::available(),
+                Helper::YtDlp => odm_tools::ytdlp_asset().is_some(),
+                Helper::GalleryDl => odm_tools::gallery::asset().is_some(),
+                Helper::Ffmpeg => odm_tools::ffmpeg::available(),
+                Helper::Deno => odm_tools::deno::available(),
             };
-            // The system's copy may be the person's to keep up to date: MDM's own can replace it
-            // (#452, #571), where MDM has one for this system and processor.
+            // The system's copy may be the person's to keep up to date: ODM's own can replace it
+            // (#452, #571), where ODM has one for this system and processor.
             let status = match (too_old, found) {
                 _ if downloading => {
-                    // i18n: Video helpers: MDM's own yt-dlp is being downloaded
-                    crate::i18n::t("Downloading MDM's own copy...").to_owned()
+                    // i18n: Video helpers: ODM's own yt-dlp is being downloaded
+                    crate::i18n::t("Downloading ODM's own copy...").to_owned()
                 }
                 _ if checking => {
                     // i18n: Video helpers: a program just chosen is being checked
                     crate::i18n::t("Checking the program...").to_owned()
                 }
                 (Some(old), _) => crate::i18n::fmt(
-                    // i18n: Video helpers: the person's own gallery-dl is too old and not used; {version} = its version, {oldest} = the oldest MDM can use
+                    // i18n: Video helpers: the person's own gallery-dl is too old and not used; {version} = its version, {oldest} = the oldest ODM can use
                     crate::i18n::t(
-                        "Your own program ({version}) is too old: MDM needs {oldest} or newer",
+                        "Your own program ({version}) is too old: ODM needs {oldest} or newer",
                     ),
                     &[
                         ("version", &old.version),
-                        ("oldest", mdm_tools::gallery::OLDEST),
+                        ("oldest", odm_tools::gallery::OLDEST),
                     ],
                 ),
                 (None, Some(i)) if mine && !i.version.is_empty() => crate::i18n::fmt(
@@ -1005,7 +1003,7 @@ impl Programs {
                     &[("path", &crate::i18n::ltr(&i.exe.display().to_string()))],
                 ),
                 (None, Some(i)) => crate::i18n::fmt(
-                    // i18n: Video helpers: {version} = the version of MDM's own copy
+                    // i18n: Video helpers: {version} = the version of ODM's own copy
                     crate::i18n::t("Orbit copy {version}: {path}"),
                     &[
                         ("version", &i.version),
@@ -1013,14 +1011,14 @@ impl Programs {
                     ],
                 ),
                 // Linux and macOS as before: there the system's package manager (or Homebrew)
-                // installs what MDM has no copy of, and MDM finds it.
+                // installs what ODM has no copy of, and ODM finds it.
                 // i18n: Video helpers: no copy of this helper yet
                 (None, None) if has_own || !cfg!(windows) => {
                     crate::i18n::t("Not installed yet").to_owned()
                 }
-                // i18n: Video helpers: MDM can't download this helper on this Windows (ffmpeg on 32-bit Windows); "Use another program" is the button below
+                // i18n: Video helpers: ODM can't download this helper on this Windows (ffmpeg on 32-bit Windows); "Use another program" is the button below
                 (None, None) => crate::i18n::t(
-                    "MDM has no copy for this system: install it, or use another program",
+                    "ODM has no copy for this system: install it, or use another program",
                 )
                 .to_owned(),
             };
@@ -1082,7 +1080,7 @@ impl Programs {
             if winui::button(
                 ui,
                 r(o, own_at.0, y - o.y + 46.0, own_at.1, 21.0),
-                // i18n: Video helpers: button: go back to the copy MDM downloads and checks itself
+                // i18n: Video helpers: button: go back to the copy ODM downloads and checks itself
                 action,
                 if !busy {
                     ButtonKind::Normal
@@ -1097,9 +1095,9 @@ impl Programs {
             {
                 if mine {
                     let result = if h == Helper::Deno {
-                        mdm_tools::deno::reset(&dir)
+                        odm_tools::deno::reset(&dir)
                     } else {
-                        mdm_tools::chosen::forget(&dir, h)
+                        odm_tools::chosen::forget(&dir, h)
                     };
                     self.error = result.err().map(|e| crate::errors::tools(&e));
                     self.look();
@@ -1109,7 +1107,7 @@ impl Programs {
                         self.install_own(h, dir, rt, ui.ctx());
                     }
                 } else if found.is_none() && h == Helper::Deno {
-                    let _ = open::that_detached(mdm_tools::deno::INSTALL_PAGE);
+                    let _ = open::that_detached(odm_tools::deno::INSTALL_PAGE);
                 } else {
                     self.look();
                 }
@@ -1178,7 +1176,7 @@ impl Programs {
                 if let Some(dir) = &self.dir {
                     let file = (!self.config_path.trim().is_empty())
                         .then(|| std::path::Path::new(self.config_path.trim()));
-                    self.error = mdm_tools::chosen::set_config_file(dir, file)
+                    self.error = odm_tools::chosen::set_config_file(dir, file)
                         .err()
                         .map(|e| e.to_string());
                 }
@@ -1194,11 +1192,11 @@ impl Programs {
             .clicked()
             {
                 if let Some(dir) = &self.dir {
-                    self.error = mdm_tools::chosen::set_config_file(dir, None)
+                    self.error = odm_tools::chosen::set_config_file(dir, None)
                         .err()
                         .map(|e| e.to_string());
                 }
-                self.config_path = mdm_tools::config::path()
+                self.config_path = odm_tools::config::path()
                     .map(|p| p.display().to_string())
                     .unwrap_or_default();
             }
@@ -1247,7 +1245,7 @@ impl Programs {
                 crate::i18n::t("Cookies from browser"),
                 winui::TEXT(),
             );
-            let browsers = mdm_tools::proc::cookie_browsers();
+            let browsers = odm_tools::proc::cookie_browsers();
             let names: Vec<_> = std::iter::once("Off")
                 .chain(browsers.iter().map(|b| crate::videodlg::browser_label(b)))
                 .collect();

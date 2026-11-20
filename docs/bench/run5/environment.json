@@ -5,7 +5,7 @@
  "ram_gb": 63.8,
  "disk": "C: (both clients' destination and IDM's temp folder)",
  "idm_version": "6, 42, 25, 3",
- "mdm_commit": "caa200c",
+ "odm_commit": "caa200c",
  "server": "labserver (this repo), 127.0.0.1:8097, generated content",
  "settings": "both at defaults: 8 connections"
 }

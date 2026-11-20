@@ -42,7 +42,7 @@ def main():
     n = data[7]
     codes = [data[8 + 2 * i:10 + 2 * i].decode() for i in range(n)]
     lines = [
-        "//! Country names (#140, `mdm_geo`): each country of the IP table, in the interface's",
+        "//! Country names (#140, `odm_geo`): each country of the IP table, in the interface's",
         "//! language. Written by tools/geo/countries.py (names from lipis/flag-icons, MIT).",
         "",
         "/// The name of the country with ISO 3166-1 code `code` (upper case), or None.",

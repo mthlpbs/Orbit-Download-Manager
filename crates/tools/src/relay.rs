@@ -4,7 +4,7 @@
 //! Ethernet adapter's), an address alone doesn't hold on Linux (it routes by destination, the weak
 //! host model), and none of them can bind a device or an interface. So while an adapter is chosen
 //! they are given this proxy (`--proxy`, and `HTTP_PROXY`… for what they start), and it opens
-//! their connections through [`mdm_engine::net`], bound as MDM's own are, with the chosen DNS. The
+//! their connections through [`odm_engine::net`], bound as ODM's own are, with the chosen DNS. The
 //! same code holds them on Windows, Linux and macOS, IPv4 and IPv6: the binding is the engine's.
 //!
 //! - It listens on 127.0.0.1 only, on a port the system picks (no firewall asks about a socket
@@ -22,7 +22,7 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 
-use mdm_engine::{DnsChoice, Route};
+use odm_engine::{DnsChoice, Route};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
@@ -34,7 +34,7 @@ const HEAD_TIME: Duration = Duration::from_secs(30);
 /// How long each of a server's addresses may take to connect.
 const CONNECT_TIME: Duration = Duration::from_secs(10);
 /// The user name in the relay's address (any is taken: the password is what counts).
-const USER: &str = "mdm";
+const USER: &str = "odm";
 
 /// Where a relay's connections go, read for each one: the network adapter's route and the DNS.
 pub type Net = Arc<dyn Fn() -> (Route, DnsChoice) + Send + Sync>;
@@ -65,7 +65,7 @@ impl Relay {
         let secret = hex::encode(bytes);
         let rt = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
-            .thread_name("mdm-relay")
+            .thread_name("odm-relay")
             .enable_all()
             .build()?;
         let listener = {
@@ -136,7 +136,7 @@ async fn serve(mut client: TcpStream, inner: Arc<Inner>) -> io::Result<()> {
         return client
             .write_all(
                 b"HTTP/1.1 407 Proxy Authentication Required\r\n\
-                  Proxy-Authenticate: Basic realm=\"MDM\"\r\n\
+                  Proxy-Authenticate: Basic realm=\"ODM\"\r\n\
                   Content-Length: 0\r\nConnection: close\r\n\r\n",
             )
             .await;
@@ -191,13 +191,13 @@ async fn serve(mut client: TcpStream, inner: Arc<Inner>) -> io::Result<()> {
 /// A connection to `host:port` through `route`, its name looked up with `dns` (as downloads'
 /// are); else why not, for the helper's error.
 async fn open(route: &Route, dns: &DnsChoice, host: &str, port: u16) -> Result<TcpStream, String> {
-    let ips = mdm_engine::dns::lookup(dns, host, port, &[], route)
+    let ips = odm_engine::dns::lookup(dns, host, port, &[], route)
         .await
         .map_err(|e| e.to_string())?;
     let mut why = format!("{host} has no address");
     for ip in ips {
         let addr = SocketAddr::new(ip, port);
-        match tokio::time::timeout(CONNECT_TIME, mdm_engine::net::tcp_connect(route, addr)).await {
+        match tokio::time::timeout(CONNECT_TIME, odm_engine::net::tcp_connect(route, addr)).await {
             Ok(Ok(s)) => return Ok(s),
             Ok(Err(e)) => why = e.to_string(),
             Err(_) => why = format!("{addr} didn't answer"),

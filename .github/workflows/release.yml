@@ -136,9 +136,9 @@ jobs:
         if: ${{ inputs.installer_preview }}
         shell: pwsh
         run: |
-          cargo test --locked -p mdm-tools --lib --target ${{ matrix.target }}
+          cargo test --locked -p odm-tools --lib --target ${{ matrix.target }}
           if ($LASTEXITCODE) { throw "helper tests failed" }
-          cargo test --locked -p mdm-app --bin orbitdownloadmanager --target ${{ matrix.target }} selecting_raw_formats_builds_the_exact_pair_in_either_click_order
+          cargo test --locked -p odm-app --bin orbitdownloadmanager --target ${{ matrix.target }} selecting_raw_formats_builds_the_exact_pair_in_either_click_order
           if ($LASTEXITCODE) { throw "video format test failed" }
 
       - name: Inno Setup
@@ -165,7 +165,7 @@ jobs:
       - name: Installer and portable zip
         shell: pwsh
         env:
-          MDM_SIGN_COMMAND: ${{ steps.cert.outputs.command }}
+          ODM_SIGN_COMMAND: ${{ steps.cert.outputs.command }}
         run: ./tools/installer/build.ps1 -Arch ${{ matrix.arch }}
 
       # The programs on the machine that built them: for this processor, and a download works.
@@ -217,12 +217,12 @@ jobs:
           node tools/extension/check-pack.mjs
           $v = [regex]::Match((Get-Content Cargo.toml -Raw), '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
           New-Item -ItemType Directory -Force target/dist | Out-Null
-          Copy-Item target/extension/mdm-chromium.zip "target/dist/OrbitDownloadManager-$v-extension-chromium.zip"
-          Copy-Item target/extension/mdm-firefox.xpi "target/dist/OrbitDownloadManager-$v-extension-firefox.xpi"
+          Copy-Item target/extension/odm-chromium.zip "target/dist/OrbitDownloadManager-$v-extension-chromium.zip"
+          Copy-Item target/extension/odm-firefox.xpi "target/dist/OrbitDownloadManager-$v-extension-firefox.xpi"
           # For the Chrome Web Store (the next step, or its dashboard by hand): kept with the
           # build, not the release.
           New-Item -ItemType Directory -Force target/store | Out-Null
-          Copy-Item target/extension/mdm-chrome-store.zip "target/store/OrbitDownloadManager-$v-chrome-web-store.zip"
+          Copy-Item target/extension/odm-chrome-store.zip "target/store/OrbitDownloadManager-$v-chrome-web-store.zip"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -291,7 +291,7 @@ jobs:
             if (-not $env:ORBIT_RELEASE_PUBLIC_KEY) { throw "Set the ORBIT_RELEASE_PUBLIC_KEY repository variable before signing releases" }
             $env:GNUPGHOME = Join-Path $env:RUNNER_TEMP "orbit-gnupg"
             New-Item -ItemType Directory -Force $env:GNUPGHOME | Out-Null
-            $key = Join-Path $env:RUNNER_TEMP "mdm-release.asc"
+            $key = Join-Path $env:RUNNER_TEMP "odm-release.asc"
             Set-Content -Encoding ascii $key $env:ORBIT_RELEASE_KEY
             gpg --batch --quiet --import $key
             Remove-Item $key
@@ -307,7 +307,7 @@ jobs:
             gpg --homedir $verifyHome --batch --verify dist/SHA256SUMS.txt.sig dist/SHA256SUMS.txt
             if ($LASTEXITCODE) { throw "the signature of SHA256SUMS.txt doesn't verify" }
           } else {
-            Write-Warning "ORBIT_RELEASE_KEY isn't set: this release is unsigned, and MDM won't update to it by itself."
+            Write-Warning "ORBIT_RELEASE_KEY isn't set: this release is unsigned, and ODM won't update to it by itself."
           }
           # Notes: the version's section of CHANGELOG.md ("## [X.Y.Z]" up to the next "## "),
           # else GitHub's list of changes since the last tag.

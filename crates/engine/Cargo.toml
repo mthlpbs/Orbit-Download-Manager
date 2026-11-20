@@ -1,6 +1,6 @@
 [package]
-name = "mdm-engine"
-description = "MDM download engine: dynamic segmentation, workers, resume"
+name = "odm-engine"
+description = "ODM download engine: dynamic segmentation, workers, resume"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,7 +11,7 @@ publish.workspace = true
 
 [features]
 default = ["browser-connection"]
-# The browser-like connection for sites whose bot check refuses MDM's own (#668,
+# The browser-like connection for sites whose bot check refuses ODM's own (#668,
 # src/browserlike.rs). Without it a bot check's refusal stands (the browser takes the download).
 browser-connection = ["dep:wreq", "dep:wreq-util", "dep:rustls-native-certs", "dep:webpki-root-certs"]
 
@@ -83,7 +83,7 @@ core-foundation-sys = "0.8.7"
 cap = { version = "0.1.2", features = ["stats"] }
 # The free-space probe's test compares it with the volume list it replaced (#224).
 sysinfo.workspace = true
-mdm-labserver.workspace = true
+odm-labserver.workspace = true
 proptest.workspace = true
 serde_json.workspace = true
 tempfile.workspace = true

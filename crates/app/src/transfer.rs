@@ -2,7 +2,7 @@
 //! (`.ef2`), and downloads from either. IDM's import finds every web address in a file and shows
 //! them to check before they are added; so does ours (in Link grabber, grabber.rs). An `.ef2` file holds one block per
 //! download — `<`, the address, `referer: …` / `cookie: …` / `User-Agent: …` lines, `>` — so a
-//! list moves between IDM and MDM with its request context.
+//! list moves between IDM and ODM with its request context.
 
 use crate::model::Item;
 use std::path::{Path, PathBuf};
@@ -213,7 +213,7 @@ fn ef2_blocks(text: &str) -> Vec<Imported> {
 }
 
 fn downloadable(url: &str) -> bool {
-    url::Url::parse(url).is_ok_and(|u| mdm_engine::supported(&u))
+    url::Url::parse(url).is_ok_and(|u| odm_engine::supported(&u))
 }
 
 /// Every download address in free text (a page saved as text, a list, a mail, a forum post):
@@ -278,7 +278,7 @@ impl Next {
 }
 
 /// Where the scheme before the "://" at `sep` starts: the letters right before it, or only
-/// their end when it is a scheme MDM downloads glued to a word (`Linkhttps://…`).
+/// their end when it is a scheme ODM downloads glued to a word (`Linkhttps://…`).
 fn scheme_start(lower: &str, sep: usize) -> usize {
     let start = lower[..sep]
         .char_indices()
@@ -333,20 +333,20 @@ fn trim_address(cand: &str, before: Option<char>) -> &str {
     }
 }
 
-/// An http(s) or ftp(s) address MDM downloads, as the address bar writes it; `&amp;` read as
+/// An http(s) or ftp(s) address ODM downloads, as the address bar writes it; `&amp;` read as
 /// `&` (an address copied out of a page's HTML).
 fn web_address(cand: &str) -> Option<String> {
     let cand = cand.replace("&amp;", "&");
     url::Url::parse(&cand)
         .ok()
-        .filter(|u| mdm_engine::supported(u) && u.host_str().is_some_and(|h| !h.is_empty()))
+        .filter(|u| odm_engine::supported(u) && u.host_str().is_some_and(|h| !h.is_empty()))
         .map(String::from)
 }
 
 /// A magnet link to a torrent (one with its BitTorrent hash, `xt=urn:btih:` or `urn:btmh:`).
 fn magnet_link(cand: &str) -> Option<String> {
     let cand = cand.replace("&amp;", "&");
-    (mdm_torrent::Source::magnet(&cand).is_some() && magnet_hash(&cand).is_some()).then_some(cand)
+    (odm_torrent::Source::magnet(&cand).is_some() && magnet_hash(&cand).is_some()).then_some(cand)
 }
 
 /// A magnet link's torrent hash (`xt=urn:btih:<hash>`), in lower case.
@@ -369,7 +369,7 @@ fn same_key(address: &str) -> String {
     }
     match url::Url::parse(address) {
         Ok(mut u) => {
-            if mdm_engine::mega::is_mega(&u) {
+            if odm_engine::mega::is_mega(&u) {
                 return u.into();
             }
             u.set_fragment(None);
@@ -480,7 +480,7 @@ mod tests {
     }
 
     fn temp(name: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("mdm-transfer-{name}-{}", std::process::id()));
+        let d = std::env::temp_dir().join(format!("odm-transfer-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
@@ -586,6 +586,6 @@ mod tests {
             text
         };
         assert_eq!(import(&list(1_000)).len(), 1_000);
-        mdm_labserver::growth::assert_linear(2_500, list, |text| import(&text));
+        odm_labserver::growth::assert_linear(2_500, list, |text| import(&text));
     }
 }

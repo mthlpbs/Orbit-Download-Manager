@@ -1,5 +1,5 @@
-//! A page's links that came from the browser in parts (`mdm_ipc::LinksPart`): the browser's
-//! native host takes at most 1 MB a message (`mdm_ipc::MAX_MESSAGE`), so the extension sends a
+//! A page's links that came from the browser in parts (`odm_ipc::LinksPart`): the browser's
+//! native host takes at most 1 MB a message (`odm_ipc::MAX_MESSAGE`), so the extension sends a
 //! longer list (a page of 20,000 links) in parts, each with the page's referrer and cookies. They
 //! are kept here until the last one is in, then go to Link grabber as one list, in their order,
 //! as a short list does.
@@ -10,10 +10,10 @@
 
 use std::time::{Duration, Instant};
 
-use mdm_ipc::{Command, LinksPart};
+use odm_ipc::{Command, LinksPart};
 
 /// How long a list waits for its next part. The extension sends them one after another, each
-/// in a moment; the first may start MDM, which the host waits for before handing it over.
+/// in a moment; the first may start ODM, which the host waits for before handing it over.
 pub const WAIT: Duration = Duration::from_secs(60);
 
 /// The most lists waiting at once (two pages' menus clicked together): a new one past it drops
@@ -284,7 +284,7 @@ mod tests {
                 .len(),
             5
         );
-        // A part with nothing MDM downloads (the host still hands it over) completes its list.
+        // A part with nothing ODM downloads (the host still hands it over) completes its list.
         parts.add(part("e", 0, 2, "x.test", 0), now);
         assert_eq!(
             whole(parts.add(part("e", 1, 2, "x.test", 2), now))

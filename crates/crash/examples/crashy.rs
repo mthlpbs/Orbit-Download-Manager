@@ -1,11 +1,11 @@
 //! The end-to-end test's program (tests/e2e.rs): `crashy <freeze|panic|crash|thread-crash> <data
-//! dir>` starts its monitor (itself with `--crash-monitor`), attaches the crash handler as MDM
+//! dir>` starts its monitor (itself with `--crash-monitor`), attaches the crash handler as ODM
 //! does, and then freezes its main thread, panics, or crashes (on a thread of its own with
 //! `thread-crash`). The monitor writes the dump and the report
 //! (`<data>/crashes/*.txt`) and exits when this process is gone. With `CRASHY_MONITOR_LATE_MS` set,
 //! the monitor listens that much later.
 //!
-//! Test code: it may use `unsafe` (the crash handler, a null write, the thread id), MDM's own code
+//! Test code: it may use `unsafe` (the crash handler, a null write, the thread id), ODM's own code
 //! keeps that in win32.rs / unix.rs.
 #![allow(unsafe_code)]
 
@@ -13,18 +13,18 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use mdm_crash::client::Reporter;
-use mdm_crash::crash_handler::{CrashEventResult, CrashHandler, make_crash_event};
-use mdm_crash::monitor::{self, Event};
-use mdm_crash::protocol::{Freeze, Panic, Session};
+use odm_crash::client::Reporter;
+use odm_crash::crash_handler::{CrashEventResult, CrashHandler, make_crash_event};
+use odm_crash::monitor::{self, Event};
+use odm_crash::protocol::{Freeze, Panic, Session};
 
 fn main() {
     // What the connection and the monitor say goes to stderr, which the test leaves to the
     // terminal: a run that fails shows how far it got ("listening, 84 ms after start", "crash
-    // reports are off for this session (…)"). MDM_LOG chooses more.
+    // reports are off for this session (…)"). ODM_LOG chooses more.
     // (Reading the dump, minidump's crates warn of what a report can do without.)
-    let filter = std::env::var("MDM_LOG").unwrap_or_else(|_| {
-        "warn,minidump=off,minidump_processor=off,minidump_unwind=off,mdm_crash=info".into()
+    let filter = std::env::var("ODM_LOG").unwrap_or_else(|_| {
+        "warn,minidump=off,minidump_processor=off,minidump_unwind=off,odm_crash=info".into()
     });
     let _ = tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
@@ -33,7 +33,7 @@ fn main() {
         .with_env_filter(tracing_subscriber::EnvFilter::new(filter))
         .try_init();
     let args: Vec<String> = std::env::args().collect();
-    if let Some(m) = mdm_crash::MonitorArgs::parse(&args) {
+    if let Some(m) = odm_crash::MonitorArgs::parse(&args) {
         run_monitor(m);
         return;
     }
@@ -175,7 +175,7 @@ fn os_thread_id() -> u32 {
 /// does (a cold disk, a virus scan of a new program, a busy CI runner).
 const MONITOR_LATE: &str = "CRASHY_MONITOR_LATE_MS";
 
-fn run_monitor(m: mdm_crash::MonitorArgs) {
+fn run_monitor(m: odm_crash::MonitorArgs) {
     if let Some(ms) = std::env::var(MONITOR_LATE)
         .ok()
         .and_then(|v| v.parse().ok())
@@ -190,7 +190,7 @@ fn run_monitor(m: mdm_crash::MonitorArgs) {
             let _ = failed.send(Event::ServeFailed(e));
         }
     });
-    // Leave once crashy is gone, as MDM's monitor does: on macOS the connection a dump was
+    // Leave once crashy is gone, as ODM's monitor does: on macOS the connection a dump was
     // written for isn't seen to close (minidumper drops it without a word), and crashy's
     // monitors stayed behind the tests.
     #[cfg(unix)]
@@ -213,7 +213,7 @@ fn run_monitor(m: mdm_crash::MonitorArgs) {
         match e {
             Event::Dump { path, kind, notes } => {
                 // The example's own debug info is beside it (no .sym store needed).
-                mdm_crash::report::make(Some(&path), kind, notes, &m.data, &[]);
+                odm_crash::report::make(Some(&path), kind, notes, &m.data, &[]);
             }
             Event::DumpFailed { error, .. } => eprintln!("monitor: dump failed: {error}"),
             Event::Recovered => {}
@@ -226,14 +226,14 @@ fn run_monitor(m: mdm_crash::MonitorArgs) {
     }
 }
 
-// MDM's handler in front of crash-handler's, as the app has it (crates/app/src/unix.rs), so the
-// crashes here go through it as MDM's do. A copy, not shared: the app keeps `unsafe` in its
+// ODM's handler in front of crash-handler's, as the app has it (crates/app/src/unix.rs), so the
+// crashes here go through it as ODM's do. A copy, not shared: the app keeps `unsafe` in its
 // unix.rs (CLAUDE.md, rule 3); tests/in_frame.rs checks the two are the same.
 // ---- The handler in front of crash-handler's (#1239). examples/crashy.rs in crates/crash keeps
 // a copy of this module, from this line to the end mark, that crates/crash/tests/in_frame.rs
 // checks is the same.
 /// crash-handler's signal handler, kept inside the signal's frame where the kernel's is smaller
-/// than the context it copies (no XSAVE: mdm_crash::frame says how). Linux only: crash-handler
+/// than the context it copies (no XSAVE: odm_crash::frame says how). Linux only: crash-handler
 /// takes Mach exceptions on macOS, with no signal frame.
 #[cfg(target_os = "linux")]
 #[allow(unsafe_code)]
@@ -328,14 +328,14 @@ pub mod in_frame {
         let on_alt_stack = unsafe { libc::sigaltstack(std::ptr::null(), &mut ss) } == 0
             && ss.ss_flags & libc::SS_ONSTACK != 0;
         let stack = on_alt_stack.then(|| ss.ss_sp as usize..ss.ss_sp as usize + ss.ss_size);
-        let len = mdm_crash::frame::context_len();
-        let readable = mdm_crash::frame::readable(uc as usize, len, stack);
+        let len = odm_crash::frame::context_len();
+        let readable = odm_crash::frame::readable(uc as usize, len, stack);
         if readable == len {
             // SAFETY: crash-handler's handler with the kernel's own arguments, as without this.
             unsafe { theirs(sig, info, uc) };
             return;
         }
-        mdm_crash::frame::with_copy(|copy| {
+        odm_crash::frame::with_copy(|copy| {
             // SAFETY: the first `readable` bytes at `uc` are the kernel's frame, inside the
             // alternate stack; `copy` is a zeroed context of the type crash-handler reads, `len`
             // bytes, more than `readable`.

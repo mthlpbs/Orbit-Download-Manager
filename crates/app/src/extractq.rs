@@ -1,7 +1,7 @@
 //! Extracting archives when their download completes (#37): a Link grabber package's that says
 //! so, or every archive with Options → Archives → "Extract archives when their download
 //! completes"; and right-click → Extract on a finished one. A split archive waits for its last
-//! volume. One archive at a time, on a thread of its own (mdm-extract does the work, into a
+//! volume. One archive at a time, on a thread of its own (odm-extract does the work, into a
 //! staging folder, so a failure leaves only the archive); each extracted file is marked as
 //! downloaded from the archive's site, as the archive is. Afterwards the archive goes to the
 //! Recycle Bin (the Trash) only when its package or Options says so.
@@ -10,14 +10,14 @@
 //! tried with its package's password, then with each of Options → Archives → Archive passwords
 //! in turn, and only then is its password asked. A password that opened it moves to the top of
 //! that list, as does one typed with "Remember it" (unticked at first). 7-Zip gets each one on
-//! its standard input, never on its command line (mdm-extract).
+//! its standard input, never on its command line (odm-extract).
 
 use std::collections::{HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use mdm_extract::{Error, Report, volume_key};
+use odm_extract::{Error, Report, volume_key};
 
 use egui::vec2;
 
@@ -58,7 +58,7 @@ struct Job {
     in_place: bool,
     /// Right-click → Extract (said again, a missing 7-Zip, each time).
     by_hand: bool,
-    subfolder: mdm_extract::Subfolder,
+    subfolder: odm_extract::Subfolder,
     /// Where the archive came from, for the mark on what it holds.
     url: url::Url,
     referer: Option<String>,
@@ -425,37 +425,37 @@ impl Extracts {
 
 /// Tests only: the 7-Zip program to use instead of the one installed; empty or `none`: as if
 /// 7-Zip weren't installed (the "needs 7-Zip" message). Never set for users.
-const TEST_7ZIP: &str = "MDM_TEST_7ZIP";
+const TEST_7ZIP: &str = "ODM_TEST_7ZIP";
 
 /// 7-Zip's program, which extracts 7z and RAR archives: the installed one (Options → Archives
-/// says which), or a test's `MDM_TEST_7ZIP`.
+/// says which), or a test's `ODM_TEST_7ZIP`.
 pub fn seven_zip() -> Option<PathBuf> {
     match std::env::var_os(TEST_7ZIP) {
         Some(v) if v.is_empty() || v.eq_ignore_ascii_case("none") => None,
         Some(v) => Some(PathBuf::from(v)),
-        None => mdm_extract::find_7zip(),
+        None => odm_extract::find_7zip(),
     }
 }
 
 /// Tests only: the HatchZip program to use instead of the one installed; empty or `none`: as
 /// if it weren't installed. Never set for users.
-const TEST_HATCHZIP: &str = "MDM_TEST_HATCHZIP";
+const TEST_HATCHZIP: &str = "ODM_TEST_HATCHZIP";
 
 /// HatchZip's command line program (hatchzip.dev), optional: the installed one, or a test's
-/// `MDM_TEST_HATCHZIP`.
+/// `ODM_TEST_HATCHZIP`.
 pub fn hatch_zip() -> Option<PathBuf> {
     match std::env::var_os(TEST_HATCHZIP) {
         Some(v) if v.is_empty() || v.eq_ignore_ascii_case("none") => None,
         Some(v) => Some(PathBuf::from(v)),
-        None => mdm_extract::find_hatchzip(),
+        None => odm_extract::find_hatchzip(),
     }
 }
 
 /// Tests only: archives "moved to the Recycle Bin" go into this folder instead, so a test never
 /// fills the real (per-user, shared) Recycle Bin or Trash. Never set for users.
-const TEST_TRASH: &str = "MDM_TEST_TRASH_DIR";
+const TEST_TRASH: &str = "ODM_TEST_TRASH_DIR";
 
-/// Move `files` to the Recycle Bin (the Trash), or into `MDM_TEST_TRASH_DIR` when a test set it.
+/// Move `files` to the Recycle Bin (the Trash), or into `ODM_TEST_TRASH_DIR` when a test set it.
 fn to_trash(files: &[PathBuf]) -> bool {
     if let Some(dir) = std::env::var_os(TEST_TRASH).filter(|d| !d.is_empty()) {
         let dir = PathBuf::from(dir);
@@ -532,10 +532,10 @@ fn failed(name: &str, e: &Error) -> String {
             ],
         ),
         // i18n: why an archive wasn't extracted (after "Couldn't extract {name}: ")
-        Error::Unsupported => crate::i18n::t("it is not an archive MDM extracts").to_owned(),
+        Error::Unsupported => crate::i18n::t("it is not an archive ODM extracts").to_owned(),
         // i18n: why an archive wasn't extracted (after "Couldn't extract {name}: ")
         Error::Cancelled => crate::i18n::t("it was stopped").to_owned(),
-        Error::Io(e) => crate::errors::describe(&mdm_engine::Error::Io(Arc::new(
+        Error::Io(e) => crate::errors::describe(&odm_engine::Error::Io(Arc::new(
             std::io::Error::new(e.kind(), e.to_string()),
         ))),
     };
@@ -588,16 +588,16 @@ fn run(job: &Job, cancel: &AtomicBool) -> Result<Report, Error> {
         .filter_map(|f| f.metadata().ok())
         .map(|m| m.len())
         .sum();
-    let mut limits = mdm_extract::Limits::for_archive(size);
+    let mut limits = odm_extract::Limits::for_archive(size);
     // No more than the disk has room for (keeping the engine's margin free).
-    if let Some(v) = mdm_engine::disk::volume_of(&dest) {
+    if let Some(v) = odm_engine::disk::volume_of(&dest) {
         limits.total = limits
             .total
-            .min(v.free.saturating_sub(mdm_engine::disk::MARGIN));
+            .min(v.free.saturating_sub(odm_engine::disk::MARGIN));
     }
     let hook = crate::app::mark_hook(&job.url, job.referer.as_deref());
     let mut on_file = |p: &Path| (hook.0)(p);
-    let mut policy = mdm_extract::Policy {
+    let mut policy = odm_extract::Policy {
         dest,
         subfolder: job.subfolder,
         password: job.password.clone(),
@@ -605,11 +605,11 @@ fn run(job: &Job, cancel: &AtomicBool) -> Result<Report, Error> {
         tool: seven_zip(),
         hatchzip: hatch_zip(),
         in_place: job.in_place,
-        runs: mdm_ipc::data_dir().map(|d| d.join("hatchzip-runs")),
+        runs: odm_ipc::data_dir().map(|d| d.join("hatchzip-runs")),
         on_file: &mut on_file,
         cancel: Some(cancel),
     };
-    mdm_extract::extract(&job.archive, &mut policy)
+    odm_extract::extract(&job.archive, &mut policy)
 }
 
 /// "7-Zip needed": a 7z or RAR archive, and 7-Zip isn't installed. Get 7-Zip opens its site.
@@ -633,7 +633,7 @@ impl ToolDialog {
                 let line = crate::i18n::fmt(
                     // i18n: in the "7-Zip needed" window: {name} is the archive's file name; 7-Zip is a program's name
                     crate::i18n::t(
-                        "{name} is a 7z or RAR archive. MDM extracts those with 7-Zip, which isn't installed.",
+                        "{name} is a 7z or RAR archive. ODM extracts those with 7-Zip, which isn't installed.",
                     ),
                     &[("name", &crate::i18n::isolate(&self.name))],
                 );
@@ -831,7 +831,7 @@ impl PasswordDialog {
 mod tests {
     use super::*;
     use crate::model::{Category, PackageTag};
-    use mdm_extract::VolumeKind;
+    use odm_extract::VolumeKind;
 
     fn item(id: u64, name: &str, status: Status, pkg: Option<u64>) -> Item {
         let mut i = Item::new(

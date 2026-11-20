@@ -15,8 +15,8 @@ command takes them all again, light and dark:
     python tools/shots/make.py docs <run>      # docs/images/*.webp from a Docs screenshots run
 
 `shoot` runs tools/lab/docs-shots.ps1 twice (light, then dark) with the list's windows: the
-app's own instance with its own data folder and download folder (MDM_DATA_DIR), off the screens
-(MDM_OFFSCREEN=1), the lab server's neutral files, nothing clicked or typed. Each window's
+app's own instance with its own data folder and download folder (ODM_DATA_DIR), off the screens
+(ODM_OFFSCREEN=1), the lab server's neutral files, nothing clicked or typed. Each window's
 controls come with it (tools/lab/ui-rects.ps1, the app's accessibility tree), so the list names
 controls ("Start Download") instead of pixels, and a moved button needs no edit here. The raw
 pictures stay in target/shots/raw/.
@@ -91,7 +91,7 @@ def shoot(shots: list[dict], bin_dir: Path, work: str | None, extra: list[str]) 
     server = bin_dir / "labserver.exe"
     for p in (exe, server):
         if not p.is_file():
-            sys.exit(f"{p} missing: cargo build --release -p mdm-app -p mdm-labserver")
+            sys.exit(f"{p} missing: cargo build --release -p odm-app -p odm-labserver")
     takes = []
     for s in shots:
         if s.get("take") and s["take"] not in takes:

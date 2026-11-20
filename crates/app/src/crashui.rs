@@ -1,6 +1,6 @@
 //! The crash monitor's process (`--crash-monitor`, started by crash.rs) and its report window.
 //!
-//! The monitor waits without a window. When MDM crashes, panics or freezes, mdm-crash writes the
+//! The monitor waits without a window. When ODM crashes, panics or freezes, odm-crash writes the
 //! dump and this window opens: what happened, a box for what the user was doing, the whole report
 //! to read, and Send on GitHub (the browser opens the Crash report form filled in; nothing is sent
 //! by itself). Behind it, the report is made readable: the release's symbols are fetched when the
@@ -13,18 +13,18 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use egui::{Pos2, Rect, Ui};
-use mdm_crash::MonitorArgs;
-use mdm_crash::github::{self, Found};
-use mdm_crash::monitor::{self, Event};
-use mdm_crash::protocol::{Kind, Notes};
-use mdm_crash::report::{self, Made};
+use odm_crash::MonitorArgs;
+use odm_crash::github::{self, Found};
+use odm_crash::monitor::{self, Event};
+use odm_crash::protocol::{Kind, Notes};
+use odm_crash::report::{self, Made};
 
 use crate::winui::{self, ButtonKind, r};
 
 const CLIENT: [f32; 2] = [620.0, 540.0];
 
 pub fn monitor_main(m: MonitorArgs) -> eframe::Result {
-    mdm_crash::logs::init(&m.data, mdm_crash::logs::MONITOR);
+    odm_crash::logs::init(&m.data, odm_crash::logs::MONITOR);
     tracing::info!(
         "crash monitor (process {}) for {}",
         std::process::id(),
@@ -69,7 +69,7 @@ pub fn monitor_main(m: MonitorArgs) -> eframe::Result {
                 if !clean && notes.session.is_some() {
                     // Kept for a later look, without a window (a shutdown can look the same).
                     let made = report::make(None, Kind::Exit, notes, &m.data, &[]);
-                    tracing::warn!("MDM ended unexpectedly: {}", made.path.display());
+                    tracing::warn!("ODM ended unexpectedly: {}", made.path.display());
                 }
                 return Ok(());
             }
@@ -83,7 +83,7 @@ pub fn monitor_main(m: MonitorArgs) -> eframe::Result {
     };
     tracing::warn!("crash monitor: {} report", kind.word());
 
-    // The window speaks MDM's language and follows its theme. The language first: the title
+    // The window speaks ODM's language and follows its theme. The language first: the title
     // below is translated before the window exists, and Windows' caption is found by it
     // (`win32::caption_dark` in `update`).
     let settings = crate::store::load().settings;
@@ -102,7 +102,7 @@ pub fn monitor_main(m: MonitorArgs) -> eframe::Result {
             .with_icon(crate::app_icon()),
     );
     let builder = if crate::offscreen() {
-        // Where the main window goes too: on a runner's screen (MDM_OFFSCREEN_AT), whose software
+        // Where the main window goes too: on a runner's screen (ODM_OFFSCREEN_AT), whose software
         // OpenGL draws nothing off the screens (docs-shots.yml).
         builder.with_position(crate::offscreen_at())
     } else {
@@ -112,7 +112,7 @@ pub fn monitor_main(m: MonitorArgs) -> eframe::Result {
         viewport: builder.clone(),
         ..Default::default()
     };
-    // What the app draws with (renderer.rs, MDM_RENDERER too), the next way when one can't
+    // What the app draws with (renderer.rs, ODM_RENDERER too), the next way when one can't
     // start. A way the app failed with, or is still starting with (this report may be about it),
     // is passed over: WARP when its Direct3D on the card did, OpenGL when WARP did too; only the
     // app's own starts are watched.
@@ -241,10 +241,10 @@ fn prepare(job: &Job, shared: Arc<Mutex<Shared>>, ctx: egui::Context) {
         let from_source = notes
             .session
             .as_ref()
-            .is_some_and(|s| s.install == mdm_tools::update::Install::Source.label());
+            .is_some_and(|s| s.install == odm_tools::update::Install::Source.label());
         let store = version
             .as_deref()
-            .map(|v| mdm_crash::symbols::store(&data, v));
+            .map(|v| odm_crash::symbols::store(&data, v));
         let stores: Vec<PathBuf> = store.iter().cloned().collect();
         let made = report::make(dump.as_deref(), kind, notes.clone(), &data, &stores);
         note_gl_freeze(&made);
@@ -269,7 +269,7 @@ fn prepare(job: &Job, shared: Arc<Mutex<Shared>>, ctx: egui::Context) {
         };
         // The release's symbols, when the stacks need them and they aren't here yet.
         if let (Some(v), true, false) = (version.as_deref(), missing, from_source)
-            && !mdm_crash::symbols::have(&data, v)
+            && !odm_crash::symbols::have(&data, v)
             && dump.is_some()
         {
             set(&shared, &ctx, |s| s.fetching = Some((0, None)));
@@ -277,7 +277,7 @@ fn prepare(job: &Job, shared: Arc<Mutex<Shared>>, ctx: egui::Context) {
             let progress = move |done: u64, total: Option<u64>| {
                 set(&sh, &cx, |s| s.fetching = Some((done, total)));
             };
-            let fetched = rt.block_on(mdm_crash::symbols::fetch(
+            let fetched = rt.block_on(odm_crash::symbols::fetch(
                 &data,
                 v,
                 crate::settings::own_net(),
@@ -325,9 +325,9 @@ fn note_gl_freeze(made: &Made) {
         return;
     };
     let modules = thread.frames.iter().map(|f| f.module.as_deref());
-    // MDM_TEST_GL_STALL=1 (off-screen test copies): the app's stall stands for a driver's.
+    // ODM_TEST_GL_STALL=1 (off-screen test copies): the app's stall stands for a driver's.
     let testing =
-        crate::offscreen() && std::env::var_os("MDM_TEST_GL_STALL").is_some_and(|v| v == "1");
+        crate::offscreen() && std::env::var_os("ODM_TEST_GL_STALL").is_some_and(|v| v == "1");
     if let Some(module) = crate::renderer::gl_driver_frame(modules, testing) {
         let seconds = made.notes.freeze.as_ref().map_or(0, |f| f.seconds);
         crate::renderer::remember_gl_froze(&module, seconds);
@@ -343,7 +343,7 @@ fn set(shared: &Mutex<Shared>, ctx: &egui::Context, f: impl FnOnce(&mut Shared))
 
 impl eframe::App for ReportWindow {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
-        // The caption in the window's light or dark, as every MDM window's (Windows would draw
+        // The caption in the window's light or dark, as every ODM window's (Windows would draw
         // it in its own app mode).
         if !self.caption_set {
             // As the app logs its windows (crash.rs), for the log and the tests.
@@ -372,7 +372,7 @@ impl eframe::App for ReportWindow {
                 self.recovered = true;
             }
         }
-        // MDM's state is checked now and then (a frozen one may recover or be ended).
+        // ODM's state is checked now and then (a frozen one may recover or be ended).
         ui.ctx().request_repaint_after(Duration::from_secs(1));
         egui::CentralPanel::no_frame()
             .frame(egui::Frame::new().fill(winui::BG()))
@@ -389,15 +389,15 @@ impl eframe::App for ReportWindow {
 impl ReportWindow {
     fn heading(&self, alive: bool) -> &'static str {
         match self.job.kind {
-            // i18n: crash report window heading: the window of MDM stopped answering, then answered again
+            // i18n: crash report window heading: the window of ODM stopped answering, then answered again
             Kind::Freeze if self.recovered => {
                 crate::i18n::t("Orbit Download Manager stopped responding for a while")
             }
-            // i18n: crash report window heading: MDM's window doesn't answer (frozen)
+            // i18n: crash report window heading: ODM's window doesn't answer (frozen)
             Kind::Freeze => crate::i18n::t("Orbit Download Manager stopped responding"),
-            // i18n: crash report window heading: an internal error, MDM still running
+            // i18n: crash report window heading: an internal error, ODM still running
             Kind::Panic if alive => crate::i18n::t("Orbit Download Manager hit an internal error"),
-            // i18n: crash report window heading: MDM crashed and is gone
+            // i18n: crash report window heading: ODM crashed and is gone
             _ => crate::i18n::t("Orbit Download Manager closed unexpectedly"),
         }
     }
@@ -548,7 +548,7 @@ impl ReportWindow {
                 ui,
                 o + egui::vec2(16.0, 462.0),
                 &mut self.attach,
-                // i18n: crash report window: checkbox; the .dmp file holds what MDM had in memory
+                // i18n: crash report window: checkbox; the .dmp file holds what ODM had in memory
                 "Also attach the crash data (.dmp): it may hold addresses, cookies and passwords",
                 true,
             );
@@ -564,14 +564,14 @@ impl ReportWindow {
             // i18n: crash report window button: open GitHub's crash report form filled in
             "Send on GitHub"
         };
-        // A frozen MDM can be ended; a gone one started again.
+        // A frozen ODM can be ended; a gone one started again.
         let frozen = self.job.kind == Kind::Freeze && alive && !self.recovered;
         let restart_label = if frozen {
-            // i18n: crash report window button: end the frozen MDM and start it again
-            "End and restart MDM"
+            // i18n: crash report window button: end the frozen ODM and start it again
+            "End and restart ODM"
         } else {
-            // i18n: crash report window button: start MDM again
-            "Restart MDM"
+            // i18n: crash report window button: start ODM again
+            "Restart ODM"
         };
         let [send_at, copy_at, folder_at, restart_at, close_at] = winui::button_row(
             &p,

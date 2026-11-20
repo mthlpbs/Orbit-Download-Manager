@@ -1,11 +1,11 @@
 //! yt-dlp's `-J` answer, which carries what a site sent (titles, formats, subtitles): read
-//! (`mdm_tools::resolve`), its program-typed extensions retyped, turned into the choices the
+//! (`odm_tools::resolve`), its program-typed extensions retyped, turned into the choices the
 //! video window offers and picked from, and each DASH format's pieces listed
-//! (`mdm_tools::pieces::dash`).
+//! (`odm_tools::pieces::dash`).
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use mdm_tools::{pieces, resolve};
+use odm_tools::{pieces, resolve};
 
 fuzz_target!(|data: &[u8]| {
     let retyped = resolve::typed_scripts(data.to_vec());

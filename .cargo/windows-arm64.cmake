@@ -4,7 +4,7 @@
 # The cmake crate builds it with Visual Studio's x64-hosted tools, so CMake takes the processor
 # for x64's and BoringSSL hands its x64 assembly to MSVC, which can't build it (nor its ARM64
 # assembly, which needs clang): this names the processor and builds it in C. That connection is
-# the fallback for sites that refuse MDM's own, so its speed matters little.
+# the fallback for sites that refuse ODM's own, so its speed matters little.
 set(CMAKE_SYSTEM_NAME Windows)
 set(CMAKE_SYSTEM_PROCESSOR ARM64)
 set(OPENSSL_NO_ASM ON CACHE BOOL "BoringSSL in C" FORCE)

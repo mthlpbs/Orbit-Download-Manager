@@ -266,13 +266,13 @@ pub fn filename(
         };
         result = result.replace(
             &format!("%({field})s"),
-            &mdm_engine::naming::sanitize(value),
+            &odm_engine::naming::sanitize(value),
         );
     }
     if !result.to_ascii_lowercase().ends_with(&format!(".{ext}")) {
         result.push_str(&format!(".{ext}"));
     }
-    mdm_engine::naming::sanitize(&result)
+    odm_engine::naming::sanitize(&result)
 }
 
 #[cfg(test)]

@@ -1,8 +1,8 @@
 //! #533: a web page (a firewall's "The requested URL was rejected") where the download expects
 //! another kind of file is an error, never saved as the file; real pages and files still are.
 
-use mdm_engine::{Destination, Download, Error, Options, Request};
-use mdm_labserver::{Config, LabServer, content};
+use odm_engine::{Destination, Download, Error, Options, Request};
+use odm_labserver::{Config, LabServer, content};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 async fn server() -> LabServer {
@@ -72,7 +72,7 @@ async fn a_page_where_the_browser_had_another_type_is_an_error() {
         expected_type: Some("application/msword".into()),
         ..Options::default()
     };
-    let probed = mdm_engine::probe_kept(url.parse().unwrap(), Default::default(), &opts).await;
+    let probed = odm_engine::probe_kept(url.parse().unwrap(), Default::default(), &opts).await;
     assert!(matches!(probed, Err(Error::GotWebPage)), "{probed:?}");
     // An address named like a file, added by hand (no browser): the same.
     let (out, _) = get(&s.url("/gen/245/report.pdf?html=1"), None, None).await;
@@ -163,7 +163,7 @@ async fn an_untyped_answer_is_looked_into() {
     assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 2);
 }
 
-/// Downloads `url` as [`get`] does, into a folder (named by MDM), with the browser's announced
+/// Downloads `url` as [`get`] does, into a folder (named by ODM), with the browser's announced
 /// size `size`.
 async fn get_sized(url: &str, size: Option<u64>) -> (Result<Vec<u8>, Error>, Vec<String>) {
     let dir = tempfile::tempdir().unwrap();
@@ -204,7 +204,7 @@ async fn a_waiting_page_is_never_the_archive() {
         "html=1&html_cd=1&html_type=application/octet-stream",
     ] {
         let url = s.url(&format!("/gen/37K/KtK.zip?{faults}"));
-        // Named by the browser, and named by MDM (from the address or the server).
+        // Named by the browser, and named by ODM (from the address or the server).
         for name in [Some("KtK.zip"), None] {
             let (out, files) = get(&url, name, None).await;
             assert!(
@@ -218,7 +218,7 @@ async fn a_waiting_page_is_never_the_archive() {
             );
         }
         // The file's information window says so, before anything is saved.
-        let probed = mdm_engine::probe_kept(
+        let probed = odm_engine::probe_kept(
             url.parse().unwrap(),
             Default::default(),
             &Options::default(),
@@ -296,7 +296,7 @@ async fn paused_on_one(s: &LabServer, path: &str) -> (tempfile::TempDir, std::pa
     };
     dl.cancel();
     assert!(matches!(dl.wait().await, Err(Error::Cancelled)));
-    (dir, mdm_engine::state::state_path(&file))
+    (dir, odm_engine::state::state_path(&file))
 }
 
 /// #701: a link that leads to the site's page once the download is resumed (`html_after`):
@@ -312,8 +312,8 @@ async fn a_resume_that_meets_a_page_keeps_the_data() {
     ] {
         let path = format!("/gen/8M/KtK.zip?seed={seed}&rate=1M&{faults}");
         let (_dir, state) = paused_on_one(&s, &path).await;
-        let saved = mdm_engine::state::ResumeState::load(&state).unwrap();
-        let part = mdm_engine::naming::part_path(&saved.dest);
+        let saved = odm_engine::state::ResumeState::load(&state).unwrap();
+        let part = odm_engine::naming::part_path(&saved.dest);
         let before = std::fs::read(&part).unwrap();
         let err = Download::resume(state.clone(), Default::default(), Options::default())
             .unwrap()

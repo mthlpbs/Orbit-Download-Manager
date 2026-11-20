@@ -1,4 +1,4 @@
-# Issue #145: a magnet link or a download handed over from the browser while MDM's main window was
+# Issue #145: a magnet link or a download handed over from the browser while ODM's main window was
 # hidden (closed to the notification area) crashed 0.2.4 ("egui backend is implemented incorrectly
 # - the user callback was never called"). This script plays it on a test copy, off the screens:
 #
@@ -12,13 +12,13 @@
 #             ID) with one native message; the host passes it on and the copy opens Download File
 #             Info. The address is on 127.0.0.1 port 9, where nothing answers.
 # -State: visible (the window as it opens), hidden (ShowWindow hides it, as the notification area
-#   does), tray (MDM hides it there itself: `/show tray`, after 0.2.4), minimized,
+#   does), tray (ODM hides it there itself: `/show tray`, after 0.2.4), minimized,
 #   dialog (Options open, the main window minimized), twice (two in a row, hidden), restoring (a
 #   plain second launch, which shows the window again, right before), all (each in turn).
-# -Renderer: glow or direct3d (MDM_RENDERER; after 0.2.4).
+# -Renderer: glow or direct3d (ODM_RENDERER; after 0.2.4).
 #
-# Each run has its own data folder (MDM_DATA_DIR, deleted after unless -Keep), so nothing touches
-# an installed MDM, its registrations or the browsers. Nothing goes to the internet: the magnet
+# Each run has its own data folder (ODM_DATA_DIR, deleted after unless -Keep), so nothing touches
+# an installed ODM, its registrations or the browsers. Nothing goes to the internet: the magnet
 # names no tracker, the update check is off, and the torrent engine's DHT, local discovery, UPnP
 # and incoming connections are off. A release that can't turn them off (0.2.4 and older) needs
 # -NoTorrentEngine: a file named `torrents` in its data folder, so its torrent engine can't start.
@@ -34,8 +34,8 @@ param(
   [ValidateSet("magnet", "download")]
   [string]$Send = "magnet",
   [string]$Renderer = "",
-  [string]$Magnet = "magnet:?xt=urn:btih:5b4f0c3a9e1d27f86c0b3a4e9d1f2a7c6e8b0d14&dn=MDM%20test%20145",
-  [string]$Url = "http://127.0.0.1:9/mdm-test-145.zip",
+  [string]$Magnet = "magnet:?xt=urn:btih:5b4f0c3a9e1d27f86c0b3a4e9d1f2a7c6e8b0d14&dn=ODM%20test%20145",
+  [string]$Url = "http://127.0.0.1:9/odm-test-145.zip",
   [int]$WaitSec = 6,
   [switch]$NoTorrentEngine,
   [switch]$Keep,
@@ -67,7 +67,7 @@ public static class MagWin {
 }
 "@
 $SW_HIDE = 0; $SW_SHOWMINNOACTIVE = 7; $WM_CLOSE = 0x10
-# Windows of the test copy that aren't MDM's own (OpenGL's and the input method's helpers).
+# Windows of the test copy that aren't ODM's own (OpenGL's and the input method's helpers).
 $Helpers = "__wglDummyWindowFodder", "NVOGLDC invisible", "Default IME", "MSCTFIME UI"
 
 function Windows-Of([int]$ProcId) {
@@ -124,14 +124,14 @@ function Hand-Over {
   }
   # What the extension sends for a download it takes over from Firefox (background.js).
   Native-Message @{
-    url = $Url; filename = "mdm-test-145.zip"; mime = "application/zip"; size = 10485760
+    url = $Url; filename = "odm-test-145.zip"; mime = "application/zip"; size = 10485760
     referrer = "http://127.0.0.1:9/"; user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:144.0) Gecko/20100101 Firefox/144.0"
     brands = @(); v = "0.2.4"; explicit = $true
   }
 }
 
 function Run-State([string]$St) {
-  $data = Join-Path ([IO.Path]::GetTempPath()) ("mdm-145-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+  $data = Join-Path ([IO.Path]::GetTempPath()) ("odm-145-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
   New-Item -ItemType Directory -Force $data | Out-Null
   # The list's settings: no update check, no first-start questions, the torrent engine kept local.
   $settings = @{
@@ -143,9 +143,9 @@ function Run-State([string]$St) {
   if ($NoTorrentEngine) {
     Set-Content -Encoding Ascii (Join-Path $data "torrents") "not a folder (tools/lab/magnet-hidden.ps1)"
   }
-  $env:MDM_DATA_DIR = $data
-  $env:MDM_OFFSCREEN = "1"
-  if ($Renderer) { $env:MDM_RENDERER = $Renderer } else { Remove-Item Env:MDM_RENDERER -ErrorAction SilentlyContinue }
+  $env:ODM_DATA_DIR = $data
+  $env:ODM_OFFSCREEN = "1"
+  if ($Renderer) { $env:ODM_RENDERER = $Renderer } else { Remove-Item Env:ODM_RENDERER -ErrorAction SilentlyContinue }
   $app = Start-Process -FilePath $Exe -PassThru
   $reply = ""
   try {
@@ -214,7 +214,7 @@ function Run-State([string]$St) {
       }
     }
     if (-not $Keep) { Remove-Item -Recurse -Force $data -ErrorAction SilentlyContinue }
-    Remove-Item Env:MDM_DATA_DIR, Env:MDM_OFFSCREEN, Env:MDM_RENDERER -ErrorAction SilentlyContinue
+    Remove-Item Env:ODM_DATA_DIR, Env:ODM_OFFSCREEN, Env:ODM_RENDERER -ErrorAction SilentlyContinue
   }
 }
 

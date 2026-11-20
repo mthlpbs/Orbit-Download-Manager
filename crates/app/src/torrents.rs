@@ -10,9 +10,9 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, OnceLock, mpsc};
 
-use mdm_engine::Snapshot;
-use mdm_engine::download::State;
-use mdm_torrent::{Config, Phase, Torrents};
+use odm_engine::Snapshot;
+use odm_engine::download::State;
+use odm_torrent::{Config, Phase, Torrents};
 use serde::{Deserialize, Serialize};
 
 /// What a torrent download keeps in the list (downloads.json). `Eq` is not derived: its live
@@ -61,13 +61,13 @@ fn first_and_last_first() -> bool {
 
 impl TorrentSpec {
     /// The order its pieces are downloaded in (#39).
-    pub fn order(&self) -> mdm_torrent::PieceOrder {
+    pub fn order(&self) -> odm_torrent::PieceOrder {
         if self.in_order {
-            mdm_torrent::PieceOrder::InOrder {
+            odm_torrent::PieceOrder::InOrder {
                 first_and_last_first: self.ends_first,
             }
         } else {
-            mdm_torrent::PieceOrder::RarestFirst
+            odm_torrent::PieceOrder::RarestFirst
         }
     }
 }
@@ -162,7 +162,7 @@ impl Accountant {
 
 /// Our torrent data: librqbit's resume data and DHT nodes, and a copy of each .torrent.
 pub fn state_dir() -> Option<PathBuf> {
-    mdm_ipc::data_dir().map(|d| d.join("torrents"))
+    odm_ipc::data_dir().map(|d| d.join("torrents"))
 }
 
 pub fn torrent_file(hash: &str) -> Option<PathBuf> {
@@ -186,7 +186,7 @@ pub fn save_torrent(hash: &str, bytes: &[u8]) -> std::io::Result<()> {
 /// A change of a torrent's kept files, beside the window.
 type Change = Box<dyn FnOnce() + Send>;
 
-/// MDM's own files for the torrents of the list, in its data folder: the .torrent kept for each
+/// ODM's own files for the torrents of the list, in its data folder: the .torrent kept for each
 /// and the record of a single file's new name (#517). A torrent's Delete changes them beside the
 /// window, on a thread of their own, one change after the other (an antivirus or a busy disk
 /// could hold the window on them); a torrent added while changes are under way has its files
@@ -311,7 +311,7 @@ pub async fn read_kept(hash: &str) -> Result<Vec<u8>, String> {
 /// A magnet link for a torrent in the list, with its trackers, from the .torrent kept for it.
 pub fn magnet_of(hash: &str) -> Option<String> {
     let bytes = std::fs::read(torrent_file(hash)?).ok()?;
-    mdm_torrent::magnet_link(&bytes)
+    odm_torrent::magnet_link(&bytes)
 }
 
 /// Whether a web address is a .torrent file's (Add URL, the browser): its path ends in
@@ -336,24 +336,24 @@ pub struct Remote {
     pub parts: crate::app::RequestParts,
 }
 
-/// Fetch a .torrent from the web with MDM's own downloader, as `remote` says; at most
-/// `mdm_torrent::MAX_TORRENT_FILE` (a bigger file isn't a torrent, and is stopped there).
+/// Fetch a .torrent from the web with ODM's own downloader, as `remote` says; at most
+/// `odm_torrent::MAX_TORRENT_FILE` (a bigger file isn't a torrent, and is stopped there).
 pub async fn fetch_torrent(remote: Remote) -> Result<Vec<u8>, String> {
-    let not = || crate::errors::torrent(&mdm_torrent::TorrentError::NotATorrent);
-    fetch_small(remote, mdm_torrent::MAX_TORRENT_FILE)
+    let not = || crate::errors::torrent(&odm_torrent::TorrentError::NotATorrent);
+    fetch_small(remote, odm_torrent::MAX_TORRENT_FILE)
         .await?
         .ok_or_else(not)
 }
 
-/// Fetch a small file from the web (a .torrent, an RSS feed) with MDM's own downloader, as
+/// Fetch a small file from the web (a .torrent, an RSS feed) with ODM's own downloader, as
 /// `remote` says, into memory: None when it is bigger than `max` bytes (stopped there). Its
 /// temporary file, resume state and part file are removed.
 pub async fn fetch_small(remote: Remote, max: u64) -> Result<Option<Vec<u8>>, String> {
-    use mdm_engine::download::{Destination, Download, Request};
+    use odm_engine::download::{Destination, Download, Request};
     let dir = state_dir().ok_or(crate::i18n::t("no data folder"))?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join(format!(
-        "fetched-{}.part-of-mdm",
+        "fetched-{}.part-of-odm",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos())
@@ -390,12 +390,12 @@ pub async fn fetch_small(remote: Remote, max: u64) -> Result<Option<Vec<u8>>, St
     };
     // The file, its resume state, and the part file a stopped one leaves.
     let _ = std::fs::remove_file(&path);
-    let _ = std::fs::remove_file(mdm_engine::state::state_path(&path));
-    let _ = std::fs::remove_file(mdm_engine::naming::part_path(&path));
+    let _ = std::fs::remove_file(odm_engine::state::state_path(&path));
+    let _ = std::fs::remove_file(odm_engine::naming::part_path(&path));
     bytes
 }
 
-/// The blocklist as MDM converted it (mdm_torrent::blocklist), in the torrent data folder.
+/// The blocklist as ODM converted it (odm_torrent::blocklist), in the torrent data folder.
 pub const BLOCKLIST_FILE: &str = "blocklist.p2p";
 /// The address it was fetched from (another address: fetched again).
 const BLOCKLIST_SOURCE: &str = "blocklist.source";
@@ -418,7 +418,7 @@ pub fn blocklist_updated(url: &str) -> Option<std::time::SystemTime> {
 
 /// Fetch and convert the blocklist at `url` (#40) when it was never converted, comes from
 /// another address now, or is older than `BLOCKLIST_DAYS`; in the background, one at a time
-/// (`busy`), with MDM's own downloader (Proxy / Socks applies). A list that isn't one keeps the
+/// (`busy`), with ODM's own downloader (Proxy / Socks applies). A list that isn't one keeps the
 /// last good one. The torrent session reads it when it starts.
 pub fn refresh_blocklist(
     rt: &tokio::runtime::Handle,
@@ -442,12 +442,12 @@ pub fn refresh_blocklist(
         let _ = std::fs::create_dir_all(&dir);
         let download = dir.join("blocklist.download");
         let fetched =
-            mdm_engine::fetch(parsed, &download, crate::settings::own_net(), |_, _| {}).await;
+            odm_engine::fetch(parsed, &download, crate::settings::own_net(), |_, _| {}).await;
         match fetched {
             Ok(_) => match std::fs::read(&download)
                 .ok()
                 .as_deref()
-                .and_then(mdm_torrent::blocklist::convert)
+                .and_then(odm_torrent::blocklist::convert)
             {
                 Some(list) => {
                     let tmp = dir.join(format!("{BLOCKLIST_FILE}.tmp"));
@@ -462,19 +462,19 @@ pub fn refresh_blocklist(
                         );
                     }
                 }
-                None => tracing::warn!("blocklist: {url} is not a list MDM can read"),
+                None => tracing::warn!("blocklist: {url} is not a list ODM can read"),
             },
             Err(e) => tracing::warn!("blocklist: {e}"),
         }
         let _ = std::fs::remove_file(&download);
-        let _ = std::fs::remove_file(mdm_engine::state::state_path(&download));
+        let _ = std::fs::remove_file(odm_engine::state::state_path(&download));
         busy.store(false, Ordering::SeqCst);
     });
 }
 
 /// How the torrent session is held to the network adapter as it is (#35, #143): None without
 /// one chosen; else why torrents can't start (it isn't connected).
-pub fn route_bind(route: &mdm_engine::Route) -> Result<Option<mdm_torrent::Bind>, String> {
+pub fn route_bind(route: &odm_engine::Route) -> Result<Option<odm_torrent::Bind>, String> {
     let down = |label: &str| {
         crate::i18n::fmt(
             // i18n: an error: the network adapter chosen in Options (a VPN's, usually) is off or gone; {adapter} its name
@@ -483,19 +483,19 @@ pub fn route_bind(route: &mdm_engine::Route) -> Result<Option<mdm_torrent::Bind>
         )
     };
     match route {
-        mdm_engine::Route::Any => Ok(None),
-        mdm_engine::Route::Down { label } => Err(down(label)),
-        // Windows: its address (strong host model, see mdm_engine::net); IPv4 when it has one.
+        odm_engine::Route::Any => Ok(None),
+        odm_engine::Route::Down { label } => Err(down(label)),
+        // Windows: its address (strong host model, see odm_engine::net); IPv4 when it has one.
         #[cfg(windows)]
-        mdm_engine::Route::Bound(b) => {
+        odm_engine::Route::Bound(b) => {
             b.v4.map(std::net::IpAddr::V4)
                 .or(b.v6.map(std::net::IpAddr::V6))
-                .map(|ip| Some(mdm_torrent::Bind::Address(ip)))
+                .map(|ip| Some(odm_torrent::Bind::Address(ip)))
                 .ok_or_else(|| down(&b.label))
         }
         // Linux and macOS: its device.
         #[cfg(not(windows))]
-        mdm_engine::Route::Bound(b) => Ok(Some(mdm_torrent::Bind::Device {
+        odm_engine::Route::Bound(b) => Ok(Some(odm_torrent::Bind::Device {
             name: b.name.clone(),
             v4_only: b.v6.is_none(),
         })),
@@ -596,15 +596,15 @@ impl Host {
         spec: &TorrentSpec,
         act: Act,
     ) -> Result<Done, String> {
-        let err = |e: mdm_torrent::TorrentError| crate::errors::torrent(&e);
+        let err = |e: odm_torrent::TorrentError| crate::errors::torrent(&e);
         let hash = spec.hash.as_str();
         match act {
             Act::AddTrackers(more) => {
                 let bytes = read_kept(hash).await?;
-                let with = mdm_torrent::trackers::add(&bytes, &more)
-                    .ok_or_else(|| err(mdm_torrent::TorrentError::NotATorrent))?;
-                let added = mdm_torrent::trackers::listed(&with).len()
-                    - mdm_torrent::trackers::listed(&bytes).len();
+                let with = odm_torrent::trackers::add(&bytes, &more)
+                    .ok_or_else(|| err(odm_torrent::TorrentError::NotATorrent))?;
+                let added = odm_torrent::trackers::listed(&with).len()
+                    - odm_torrent::trackers::listed(&bytes).len();
                 if with != bytes {
                     save_torrent(hash, &with).map_err(|e| e.to_string())?;
                     // The running session's copy too; a session isn't started for it (the
@@ -680,11 +680,11 @@ impl Host {
         spec: &TorrentSpec,
         from: PathBuf,
         initial_to: PathBuf,
-        hold: Option<mdm_engine::naming::Reservation>,
+        hold: Option<odm_engine::naming::Reservation>,
         is_dir: bool,
         keep_sharing: bool,
         tx: std::sync::mpsc::Sender<(Result<PathBuf, String>, Option<String>)>,
-    ) -> Result<(), Option<mdm_engine::naming::Reservation>> {
+    ) -> Result<(), Option<odm_engine::naming::Reservation>> {
         {
             let mut busy = self.busy.lock().unwrap();
             if busy.contains(&spec.hash) {
@@ -922,14 +922,14 @@ enum RunState {
     Failed(String),
 }
 
-/// Off-screen test runs only (MDM_OFFSCREEN): peers every torrent added tries first, from
-/// MDM_LAB_PEERS (`127.0.0.1:6881,…`), the local test swarm (`crates/torrent/examples/swarm.rs`):
+/// Off-screen test runs only (ODM_OFFSCREEN): peers every torrent added tries first, from
+/// ODM_LAB_PEERS (`127.0.0.1:6881,…`), the local test swarm (`crates/torrent/examples/swarm.rs`):
 /// with no DHT, no local discovery and no incoming connections, a test copy finds it so.
 fn lab_peers() -> Vec<std::net::SocketAddr> {
     if !crate::offscreen() {
         return Vec::new();
     }
-    std::env::var("MDM_LAB_PEERS")
+    odm_ipc::env_var("ODM_LAB_PEERS")
         .unwrap_or_default()
         .split(',')
         .filter_map(|a| a.trim().parse().ok())
@@ -956,7 +956,7 @@ pub struct Run {
     limit: Arc<Mutex<(Option<u64>, Option<u64>)>>,
     /// The order its pieces are downloaded in (`TorrentSpec::order`): set once it is in the
     /// session, and again on each change.
-    order: Arc<Mutex<mdm_torrent::PieceOrder>>,
+    order: Arc<Mutex<odm_torrent::PieceOrder>>,
     /// The torrents an action is busy with (`Host::act`): while this one is, it shows as
     /// checking, with the bytes last seen (`last`: done, total), not as gone or stopped.
     busy: Arc<Mutex<HashSet<String>>>,
@@ -971,7 +971,7 @@ const TORRENT_ORIGIN: &str = "about:internet";
 /// downloads are (Windows' zone, so SmartScreen and Office's Protected View check them; macOS'
 /// quarantine; Linux's origin attribute, which nothing enforces). Every file of the torrent,
 /// ticked or not: librqbit creates them all.
-fn mark_files(folder: &Path, files: &[mdm_torrent::FileEntry]) {
+fn mark_files(folder: &Path, files: &[odm_torrent::FileEntry]) {
     for f in files.iter().filter(|f| !f.padding) {
         let path = folder.join(&f.path);
         if !path.is_file() {
@@ -985,12 +985,12 @@ fn mark_files(folder: &Path, files: &[mdm_torrent::FileEntry]) {
 pub struct Details {
     /// Each file (padding left out): its index in the torrent's list, its entry, chosen?,
     /// bytes there.
-    pub files: Vec<(usize, mdm_torrent::FileEntry, bool, u64)>,
+    pub files: Vec<(usize, odm_torrent::FileEntry, bool, u64)>,
     pub piece_length: u32,
-    pub peers: Vec<mdm_torrent::Peer>,
+    pub peers: Vec<odm_torrent::Peer>,
     pub trackers: Vec<String>,
     pub pieces: Vec<bool>,
-    pub stats: Option<mdm_torrent::Stats>,
+    pub stats: Option<odm_torrent::Stats>,
 }
 
 impl Run {
@@ -1213,7 +1213,7 @@ impl Run {
 
     /// The order its pieces are downloaded in (#39): now if it is in the session, else once it
     /// is.
-    pub fn set_order(&self, order: mdm_torrent::PieceOrder) {
+    pub fn set_order(&self, order: odm_torrent::PieceOrder) {
         let mut own = self.order.lock().unwrap();
         *own = order;
         if let Some(t) = self.session() {
@@ -1285,9 +1285,9 @@ pub fn magnet_url(hash: &str, name: &str) -> url::Url {
 }
 
 /// The file the list row stands for: the torrent's folder, or its one file.
-pub fn dest_for(meta: &mdm_torrent::Meta, dir: &Path, files: Option<&[usize]>) -> PathBuf {
+pub fn dest_for(meta: &odm_torrent::Meta, dir: &Path, files: Option<&[usize]>) -> PathBuf {
     let folder = meta.folder_in(dir);
-    let chosen: Vec<&mdm_torrent::FileEntry> = meta
+    let chosen: Vec<&odm_torrent::FileEntry> = meta
         .files
         .iter()
         .enumerate()
@@ -1393,19 +1393,19 @@ mod tests {
         let old: TorrentSpec =
             serde_json::from_str(r#"{"hash":"h","files":null,"folder":"f"}"#).unwrap();
         assert_eq!((old.in_order, old.ends_first), (false, true));
-        assert_eq!(old.order(), mdm_torrent::PieceOrder::RarestFirst);
+        assert_eq!(old.order(), odm_torrent::PieceOrder::RarestFirst);
         let mut spec = old.clone();
         spec.in_order = true;
         assert_eq!(
             spec.order(),
-            mdm_torrent::PieceOrder::InOrder {
+            odm_torrent::PieceOrder::InOrder {
                 first_and_last_first: true
             }
         );
         spec.ends_first = false;
         assert_eq!(
             spec.order(),
-            mdm_torrent::PieceOrder::InOrder {
+            odm_torrent::PieceOrder::InOrder {
                 first_and_last_first: false
             }
         );
@@ -1517,7 +1517,7 @@ mod tests {
         std::fs::create_dir_all(dir.path().join("sub")).unwrap();
         std::fs::write(dir.path().join("sub/a.exe"), b"x").unwrap();
         std::fs::write(dir.path().join(".pad0"), b"").unwrap();
-        let entry = |p: &str, padding| mdm_torrent::FileEntry {
+        let entry = |p: &str, padding| odm_torrent::FileEntry {
             path: PathBuf::from(p),
             size: 1,
             padding,

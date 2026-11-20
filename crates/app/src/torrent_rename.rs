@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Once;
 
 use egui::{Painter, Pos2, Ui};
-use mdm_torrent::Meta;
+use odm_torrent::Meta;
 
 use crate::winui::{self, r, text};
 
@@ -53,7 +53,7 @@ impl TorrentRenamePlugin {
     }
 
     pub fn on_meta_loaded(&mut self, meta: &Meta) {
-        let non_padding: Vec<(usize, &mdm_torrent::FileEntry)> = meta
+        let non_padding: Vec<(usize, &odm_torrent::FileEntry)> = meta
             .files
             .iter()
             .enumerate()
@@ -121,15 +121,15 @@ impl TorrentRenamePlugin {
         }
     }
 
-    fn stem_unsafe(&self) -> Option<mdm_torrent::UnsafeName> {
+    fn stem_unsafe(&self) -> Option<odm_torrent::UnsafeName> {
         let stem = self.stem.trim();
         if stem.is_empty() {
             return None;
         }
-        mdm_torrent::check_single_name(stem, self.is_dir).err()
+        odm_torrent::check_single_name(stem, self.is_dir).err()
     }
 
-    fn ext_unsafe(&self) -> Option<mdm_torrent::UnsafeName> {
+    fn ext_unsafe(&self) -> Option<odm_torrent::UnsafeName> {
         if self.is_dir {
             return None;
         }
@@ -137,10 +137,10 @@ impl TorrentRenamePlugin {
         if ext.is_empty() {
             return None;
         }
-        mdm_torrent::check_single_name(ext, false).err()
+        odm_torrent::check_single_name(ext, false).err()
     }
 
-    fn candidate_unsafe(&self) -> Option<mdm_torrent::UnsafeName> {
+    fn candidate_unsafe(&self) -> Option<odm_torrent::UnsafeName> {
         if let Some(u) = self.stem_unsafe() {
             return Some(u);
         }
@@ -151,22 +151,22 @@ impl TorrentRenamePlugin {
         if candidate.is_empty() {
             return None;
         }
-        if let Err(u) = mdm_torrent::check_single_name(&candidate, self.is_dir) {
+        if let Err(u) = odm_torrent::check_single_name(&candidate, self.is_dir) {
             return Some(u);
         }
         if !self.is_dir
             && let Some(parent) = &self.orig_parent
         {
-            return mdm_torrent::check_relative_path(&parent.join(&candidate)).err();
+            return odm_torrent::check_relative_path(&parent.join(&candidate)).err();
         }
         None
     }
 
-    /// Check the uncleaned name directly against `mdm_torrent`'s safety rules (`names::check`),
+    /// Check the uncleaned name directly against `odm_torrent`'s safety rules (`names::check`),
     /// returning the translated refusal message if any part isn't safe to write as typed.
     pub fn candidate_error(&self) -> Option<String> {
         self.candidate_unsafe()
-            .map(|u| crate::errors::torrent(&mdm_torrent::TorrentError::UnsafeName(u)))
+            .map(|u| crate::errors::torrent(&odm_torrent::TorrentError::UnsafeName(u)))
     }
 
     /// Compute the effective target name and apply it to `Meta`.
@@ -272,7 +272,7 @@ pub fn ensure_loaded() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {
         if let Some(dir) = session_dir() {
-            mdm_torrent::rename_plugin::load_into_memory(&dir);
+            odm_torrent::rename_plugin::load_into_memory(&dir);
         }
     });
 }
@@ -280,10 +280,10 @@ pub fn ensure_loaded() {
 /// Return the custom file or folder name chosen in Add torrent when it differs from the
 /// torrent's original name.
 pub fn renamed_target(meta: &Meta) -> Option<String> {
-    let non_padding: Vec<&mdm_torrent::FileEntry> =
+    let non_padding: Vec<&odm_torrent::FileEntry> =
         meta.files.iter().filter(|f| !f.padding).collect();
     if let [single] = non_padding.as_slice() {
-        let changed = mdm_torrent::rename_plugin::original_single_file_path(&meta.torrent)
+        let changed = odm_torrent::rename_plugin::original_single_file_path(&meta.torrent)
             .is_none_or(|orig| orig != single.path);
         changed
             .then(|| {
@@ -295,7 +295,7 @@ pub fn renamed_target(meta: &Meta) -> Option<String> {
             .flatten()
             .filter(|n| !n.is_empty())
     } else {
-        let changed = mdm_torrent::rename_plugin::original_torrent_name(&meta.torrent)
+        let changed = odm_torrent::rename_plugin::original_torrent_name(&meta.torrent)
             .is_none_or(|orig| orig != meta.name);
         changed.then(|| meta.name.clone()).filter(|n| !n.is_empty())
     }
@@ -310,10 +310,10 @@ pub fn on_add_torrent(meta: &Meta) {
 }
 
 pub fn on_add_torrent_in(session_dir: &Path, meta: &Meta) {
-    let non_padding: Vec<&mdm_torrent::FileEntry> =
+    let non_padding: Vec<&odm_torrent::FileEntry> =
         meta.files.iter().filter(|f| !f.padding).collect();
     if let [single] = non_padding.as_slice() {
-        mdm_torrent::rename_plugin::sync_renamed_file(
+        odm_torrent::rename_plugin::sync_renamed_file(
             session_dir,
             &meta.info_hash,
             &meta.torrent,
@@ -326,14 +326,14 @@ pub fn on_add_torrent_in(session_dir: &Path, meta: &Meta) {
 pub fn on_forget_torrent(hash: &str) {
     ensure_loaded();
     if let Some(dir) = session_dir() {
-        mdm_torrent::rename_plugin::remove_renamed_file(&dir, hash);
+        odm_torrent::rename_plugin::remove_renamed_file(&dir, hash);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mdm_torrent::FileEntry;
+    use odm_torrent::FileEntry;
 
     fn sample_meta(name: &str, files: &[(&str, u64)]) -> Meta {
         Meta {

@@ -1,18 +1,18 @@
 //! Measure a download to a disk slower than the network (#782): per-second speed, stalls and
 //! the connections shed as "much slower than the others".
 //!
-//! cargo run --release -p mdm-engine --example slow_disk -- <url> <folder> [disk rate] [cache]
+//! cargo run --release -p odm-engine --example slow_disk -- <url> <folder> [disk rate] [cache]
 //!
-//! `url`: a big file on a fast server (the lab server: `cargo run -p mdm-labserver -- --faults
+//! `url`: a big file on a fast server (the lab server: `cargo run -p odm-labserver -- --faults
 //! rate=15M`, then `http://127.0.0.1:8080/gen/6G/a.bin`). `disk rate` and `cache` (bytes, with
-//! K, M or G) give the part file the slow disk of `mdm_engine::slowdisk`; without them it is
+//! K, M or G) give the part file the slow disk of `odm_engine::slowdisk`; without them it is
 //! written to the real disk. The file is deleted at the end.
 
 use std::time::{Duration, Instant};
 
-use mdm_engine::download::State;
-use mdm_engine::slowdisk::SlowDisk;
-use mdm_engine::{Destination, Download, Options, Request};
+use odm_engine::download::State;
+use odm_engine::slowdisk::SlowDisk;
+use odm_engine::{Destination, Download, Options, Request};
 
 fn size(s: &str) -> u64 {
     let (n, unit) = s.split_at(s.find(|c: char| c.is_ascii_alphabetic()).unwrap_or(s.len()));
@@ -43,7 +43,7 @@ async fn main() {
         slow_disk: disk.clone(),
         ..Options::default()
     };
-    let slow = mdm_engine::Error::SlowConnection.to_string();
+    let slow = odm_engine::Error::SlowConnection.to_string();
     let d = Download::start(
         Request {
             url: url.parse().expect("a URL"),
@@ -70,7 +70,7 @@ async fn main() {
                 let receiving = v
                     .connections
                     .iter()
-                    .filter(|c| matches!(c.status, mdm_engine::download::ConnStatus::Receiving))
+                    .filter(|c| matches!(c.status, odm_engine::download::ConnStatus::Receiving))
                     .count();
                 let n = secs.len() - 1;
                 println!(

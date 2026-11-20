@@ -50,6 +50,13 @@ def serve(body):
     class Handler(http.server.BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
+        def handle(self):
+            try:
+                super().handle()
+            except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+                # Orbit can close a range request when it reassigns the work.
+                pass
+
         def log_message(self, *args):
             pass
 
@@ -110,12 +117,12 @@ def main():
 
     body = random.Random(668).randbytes(SIZE)
     server, url = serve(body)
-    work = tempfile.mkdtemp(prefix="mdm-smoke-")
+    work = tempfile.mkdtemp(prefix="odm-smoke-")
     try:
         data, dest = os.path.join(work, "data"), os.path.join(work, "downloads", "smoke.bin")
         os.makedirs(data)
         os.makedirs(os.path.dirname(dest))
-        env = dict(os.environ, MDM_DATA_DIR=data, MDM_DOWNLOADS=os.path.dirname(dest))
+        env = dict(os.environ, ODM_DATA_DIR=data, ODM_DOWNLOADS=os.path.dirname(dest))
         out = subprocess.run(
             [os.path.join(folder, "orbitdownloadmanager" + exe), "--cli", "--json", "get", url,
              "-o", dest, "--checksum", "sha256:" + hashlib.sha256(body).hexdigest()],

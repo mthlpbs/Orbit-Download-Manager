@@ -4,7 +4,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use mdm_remote::{Config, Remote, Status};
+use odm_remote::{Config, Remote, Status};
 
 /// A remote control on 127.0.0.1, any port, with a stand-in app that answers every command
 /// with `{"seen": …}` and records it.
@@ -13,11 +13,11 @@ fn start(
 ) -> (
     Remote,
     String,
-    Arc<Mutex<Vec<mdm_ipc::Command>>>,
+    Arc<Mutex<Vec<odm_ipc::Command>>>,
     tempfile::TempDir,
 ) {
     let dir = tempfile::tempdir().unwrap();
-    let (tx, rx) = std::sync::mpsc::channel::<mdm_ipc::Incoming>();
+    let (tx, rx) = std::sync::mpsc::channel::<odm_ipc::Incoming>();
     let seen = Arc::new(Mutex::new(Vec::new()));
     let log = seen.clone();
     std::thread::spawn(move || {
@@ -33,8 +33,8 @@ fn start(
             }
         }
     });
-    let sink = mdm_ipc::Sink::new(tx, Arc::new(|| {}));
-    let texts: mdm_remote::Texts = Arc::new(|lang: &str| mdm_remote::PageTexts {
+    let sink = odm_ipc::Sink::new(tx, Arc::new(|| {}));
+    let texts: odm_remote::Texts = Arc::new(|lang: &str| odm_remote::PageTexts {
         lang: if lang.starts_with("de") {
             "de".into()
         } else {
@@ -48,7 +48,7 @@ fn start(
         on: true,
         port: 0,
         listen: "127.0.0.1".into(),
-        hosts: vec!["mdm.example".into()],
+        hosts: vec!["odm.example".into()],
     });
     let Status::Listening(addrs) = remote.status() else {
         panic!("not listening: {:?}", remote.status());
@@ -112,7 +112,7 @@ fn pair_then_control() {
         };
         assert_eq!(pair("12345678").await.unwrap().status(), 410);
         let code = remote.start_pairing();
-        tokio::time::sleep(mdm_remote::pairing::PACE).await;
+        tokio::time::sleep(odm_remote::pairing::PACE).await;
         let wrong = if code == "00000000" { "11111111" } else { "00000000" };
         let r = pair(wrong).await.unwrap();
         assert_eq!(r.status(), 403);
@@ -120,7 +120,7 @@ fn pair_then_control() {
         assert_eq!(body["left"], 4);
         // Too soon after a wrong one, even with the right code.
         assert_eq!(pair(&code).await.unwrap().status(), 429);
-        tokio::time::sleep(mdm_remote::pairing::PACE).await;
+        tokio::time::sleep(odm_remote::pairing::PACE).await;
         let r = pair(&code).await.unwrap();
         assert_eq!(r.status(), 200);
         let body: serde_json::Value = r.json().await.unwrap();
@@ -206,7 +206,7 @@ fn pair_then_control() {
         let r = c
             .get(format!("{base}api/list"))
             .bearer_auth(&token)
-            .header("host", "mdm.example")
+            .header("host", "odm.example")
             .send()
             .await
             .unwrap();
@@ -275,11 +275,11 @@ fn never_every_address() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let (tx, _rx) = std::sync::mpsc::channel();
     let dir = tempfile::tempdir().unwrap();
-    let texts: mdm_remote::Texts = Arc::new(|_: &str| mdm_remote::PageTexts::default());
+    let texts: odm_remote::Texts = Arc::new(|_: &str| odm_remote::PageTexts::default());
     let remote = Remote::new(
         rt.handle().clone(),
         dir.path().to_owned(),
-        mdm_ipc::Sink::new(tx, Arc::new(|| {})),
+        odm_ipc::Sink::new(tx, Arc::new(|| {})),
         texts,
     );
     for listen in ["0.0.0.0", "::", "203.0.113.9"] {

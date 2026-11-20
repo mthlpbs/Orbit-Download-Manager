@@ -29,5 +29,5 @@ await edit("Cargo.lock", (s) => s.replace(/\[\[package\]\][\s\S]*?(?=\[\[package
 for (const file of ["extension/manifest.json", "extension/manifest.firefox.json"]) {
   await edit(file, (s) => s.replace(/("version"\s*:\s*)"[^"]+"/, '$1"' + version + '"'));
 }
-await edit("tools/installer/mdm.iss", (s) => s.replace(/(#define AppVersion\s+)"[^"]+"/, '$1"' + version + '"'));
+await edit("tools/installer/odm.iss", (s) => s.replace(/(#define AppVersion\s+)"[^"]+"/, '$1"' + version + '"'));
 console.log("Orbit Download Manager " + version);

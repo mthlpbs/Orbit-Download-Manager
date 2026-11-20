@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         return Ok(());
     }
-    let server = mdm_mcp::Server::new(std::sync::Arc::new(mdm_ipc::request));
+    let server = odm_mcp::Server::new(std::sync::Arc::new(odm_ipc::request));
     server
         .serve(rmcp::transport::stdio())
         .await?

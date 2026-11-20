@@ -1,10 +1,10 @@
 //! The connection a browser makes (#668), for the one retry a download gets when a site refused
-//! MDM's own as a program's: its bot check (`Error::BotCheck`), or a 412 to a request without
+//! ODM's own as a program's: its bot check (`Error::BotCheck`), or a 412 to a request without
 //! preconditions (`download::refused_as_a_program`).
 //!
 //! Bot checks (Cloudflare's and others') don't only read the User-Agent: they recognise how the
 //! connection is made, its TLS handshake, its HTTP/2 settings and the order of its headers.
-//! MDM's own connection (reqwest on rustls) doesn't look like a browser's, so a site that lets
+//! ODM's own connection (reqwest on rustls) doesn't look like a browser's, so a site that lets
 //! only browsers through refuses it even when the same file downloads in the browser. This
 //! connection is made the way that browser family makes it (`wreq` on BoringSSL, with
 //! `wreq-util`'s profiles: Chrome's for Chrome and the Chromium browsers, Edge's, Opera's,
@@ -27,7 +27,7 @@
 //! check, 412) or ignores them leaves the download on one connection, as before
 //! (`download::request`).
 //!
-//! A stream's pieces (mdm-tools' `pieces`, #1289) use it through [`Connection`] once a piece was
+//! A stream's pieces (odm-tools' `pieces`, #1289) use it through [`Connection`] once a piece was
 //! refused as a program's ([`refuses_programs`]).
 //!
 //! Built with the `browser-connection` feature (on by default; BoringSSL needs CMake, a C
@@ -73,7 +73,7 @@ pub(crate) struct Browser {
 /// One connection of a [`Browser`], taken for one request and its answer: the lowest number no
 /// answer coming in holds, given back when its answer is done with (dropped). Requests at the
 /// same time get connections of their own (wreq's `Group`: its pool keeps each number's apart),
-/// as MDM's own connection does (HTTP/1.1, `download::client`), where HTTP/2 would carry them
+/// as ODM's own connection does (HTTP/1.1, `download::client`), where HTTP/2 would carry them
 /// all on one; one request after another reuses the same, kept open.
 #[cfg(feature = "browser-connection")]
 struct Lease {
@@ -144,7 +144,7 @@ impl Stream {
 
 impl Browser {
     /// A client for `url` with `opts`' User-Agent (or the one `headers` carry, which wins as it
-    /// does on MDM's own requests), proxy, DNS and network adapter. Refused when this build has
+    /// does on ODM's own requests), proxy, DNS and network adapter. Refused when this build has
     /// none, or when the adapter can't hold its connections (the kill switch, #35).
     pub(crate) fn new(opts: &Options, url: &Url, headers: &HeaderMap) -> Result<Browser, Error> {
         let agent = headers
@@ -215,7 +215,7 @@ pub fn refuses_programs(status: StatusCode, headers: &HeaderMap) -> bool {
     crate::download::is_bot_check(status, headers) || status == StatusCode::PRECONDITION_FAILED
 }
 
-/// The browser-like connection for requests of MDM's other parts (a stream's pieces, #1289):
+/// The browser-like connection for requests of ODM's other parts (a stream's pieces, #1289):
 /// made for an address with the options and headers its requests go with, as a download's is
 /// (the User-Agent of `headers`, else of the options; the proxy, the DNS and the adapter of the
 /// options). Cloned, it is the same connection: requests at the same time each get a connection
@@ -352,7 +352,7 @@ mod imp {
         let (proxy, through_local_proxy) = proxy_for(opts, url)?;
         let mut b = wreq::Client::builder()
             .emulation(emulation_for(agent))
-            // Followed in `get`, where credentials are scoped as everywhere in MDM.
+            // Followed in `get`, where credentials are scoped as everywhere in ODM.
             .redirect(wreq::redirect::Policy::none())
             .connect_timeout(opts.connect_timeout)
             .read_timeout(opts.read_timeout)
@@ -384,7 +384,7 @@ mod imp {
         ))
     }
 
-    /// The certificates the connection trusts: Mozilla's, the system's (as MDM's own connection
+    /// The certificates the connection trusts: Mozilla's, the system's (as ODM's own connection
     /// trusts them: an antivirus's or a company's HTTPS inspection puts its own there) and
     /// `extra` (the tests' own CA). The system's are read once.
     fn cert_store(extra: &[Vec<u8>]) -> Result<wreq::tls::trust::CertStore, Error> {
@@ -408,7 +408,7 @@ mod imp {
             .map_err(|e| net_error(&e))
     }
 
-    /// `builder` held to `route`'s adapter as `net::bind_client` holds MDM's own clients: the
+    /// `builder` held to `route`'s adapter as `net::bind_client` holds ODM's own clients: the
     /// address on Windows, the device on Linux, the interface on macOS. Elsewhere, refused.
     fn bind(
         builder: wreq::ClientBuilder,
@@ -579,7 +579,7 @@ mod imp {
         pick.unwrap_or_default()
     }
 
-    /// MDM's resolver (`dns::Resolver`: the chosen DNS, only addresses the adapter reaches)
+    /// ODM's resolver (`dns::Resolver`: the chosen DNS, only addresses the adapter reaches)
     /// for the browser-like client.
     struct Dns(crate::dns::Resolver);
 

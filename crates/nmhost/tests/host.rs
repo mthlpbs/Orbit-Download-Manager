@@ -1,5 +1,5 @@
 //! The native host as the browser runs it: the real program, its standard streams framed as
-//! native messages, its own data folder (MDM_DATA_DIR) with a fake Orbit Download Manager
+//! native messages, its own data folder (ODM_DATA_DIR) with a fake Orbit Download Manager
 //! listening where `ipc.json` says, answering as the test wants.
 
 use std::io::{BufRead, BufReader, Read, Write};
@@ -15,7 +15,7 @@ const UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Saf
 
 /// A data folder of its own, with the app's Options as `settings` (downloads.json).
 fn data_dir(name: &str, settings: serde_json::Value) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("mdm-nmhost-test-{name}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("odm-nmhost-test-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let list = serde_json::json!({ "settings": settings });
@@ -54,7 +54,7 @@ fn run(
 ) -> (Vec<serde_json::Value>, bool) {
     let mut child = Command::new(HOST)
         .arg(caller)
-        .env("MDM_DATA_DIR", dir)
+        .env("ODM_DATA_DIR", dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -186,7 +186,7 @@ fn options_and_a_refusing_app_start_nothing() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// #208: every download left to the browser is in MDM's log with why, whether the host refused
+/// #208: every download left to the browser is in ODM's log with why, whether the host refused
 /// it or the extension left it alone by the same rules (and only told the host); none reaches
 /// the app. A private window's is logged without its site or name.
 #[test]
@@ -194,7 +194,7 @@ fn what_is_left_to_the_browser_is_logged() {
     let dir = data_dir("logged", serde_json::json!({ "auto_types": "ZIP" }));
     let app = fake_app(&dir, "ok");
     std::fs::create_dir_all(dir.join("logs")).unwrap();
-    std::fs::write(dir.join("logs").join("mdm.log"), "an earlier line\n").unwrap();
+    std::fs::write(dir.join("logs").join("odm.log"), "an earlier line\n").unwrap();
     let (replies, ok) = run(
         &dir,
         CALLER,
@@ -221,7 +221,7 @@ fn what_is_left_to_the_browser_is_logged() {
         app.recv_timeout(Duration::from_millis(500)).is_err(),
         "nothing reached the app"
     );
-    let log = std::fs::read_to_string(dir.join("logs").join("mdm.log")).unwrap();
+    let log = std::fs::read_to_string(dir.join("logs").join("odm.log")).unwrap();
     let lines: Vec<&str> = log.lines().collect();
     assert_eq!(lines.len(), 5, "{log}");
     assert_eq!(lines[0], "an earlier line");
@@ -293,7 +293,7 @@ fn zen_and_helium_alone_are_registered() {
             .arg(arg)
             .env("HOME", &home)
             .env_remove("XDG_CONFIG_HOME")
-            .env("MDM_DATA_DIR", &home)
+            .env("ODM_DATA_DIR", &home)
             .output()
             .unwrap();
         assert!(out.status.success(), "{arg}: {out:?}");
@@ -355,7 +355,7 @@ fn brave_origin_alone_is_registered() {
         .env("HOME", &home)
         .env_remove("XDG_CONFIG_HOME")
         .env_remove("APPDIR")
-        .env("MDM_DATA_DIR", &home)
+        .env("ODM_DATA_DIR", &home)
         .output()
         .unwrap();
     assert!(out.status.success(), "{out:?}");
@@ -382,7 +382,7 @@ fn a_host_inside_an_appimage_mount_is_not_registered() {
         .env("HOME", &home)
         .env_remove("XDG_CONFIG_HOME")
         .env("APPDIR", &mount)
-        .env("MDM_DATA_DIR", &home)
+        .env("ODM_DATA_DIR", &home)
         .output()
         .unwrap();
     assert!(!out.status.success());
@@ -432,7 +432,7 @@ fn a_host_in_a_temporary_folder_is_not_registered() {
                 .env("HOME", &home)
                 .env_remove("XDG_CONFIG_HOME")
                 .env_remove("APPDIR")
-                .env("MDM_DATA_DIR", &home)
+                .env("ODM_DATA_DIR", &home)
                 .output();
             match run {
                 Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy && tries < 50 => {
@@ -452,7 +452,7 @@ fn a_host_in_a_temporary_folder_is_not_registered() {
     let _ = std::fs::remove_dir_all(&home);
 }
 
-/// #818: at the app's start (`--repair`) a manifest that works naming another copy of MDM stays
+/// #818: at the app's start (`--repair`) a manifest that works naming another copy of ODM stays
 /// (two copies are both legitimate); one naming a helper that is gone is taken over, and Set it
 /// up (`--register`) takes the browsers from any copy.
 #[cfg(not(windows))]
@@ -480,7 +480,7 @@ fn a_start_takes_only_a_registration_that_leads_nowhere() {
             .env("HOME", &home)
             .env_remove("XDG_CONFIG_HOME")
             .env_remove("APPDIR")
-            .env("MDM_DATA_DIR", &home)
+            .env("ODM_DATA_DIR", &home)
             .output()
             .unwrap();
         assert!(out.status.success(), "{arg}: {out:?}");

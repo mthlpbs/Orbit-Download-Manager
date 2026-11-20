@@ -6,7 +6,7 @@
 //! download chosen in the browser's quality menu, which takes the look-up the menu was made from
 //! ([`Preloaded`]): the page is then read once for the menu and the download together.
 //!
-//! The bytes come down through MDM's engine (#769, [`crate::streams`]): yt-dlp chooses the
+//! The bytes come down through ODM's engine (#769, [`crate::streams`]): yt-dlp chooses the
 //! formats, the engine downloads each stream into the file yt-dlp looks for, then yt-dlp merges
 //! them, saves the subtitles and the metadata as after its own download. What the engine can't
 //! download (a live stream, RTMP…) yt-dlp downloads itself, as before.
@@ -41,7 +41,7 @@ pub struct Progress {
     /// Subtitles that didn't come with the video, once it is done (#68): the video is saved all
     /// the same.
     pub sub_problems: Vec<SubProblem>,
-    /// While MDM's engine downloads the streams (#769): its segments, connections and server.
+    /// While ODM's engine downloads the streams (#769): its segments, connections and server.
     pub engine: Option<crate::streams::View>,
     /// Why yt-dlp downloads this one itself (#769), once a run has found out.
     pub helper: Option<crate::streams::Helper>,
@@ -74,10 +74,10 @@ pub enum SubReason {
 }
 
 /// How long to wait before asking once more for the subtitles a site refused. A site that
-/// answers "too many requests" wants a pause, not a quick retry. `MDM_SUBS_RETRY_SECS`
+/// answers "too many requests" wants a pause, not a quick retry. `ODM_SUBS_RETRY_SECS`
 /// shortens it for the tests (tests/fake_ytdlp.rs).
 fn subs_retry_delay() -> std::time::Duration {
-    let secs = std::env::var("MDM_SUBS_RETRY_SECS")
+    let secs = odm_ipc::env_var("ODM_SUBS_RETRY_SECS")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(20);
@@ -218,7 +218,7 @@ pub fn set_chapters(on: bool) {
 }
 
 /// The chapters a video's page lists, put into the file (#827): `--embed-chapters` on yt-dlp's
-/// last run, the one that merges and fixes the file up (after MDM's engine too). Only with ffmpeg,
+/// last run, the one that merges and fixes the file up (after ODM's engine too). Only with ffmpeg,
 /// which writes them, and for a video or the sound as the site has it, not a conversion to MP3,
 /// Opus or FLAC. A video without chapters is left as it is.
 fn chapter_args(chapters: bool, ffmpeg: bool, converted: bool) -> Vec<String> {
@@ -442,7 +442,7 @@ impl InfoSlot {
 }
 
 /// The browser's quality menu's look-up for the download chosen there (its first run only):
-/// the look-up, and the choice as the menu offered it (MDM's selector, its label, untranslated,
+/// the look-up, and the choice as the menu offered it (ODM's selector, its label, untranslated,
 /// and whether the menu's list had merged qualities). The page yt-dlp read must offer that very
 /// choice, or the run looks the page up itself.
 pub struct Preloaded {
@@ -492,10 +492,10 @@ const SUBTITLES: [&str; 10] = [
 /// Whether `rest`, a file name after `<stem>.` (lower case), is one yt-dlp writes for a download
 /// saved as `<stem>.%(ext)s`: an unfinished run's (`<ext>.part`, `<ext>.ytdl`,
 /// `<ext>.part-Frag<N>[.part]`, each also for one stream of a merged choice as `f<id>.<ext>…`,
-/// that stream once whole, `f<id>.<ext>`, and a merge's `temp.<ext>`; MDM's engine's part file
-/// and resume state for such a stream, `f<id>.<ext>.mdm.part` and `.mdm.json`, #769); with
+/// that stream once whole, `f<id>.<ext>`, and a merge's `temp.<ext>`; ODM's engine's part file
+/// and resume state for such a stream, `f<id>.<ext>.odm.part` and `.odm.json`, #769); with
 /// `outputs`, also the finished file (`<ext>`) and its subtitles (`<language>.<srt|vtt…>`).
-/// Nothing else: another download's files (MDM's own `.mdm.part`), a file merely named alike.
+/// Nothing else: another download's files (ODM's own `.odm.part`), a file merely named alike.
 fn yt_dlp_leftover(rest: &str, outputs: bool) -> bool {
     let media = |s: &str| MEDIA.contains(&s);
     let word = |s: &str| {
@@ -529,7 +529,7 @@ fn yt_dlp_leftover(rest: &str, outputs: bool) -> bool {
     let working = match parts.as_slice() {
         ["temp", ext] => media(ext),
         [f, ext] if format(f) => media(ext),
-        [f, ext, "mdm", "part" | "json"] if format(f) => media(ext),
+        [f, ext, "odm" | "mdm", "part" | "json"] if format(f) => media(ext),
         [f, tail @ ..] if format(f) => unfinished(tail),
         p => unfinished(p),
     };
@@ -575,7 +575,7 @@ fn info_file() -> PathBuf {
     use std::sync::atomic::{AtomicU64, Ordering};
     static N: AtomicU64 = AtomicU64::new(0);
     crate::workdir::temp_dir().join(format!(
-        "mdm-video-{}-{}.json",
+        "odm-video-{}-{}.json",
         std::process::id(),
         N.fetch_add(1, Ordering::Relaxed)
     ))
@@ -637,7 +637,7 @@ enum Attempt {
         rerouted: bool,
     },
     /// Every stream came, and joining them failed: no other server or look-up mends that. With
-    /// the streams' format ids (`MDMQ`'s `1280+aud-English`).
+    /// the streams' format ids (`ODMQ`'s `1280+aud-English`).
     MergeFailed(String, Vec<String>),
 }
 
@@ -707,7 +707,7 @@ fn supervise(
     retry: Option<&SubsRetry>,
     preloaded: Option<Preloaded>,
     engine: Option<&ByEngine>,
-    saved: Option<&mdm_engine::FileHook>,
+    saved: Option<&odm_engine::FileHook>,
 ) {
     // The first run only: a run after it looks the page up afresh (links expire).
     let mut preloaded = preloaded;
@@ -862,7 +862,7 @@ fn supervise(
 /// stay what they are.
 pub const MAX_WHILE_RUNNING: f64 = 0.999;
 
-/// yt-dlp's progress lines (`MDMP <downloaded> <total> <estimate> <speed> <format id>`) made
+/// yt-dlp's progress lines (`ODMP <downloaded> <total> <estimate> <speed> <format id>`) made
 /// into one steady figure. Each stream of a merged download (video, then audio) reports from 0
 /// with its own total, and a fragmented stream's total (HLS, DASH) is an estimate that moves with
 /// every fragment: the streams are added up, and the fraction done goes back only when a stream's
@@ -875,15 +875,15 @@ pub const MAX_WHILE_RUNNING: f64 = 0.999;
 /// and that stream's, so the bar reaches the end. Which streams there are, yt-dlp says before it
 /// downloads ([`Meter::quality`]), and each line names the one it is for ([`Meter::named`]).
 ///
-/// A line named otherwise (no `MDMQ`, an id it didn't name, `NA`) is read as before: back near 0
-/// is the next stream, never counted as one of `MDMQ`'s, and the window's size holds the total.
+/// A line named otherwise (no `ODMQ`, an id it didn't name, `NA`) is read as before: back near 0
+/// is the next stream, never counted as one of `ODMQ`'s, and the window's size holds the total.
 /// Subtitle files come before the video with lines of their own, `NA` (#68): what they brought
 /// leaves the bar when the first stream's line comes.
 struct Meter {
     expected: Option<u64>,
-    /// `MDMQ`'s format id and resolution (`137+140 1920x1080`), once yt-dlp has said.
+    /// `ODMQ`'s format id and resolution (`137+140 1920x1080`), once yt-dlp has said.
     quality: Option<String>,
-    /// The stream the lines are for now (its format id), how many of `MDMQ`'s streams have
+    /// The stream the lines are for now (its format id), how many of `ODMQ`'s streams have
     /// started, and whether a line was for all of them at once (`137+140`).
     current: Option<String>,
     started: usize,
@@ -914,21 +914,21 @@ impl Meter {
         }
     }
 
-    /// yt-dlp's `MDMQ <format id> <resolution>` ([`QUALITY`]): a merged choice's id names each
+    /// yt-dlp's `ODMQ <format id> <resolution>` ([`QUALITY`]): a merged choice's id names each
     /// stream (`137+140`).
     fn quality(&mut self, rest: &str) {
         let rest = rest.trim();
         self.quality = (!rest.is_empty()).then(|| rest.to_owned());
     }
 
-    /// How many streams `MDMQ` named.
+    /// How many streams `ODMQ` named.
     fn streams(&self) -> Option<usize> {
         self.quality.as_ref().map(|q| q.split('+').count())
     }
 
-    /// Whether a line's format `id` is one of the streams `MDMQ` named (`137` of `137+140`;
+    /// Whether a line's format `id` is one of the streams `ODMQ` named (`137` of `137+140`;
     /// false), or all of them at once (`137+140`, as ffmpeg downloads and merges them; true).
-    /// None for any other: none named, `NA`, an id `MDMQ` didn't name, no `MDMQ`.
+    /// None for any other: none named, `NA`, an id `ODMQ` didn't name, no `ODMQ`.
     fn named<'a>(&self, id: Option<&'a str>) -> Option<(&'a str, bool)> {
         let (q, id) = (self.quality.as_deref()?, id.filter(|id| *id != "NA")?);
         // The id, then the resolution after the last one (one word, or two: `audio only`).
@@ -1063,9 +1063,9 @@ impl Meter {
 /// How one yt-dlp run on the looked-up page ended.
 struct Ran {
     status: std::io::Result<std::process::ExitStatus>,
-    /// Where it said it saved the file (`MDMF`).
+    /// Where it said it saved the file (`ODMF`).
     saved: Option<PathBuf>,
-    /// The quality it chose (`MDMQ`).
+    /// The quality it chose (`ODMQ`).
     quality: Option<String>,
     warnings: Vec<String>,
     /// What it said when it failed.
@@ -1123,25 +1123,25 @@ fn run(
             }
             let text = String::from_utf8_lossy(&buf);
             let line = text.trim_end_matches(['\r', '\n']);
-            if let Some(rest) = line.strip_prefix("MDMF ") {
+            if let Some(rest) = line.strip_prefix("ODMF ") {
                 saved = Some(PathBuf::from(rest.trim()));
                 // Merged and moved: done joining.
                 *merged.lock().unwrap() = None;
                 progress.lock().unwrap().merging = None;
-            } else if let Some(rest) = line.strip_prefix("MDMQ ") {
+            } else if let Some(rest) = line.strip_prefix("ODMQ ") {
                 if let Some(m) = meter.as_deref_mut() {
                     m.quality(rest);
                 }
                 quality = Some(rest.trim().to_owned());
-            } else if let Some(rest) = line.strip_prefix("MDMP ")
+            } else if let Some(rest) = line.strip_prefix("ODMP ")
                 && let Some(m) = meter.as_deref_mut()
             {
                 m.line(rest, &mut progress.lock().unwrap());
-            } else if let Some(rest) = line.strip_prefix("MDMM ")
+            } else if let Some(rest) = line.strip_prefix("ODMM ")
                 && quality.as_deref().is_some_and(several_streams)
             {
-                // Several streams: ffmpeg joins them now (#736). Told by this run's `MDMQ`, not
-                // by the meter: when MDM's engine downloaded the streams (#769) there is none,
+                // Several streams: ffmpeg joins them now (#736). Told by this run's `ODMQ`, not
+                // by the meter: when ODM's engine downloaded the streams (#769) there is none,
                 // and that is how most videos come down.
                 *merged.lock().unwrap() = Some(merge_file(Path::new(rest.trim())));
                 progress.lock().unwrap().merging = Some(None);
@@ -1227,7 +1227,7 @@ fn watch_merge(
     }
 }
 
-/// Whether `MDMQ`'s quality (`137+140 1920x1080`) is a choice of several streams, which
+/// Whether `ODMQ`'s quality (`137+140 1920x1080`) is a choice of several streams, which
 /// yt-dlp's ffmpeg merges.
 fn several_streams(quality: &str) -> bool {
     quality
@@ -1472,7 +1472,7 @@ fn attempt(
         return failed(format!("Cannot write the video information: {e}"), rerouted);
     }
     let _cleanup = Remove(file.clone());
-    // MDM's engine downloads the streams (#769); yt-dlp then finds them in place.
+    // ODM's engine downloads the streams (#769); yt-dlp then finds them in place.
     let mut by_engine = false;
     if let Some(e) = engine {
         // With the run's selector: the nearest quality once the chosen one wasn't offered
@@ -1631,15 +1631,15 @@ fn choose(exe: &Path, args: &[String], file: &Path) -> Result<serde_json::Value,
     let out = proc::output(cmd, "yt-dlp", Duration::from_secs(90)).map_err(|e| e.to_string())?;
     String::from_utf8_lossy(&out)
         .lines()
-        .find_map(|l| l.strip_prefix("MDMJ "))
+        .find_map(|l| l.strip_prefix("ODMJ "))
         .and_then(|j| serde_json::from_str(j).ok())
         .ok_or_else(|| "yt-dlp gave no choice of formats".to_owned())
 }
 
-/// yt-dlp's choice as a line of JSON: `MDMJ {…}` (`filename` and the chosen formats in it).
-const CHOICE: &str = "MDMJ %()j";
+/// yt-dlp's choice as a line of JSON: `ODMJ {…}` (`filename` and the chosen formats in it).
+const CHOICE: &str = "ODMJ %()j";
 
-/// MDM's engine for a video's streams (#769): the engine itself, the arguments yt-dlp chooses
+/// ODM's engine for a video's streams (#769): the engine itself, the arguments yt-dlp chooses
 /// the formats with (`choose`), and the download's engine part under way.
 pub(crate) struct ByEngine {
     strict: bool,
@@ -1753,7 +1753,7 @@ impl ByEngine {
         if let (crate::streams::Fetched::Done, Some(view)) = (&out, &mut p.engine) {
             view.connections
                 .iter_mut()
-                .for_each(mdm_engine::download::ConnView::finish);
+                .for_each(odm_engine::download::ConnView::finish);
         }
         drop(p);
         match out {
@@ -1833,7 +1833,7 @@ pub fn too_long(error: &str) -> Option<PathBuf> {
     SAID.iter().find_map(|(said, always)| {
         let (_, rest) = error.split_once(said)?;
         let path = python_quoted(rest.split_once(": ")?.1)?;
-        (*always || !mdm_engine::naming::fits(&path)).then_some(path)
+        (*always || !odm_engine::naming::fits(&path)).then_some(path)
     })
 }
 
@@ -1861,24 +1861,24 @@ fn template_text(s: &str) -> String {
     s.replace('%', "%%")
 }
 
-/// yt-dlp's speed when it downloads by itself (#708; MDM's engine downloads every other video,
+/// yt-dlp's speed when it downloads by itself (#708; ODM's engine downloads every other video,
 /// #769): at most `rate` bytes/s.
 pub fn limit_args(rate: Option<u64>) -> Vec<String> {
     rate.map(|r| vec!["--limit-rate".into(), r.to_string()])
         .unwrap_or_default()
 }
 
-/// Our progress line: `MDMP <downloaded> <total> <estimate> <speed> <format id>` (`NA` when
+/// Our progress line: `ODMP <downloaded> <total> <estimate> <speed> <format id>` (`NA` when
 /// unknown; the format id is the stream's, `NA` for a subtitle file).
-const PROGRESS: &str = "download:MDMP %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s %(progress.speed)s %(info.format_id)s";
-/// The final file: `MDMF <path>`.
-const FINAL: &str = "after_move:MDMF %(filepath)s";
-/// Every stream is in, the file they make is next (`MDMM <path>`): printed before yt-dlp's
+const PROGRESS: &str = "download:ODMP %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s %(progress.speed)s %(info.format_id)s";
+/// The final file: `ODMF <path>`.
+const FINAL: &str = "after_move:ODMF %(filepath)s";
+/// Every stream is in, the file they make is next (`ODMM <path>`): printed before yt-dlp's
 /// post-processing, its merge first (#736).
-const MERGE: &str = "post_process:MDMM %(filepath)s";
-/// The quality yt-dlp chose, before it downloads: `MDMQ <format id> <resolution>` (the log names
+const MERGE: &str = "post_process:ODMM %(filepath)s";
+/// The quality yt-dlp chose, before it downloads: `ODMQ <format id> <resolution>` (the log names
 /// it when it isn't the one asked for, #94).
-const QUALITY: &str = "video:MDMQ %(format_id)s %(resolution)s";
+const QUALITY: &str = "video:ODMQ %(format_id)s %(resolution)s";
 
 impl VideoJob {
     /// Download `url` in format `selector` to `dir/<stem>.<ext>`; when yt-dlp downloads it by
@@ -1886,7 +1886,7 @@ impl VideoJob {
     /// choice was shown with (every stream), so the progress starts from the whole. `browser`:
     /// what the browser's request for the page carried (proc::FromBrowser). `subs`: the
     /// subtitles to save with it (#68; none for a sound alone, which has no picture to put them
-    /// on). `engine`: MDM's engine, which downloads the streams yt-dlp finds (#769; its options'
+    /// on). `engine`: ODM's engine, which downloads the streams yt-dlp finds (#769; its options'
     /// speed limit is the download's); without it, or for what it can't download, yt-dlp does.
     #[allow(clippy::too_many_arguments)]
     pub fn start(
@@ -1927,7 +1927,7 @@ impl VideoJob {
         subs: &Subs,
         preloaded: Option<Preloaded>,
         engine: Option<crate::streams::Engine>,
-        saved: Option<mdm_engine::FileHook>,
+        saved: Option<odm_engine::FileHook>,
     ) -> Result<VideoJob, ProcError> {
         proc::safe(url)?;
         if crate::config::managed() && engine.is_none() {
@@ -1941,7 +1941,7 @@ impl VideoJob {
         let folder = crate::workdir::absolute(dir);
         // Every file of the video within the path limits (#1102), or the download says so now:
         // yt-dlp would only say `[Errno 2] No such file or directory` once it has the page.
-        if !mdm_engine::naming::stem_fits(&folder, stem) {
+        if !odm_engine::naming::stem_fits(&folder, stem) {
             return Err(ProcError::PathTooLong(folder.join(stem)));
         }
         let output = folder.join(format!("{}.%(ext)s", template_text(stem)));
@@ -2217,7 +2217,7 @@ mod tests {
 
     /// A video download's files that "overwrite" (a duplicate added again) removes: exactly what
     /// yt-dlp leaves for its stem, the finished file and subtitles only with `outputs`; never a
-    /// file merely named alike, another stem's, or MDM's own part files.
+    /// file merely named alike, another stem's, or ODM's own part files.
     #[test]
     fn a_videos_own_files_are_exactly_yt_dlps() {
         let dir = tempfile::tempdir().unwrap();
@@ -2237,9 +2237,9 @@ mod tests {
             "Clip.fdash-1.m4a.part",
             "Clip.fhttp-480p.mp4",
             "clip.temp.mp4",
-            "Clip.f137.mp4.mdm.part",
-            "Clip.f137.mp4.mdm.json",
-            "Clip.f251.webm.mdm.part",
+            "Clip.f137.mp4.odm.part",
+            "Clip.f137.mp4.odm.json",
+            "Clip.f251.webm.odm.part",
         ];
         let finished = [
             "Clip.mp4",
@@ -2254,11 +2254,11 @@ mod tests {
             "Clip.f1.jpg",
             "Clip.fhls-video.mp4",
             "Clip.v2.mp4.part",
-            "Clip.pdf.mdm.part",
-            "Clip.v2.zip.mdm.part",
-            "Clip.mp4.mdm.part",
-            "Clip.f137.mp4.mdm.zip",
-            "Clip.f1.jpg.mdm.part",
+            "Clip.pdf.odm.part",
+            "Clip.v2.zip.odm.part",
+            "Clip.mp4.odm.part",
+            "Clip.f137.mp4.odm.zip",
+            "Clip.f1.jpg.odm.part",
             "Clip.zip",
             "Clip.notes.txt",
             "Clip.final cut.mp4",
@@ -2310,7 +2310,7 @@ mod tests {
         assert_eq!(merge_step(None, 0.4), 0.4);
         assert_eq!(merge_step(Some(0.4), 0.0), 0.4);
         assert_eq!(merge_step(Some(0.4), 0.45), 0.45);
-        // A merge is a choice of several streams, as `MDMQ` names them.
+        // A merge is a choice of several streams, as `ODMQ` names them.
         assert!(several_streams("401+140 3840x2160"));
         assert!(!several_streams("18 640x360"));
         assert!(!several_streams("140 audio only"));
@@ -2362,25 +2362,25 @@ mod tests {
         assert_eq!(s(limit_args(Some(524_288))), "--limit-rate 524288");
     }
 
-    /// Live (network, yt-dlp): `MDM_LIVE_YTDLP=<yt-dlp.exe> MDM_LIVE_PAGE=<video page>
-    /// cargo test -p mdm-tools live_download -- --ignored --nocapture`. Downloads the smallest
+    /// Live (network, yt-dlp): `ODM_LIVE_YTDLP=<yt-dlp.exe> ODM_LIVE_PAGE=<video page>
+    /// cargo test -p odm-tools live_download -- --ignored --nocapture`. Downloads the smallest
     /// audio and prints the log (a swapped server shows there).
     #[test]
     #[ignore]
     fn live_download() {
-        let exe = PathBuf::from(std::env::var("MDM_LIVE_YTDLP").expect("MDM_LIVE_YTDLP"));
-        let page = std::env::var("MDM_LIVE_PAGE").expect("MDM_LIVE_PAGE");
+        let exe = PathBuf::from(std::env::var("ODM_LIVE_YTDLP").expect("ODM_LIVE_YTDLP"));
+        let page = std::env::var("ODM_LIVE_PAGE").expect("ODM_LIVE_PAGE");
         let dir = tempfile::tempdir().unwrap();
-        let format = std::env::var("MDM_LIVE_FORMAT").unwrap_or_else(|_| "worstaudio".into());
-        let ffmpeg = std::env::var("MDM_LIVE_FFMPEG").ok().map(PathBuf::from);
-        // MDM's engine downloads the streams (#769), unless MDM_LIVE_YTDLP_ALONE is set.
+        let format = std::env::var("ODM_LIVE_FORMAT").unwrap_or_else(|_| "worstaudio".into());
+        let ffmpeg = std::env::var("ODM_LIVE_FFMPEG").ok().map(PathBuf::from);
+        // ODM's engine downloads the streams (#769), unless ODM_LIVE_YTDLP_ALONE is set.
         let rt = tokio::runtime::Runtime::new().unwrap();
         let engine =
-            std::env::var_os("MDM_LIVE_YTDLP_ALONE")
+            std::env::var_os("ODM_LIVE_YTDLP_ALONE")
                 .is_none()
                 .then(|| crate::streams::Engine {
                     handle: rt.handle().clone(),
-                    opts: mdm_engine::Options::default(),
+                    opts: odm_engine::Options::default(),
                 });
         let job = VideoJob::start(
             &exe,
@@ -2429,15 +2429,15 @@ mod tests {
         );
     }
 
-    /// Live (#61): `MDM_LIVE_YTDLP=<yt-dlp.exe> MDM_LIVE_SLOW=<a slow file's address>
-    /// cargo test -p mdm-tools live_stop -- --ignored --nocapture` (the lab server:
+    /// Live (#61): `ODM_LIVE_YTDLP=<yt-dlp.exe> ODM_LIVE_SLOW=<a slow file's address>
+    /// cargo test -p odm-tools live_stop -- --ignored --nocapture` (the lab server:
     /// `/gen/20M/clip.mp4?rate=50K`). Stopping a video download ends every yt-dlp process it
     /// started (Windows: the launcher and its child), and the part file stops growing.
     #[test]
     #[ignore]
     fn live_stop_ends_every_process() {
-        let exe = PathBuf::from(std::env::var("MDM_LIVE_YTDLP").expect("MDM_LIVE_YTDLP"));
-        let url = std::env::var("MDM_LIVE_SLOW").expect("MDM_LIVE_SLOW");
+        let exe = PathBuf::from(std::env::var("ODM_LIVE_YTDLP").expect("ODM_LIVE_YTDLP"));
+        let url = std::env::var("ODM_LIVE_SLOW").expect("ODM_LIVE_SLOW");
         let dir = tempfile::tempdir().unwrap();
         let job = VideoJob::start(
             &exe,
@@ -2511,10 +2511,10 @@ mod tests {
             merging: None,
             merge_failed: None,
         };
-        // `MDMQ …` as yt-dlp prints it before it downloads; every other line is an `MDMP` one's.
+        // `ODMQ …` as yt-dlp prints it before it downloads; every other line is an `ODMP` one's.
         lines
             .iter()
-            .filter_map(|l| match l.strip_prefix("MDMQ ") {
+            .filter_map(|l| match l.strip_prefix("ODMQ ") {
                 Some(q) => {
                     m.quality(q);
                     None
@@ -2597,7 +2597,7 @@ mod tests {
     fn expected_size_holds_the_bar_back() {
         let v = run(Some(1000), &["400 400 NA 0"]);
         assert_eq!(v[0], (400, Some(1000)));
-        let v = run(Some(1000), &["MDMQ 137+140 1920x1080", "400 400 NA 0 137"]);
+        let v = run(Some(1000), &["ODMQ 137+140 1920x1080", "400 400 NA 0 137"]);
         assert_eq!(v[0], (400, Some(1000)));
     }
 
@@ -2652,7 +2652,7 @@ mod tests {
             .collect()
     }
 
-    /// The figures as before yt-dlp named its streams: the same lines without `MDMQ` and without
+    /// The figures as before yt-dlp named its streams: the same lines without `ODMQ` and without
     /// their format ids.
     fn as_before(expected: Option<u64>, streams: &[Vec<String>]) -> Vec<(u64, Option<u64>)> {
         let bare: Vec<Vec<String>> = streams
@@ -2672,7 +2672,7 @@ mod tests {
     #[test]
     fn an_estimate_above_the_size_still_ends_at_the_end() {
         let stream = [hls_stream("hls-6400", 10, 100)];
-        let v = run(Some(2000), &lines(Some("MDMQ hls-6400 1280x720"), &stream));
+        let v = run(Some(2000), &lines(Some("ODMQ hls-6400 1280x720"), &stream));
         assert_forward(&fractions(&v));
         assert_ends(&v);
         let f = fractions(&as_before(Some(2000), &stream));
@@ -2689,7 +2689,7 @@ mod tests {
         ];
         let v = run(
             Some(4000),
-            &lines(Some("MDMQ hls-7040+hls-aud-English 1280x720"), &streams),
+            &lines(Some("ODMQ hls-7040+hls-aud-English 1280x720"), &streams),
         );
         let f = fractions(&v);
         assert_forward(&f);
@@ -2704,7 +2704,7 @@ mod tests {
     /// own total its end.
     #[test]
     fn a_line_for_every_stream_at_once_is_the_whole_download() {
-        let q = "MDMQ 7040+aud-English 1280x720";
+        let q = "ODMQ 7040+aud-English 1280x720";
         let all = [hls_stream("7040+aud-English", 20, 100)];
         let v = run(Some(4000), &lines(Some(q), &all));
         assert_forward(&fractions(&v));
@@ -2713,10 +2713,10 @@ mod tests {
         assert_ends(&v);
     }
 
-    /// Lines whose format id `MDMQ` didn't name, or `NA` on every line (a yt-dlp that names no
+    /// Lines whose format id `ODMQ` didn't name, or `NA` on every line (a yt-dlp that names no
     /// stream): read exactly as before, never left out (the bar never stands still at 0).
     #[test]
-    fn lines_not_named_by_mdmq_are_read_as_before() {
+    fn lines_not_named_by_odmq_are_read_as_before() {
         for (expected, ids) in [
             (Some(4000), ["999", "998"]),
             (Some(4000), ["NA", "NA"]),
@@ -2725,7 +2725,7 @@ mod tests {
             (None, ["999", "998"]),
         ] {
             let streams = [hls_stream(ids[0], 16, 100), hls_stream(ids[1], 4, 100)];
-            let v = run(expected, &lines(Some("MDMQ 137+140 1920x1080"), &streams));
+            let v = run(expected, &lines(Some("ODMQ 137+140 1920x1080"), &streams));
             assert_eq!(v, as_before(expected, &streams), "{expected:?} {ids:?}");
             assert_eq!(v[v.len() - 1].0, 2000);
             if expected != Some(4000) {
@@ -2747,7 +2747,7 @@ mod tests {
             hls_stream("137", 16, 100),
             hls_stream("140", 4, 100),
         ];
-        let v = run(Some(4000), &lines(Some("MDMQ 137+140 1920x1080"), &streams));
+        let v = run(Some(4000), &lines(Some("ODMQ 137+140 1920x1080"), &streams));
         let subs = streams[0].len() + streams[1].len();
         assert!(fractions(&v[..subs]).iter().all(|x| *x < 0.02), "{v:?}");
         assert_eq!(v[subs - 1].0, 60);
@@ -2771,7 +2771,7 @@ mod tests {
             ["300 NA 1600 5 137".to_owned(), "0 NA NA 0 137".to_owned()],
         );
         let streams = [video, hls_stream("140", 4, 100)];
-        let v = run(Some(4000), &lines(Some("MDMQ 137+140 1920x1080"), &streams));
+        let v = run(Some(4000), &lines(Some("ODMQ 137+140 1920x1080"), &streams));
         assert_eq!([v[8].0, v[9].0, v[10].0, v[11].0], [800, 800, 800, 900]);
         let f = fractions(&v);
         assert_forward(&f);
@@ -2787,7 +2787,7 @@ mod tests {
     #[test]
     fn noisy_estimates_never_pull_the_bar_back() {
         let mut l = vec![
-            "MDMQ hls-1 1280x720".to_owned(),
+            "ODMQ hls-1 1280x720".to_owned(),
             "0 NA NA 0 hls-1".to_owned(),
         ];
         for (got, estimate) in [
@@ -2815,16 +2815,16 @@ mod tests {
     #[test]
     fn an_estimate_below_the_size_is_as_before() {
         for (expected, streams, quality) in [
-            (1000, vec![hls_stream("22", 15, 100)], "MDMQ 22 1280x720"),
+            (1000, vec![hls_stream("22", 15, 100)], "ODMQ 22 1280x720"),
             (
                 1200,
                 vec![hls_stream("137", 16, 100), hls_stream("140", 4, 100)],
-                "MDMQ 137+140 1920x1080",
+                "ODMQ 137+140 1920x1080",
             ),
             (
                 1800,
                 vec![hls_stream("137", 16, 100), hls_stream("140", 4, 100)],
-                "MDMQ 137+140 1920x1080",
+                "ODMQ 137+140 1920x1080",
             ),
         ] {
             let with = run(Some(expected), &lines(Some(quality), &streams));
@@ -2833,7 +2833,7 @@ mod tests {
         }
     }
 
-    /// The streams `MDMQ` names, and which format ids are theirs: the resolution after the last
+    /// The streams `ODMQ` names, and which format ids are theirs: the resolution after the last
     /// one (two words for a sound) is not part of its id; the merged id is all of them at once;
     /// nothing is named before yt-dlp has said, nor `NA`.
     #[test]
@@ -3135,7 +3135,7 @@ mod tests {
     #[test]
     fn a_first_estimate_as_big_as_what_came_is_no_end() {
         let lines = [
-            "MDMQ 1080p+aud192k-Track_1 1920x1080",
+            "ODMQ 1080p+aud192k-Track_1 1920x1080",
             "1024 NA 1024 491.2 1080p",
             "3072 NA 20480.0 491.2 1080p",
             "7168 NA 61440.0 491.2 1080p",

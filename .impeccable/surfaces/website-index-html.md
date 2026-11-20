@@ -16,7 +16,7 @@ Action: Download (Windows installer from GitHub Releases). Proof: the real app w
 public benchmark, the price of nothing. Constraint: clean room, no IDM artwork; no invented
 claims; every image is the real app.
 
-Memorable moment: the real MDM window as the parcel, with its waybill stuck on it.
+Memorable moment: the real ODM window as the parcel, with its waybill stuck on it.
 
 ## Direction contract
 

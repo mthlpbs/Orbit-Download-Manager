@@ -27,7 +27,7 @@ pub struct Command {
     pub dir: Option<String>,
     pub name: Option<String>,
     /// The checksum the finished file must have, as the command line takes it (`sha256:…`, a
-    /// bare hex value, …): `mdm_engine::verify::Hash` reads it.
+    /// bare hex value, …): `odm_engine::verify::Hash` reads it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub checksum: Option<String>,
     /// `/a`: add to the main queue, don't start.
@@ -116,7 +116,7 @@ pub struct Command {
     /// or an uninstall). Starts nothing when no app runs.
     pub exit: bool,
     /// `/startup` (beyond IDM): started with the session (Options → General → Launch on
-    /// startup, or the installer's "Start when Windows starts", #226): MDM starts in the
+    /// startup, or the installer's "Start when Windows starts", #226): ODM starts in the
     /// notification area, its window hidden. Changes nothing in a running app.
     pub startup: bool,
     /// `/show <window>` (beyond IDM): the running app opens one of its windows by name, for
@@ -343,13 +343,29 @@ struct Envelope {
 /// The data folder a headless run was given (`--data`, #157), before anything reads it.
 static DATA_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
-/// Use `dir` as the data folder from now on (over `MDM_DATA_DIR`): `--headless --data <dir>`.
+/// Read an Orbit environment setting. Existing launch scripts may still use the old prefix.
+pub fn env_var_os(name: &str) -> Option<std::ffi::OsString> {
+    std::env::var_os(name).or_else(|| {
+        let suffix = name.strip_prefix("ODM_")?;
+        std::env::var_os(format!("MDM_{suffix}"))
+    })
+}
+
+/// A UTF-8 Orbit environment setting.
+pub fn env_var(name: &str) -> Result<String, std::env::VarError> {
+    env_var_os(name)
+        .ok_or(std::env::VarError::NotPresent)?
+        .into_string()
+        .map_err(std::env::VarError::NotUnicode)
+}
+
+/// Use `dir` as the data folder from now on (over `ODM_DATA_DIR`): `--headless --data <dir>`.
 pub fn set_data_dir(dir: PathBuf) {
     let _ = DATA_DIR.set(full(dir));
 }
 
 /// `dir` as a full path (#834): the helpers run in a folder of their own, and are given paths in
-/// the data folder (their programs, ffmpeg's place, the files MDM writes for them).
+/// the data folder (their programs, ffmpeg's place, the files ODM writes for them).
 fn full(dir: PathBuf) -> PathBuf {
     std::path::absolute(&dir).unwrap_or(dir)
 }
@@ -357,7 +373,7 @@ fn full(dir: PathBuf) -> PathBuf {
 /// The app's data folder, `%APPDATA%\orbitdownloadmanager` (list, settings, channel, crash
 /// log). The folder of the app's former codename, `idmnext`, is moved here once.
 ///
-/// `MDM_DATA_DIR` overrides it (a separate instance with its own list and channel: tests,
+/// `ODM_DATA_DIR` overrides it (a separate instance with its own list and channel: tests,
 /// screenshots). Portable mode: a writable `data` folder next to the program holds it all.
 ///
 /// Worked out once per run and kept (#565): the window asks for it on every tick (torrents'
@@ -369,7 +385,7 @@ pub fn data_dir() -> Option<PathBuf> {
     }
     static RESOLVED: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
     once(&RESOLVED, || {
-        if let Some(dir) = std::env::var_os("MDM_DATA_DIR") {
+        if let Some(dir) = env_var_os("ODM_DATA_DIR") {
             return Some(full(PathBuf::from(dir)));
         }
         if let Some(dir) = portable_dir() {
@@ -556,7 +572,7 @@ pub fn serve(tx: Sender<Incoming>, wake: impl Fn() + Send + Sync + 'static) -> s
         private_write(&path, &json)?;
     }
     std::thread::Builder::new()
-        .name("mdm-ipc".into())
+        .name("odm-ipc".into())
         .spawn(move || accept_loop(listener, token, tx, wake))?;
     Ok(())
 }
@@ -586,7 +602,7 @@ fn accept_loop(
         }
         let (token, wake, tx, slot) = (token.clone(), wake.clone(), tx.clone(), in_flight.clone());
         let spawned = std::thread::Builder::new()
-            .name("mdm-ipc-conn".into())
+            .name("odm-ipc-conn".into())
             .spawn(move || {
                 handle(&conn, &token, &tx, &*wake);
                 slot.fetch_sub(1, Ordering::SeqCst);
@@ -768,7 +784,7 @@ pub fn random_token() -> String {
 }
 
 /// The argument every startup entry passes (the Run key, the XDG autostart entry, the
-/// LaunchAgent, the installer's): MDM starts in the notification area ([`Command::startup`]).
+/// LaunchAgent, the installer's): ODM starts in the notification area ([`Command::startup`]).
 pub const STARTUP: &str = "/startup";
 
 /// Parse IDM's command line: `/d URL [/p dir] [/f name] [/a] [/n] [/q] [/s]` (case-insensitive;

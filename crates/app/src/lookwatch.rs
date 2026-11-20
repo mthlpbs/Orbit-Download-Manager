@@ -1,4 +1,4 @@
-//! What the look follows outside MDM, read off the window's thread (#719): Windows' light or dark
+//! What the look follows outside ODM, read off the window's thread (#719): Windows' light or dark
 //! app mode, its accent and contrast colours (the registry), and the theme files (the data
 //! folder's `themes` folder, pywal's colours). A registry read can wait for seconds (#719: 8 s,
 //! on the window's thread, froze the window), a folder on a slow or network disk as long; so a
@@ -387,7 +387,7 @@ mod tests {
     /// `wal` writes them; a folder that didn't change isn't listed again.
     #[test]
     fn the_files_reader_sees_a_theme_added() {
-        let dir = std::env::temp_dir().join(format!("mdm-lookwatch-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("odm-lookwatch-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let themes = dir.join("themes");
         std::fs::create_dir_all(&themes).unwrap();

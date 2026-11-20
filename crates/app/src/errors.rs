@@ -3,7 +3,7 @@
 //! event log. Every engine error is named here, so a new one can't reach the list untranslated.
 //! Data inside a message (status codes, paths, sizes) goes in as isolates (crate::i18n::fmt).
 
-use mdm_engine::{CertProblem, Error, NetKind, Refusal};
+use odm_engine::{CertProblem, Error, NetKind, Refusal};
 
 use crate::i18n::{fmt, ltr, t};
 
@@ -63,9 +63,9 @@ pub fn describe(e: &Error) -> String {
         ),
         Error::DriveGone => t("the drive or network share is no longer available").to_owned(),
         Error::PathTooLong(path) => path_too_long(path),
-        // i18n: why a download failed (#701): a file host answered with its own web page (a countdown before the link, a captcha, a sign-in) where the file was expected. The browser gets past it; MDM's browser extension then hands the real file back to MDM
+        // i18n: why a download failed (#701): a file host answered with its own web page (a countdown before the link, a captcha, a sign-in) where the file was expected. The browser gets past it; ODM's browser extension then hands the real file back to ODM
         Error::GotWebPage => t(
-            "the site sent a web page instead of the file (a waiting page, a captcha or a sign-in): open the link in your browser, finish there, and the download comes back to MDM",
+            "the site sent a web page instead of the file (a waiting page, a captcha or a sign-in): open the link in your browser, finish there, and the download comes back to ODM",
         )
         .to_owned(),
         Error::RangesUnavailable => t("the server did not send the requested part").to_owned(),
@@ -116,9 +116,9 @@ pub fn describe(e: &Error) -> String {
 /// bytes on Linux and macOS). The files saved beside it while it downloads count: a part file, a
 /// video's streams and yt-dlp's own.
 fn path_too_long(path: &std::path::Path) -> String {
-    let limits = mdm_engine::naming::Limits::here();
+    let limits = odm_engine::naming::Limits::here();
     let path = ltr(&path.display().to_string());
-    if cfg!(windows) && !mdm_engine::naming::long_paths() {
+    if cfg!(windows) && !odm_engine::naming::long_paths() {
         return fmt(
             // i18n: why a download failed (#1102): the folder and file name together are longer than Windows allows ({limit} characters, 259), counting the temporary files saved beside the file while it downloads (their names are longer). {path} = the path
             t(
@@ -148,12 +148,12 @@ fn path_too_long(path: &std::path::Path) -> String {
 }
 
 /// Why the server's certificate was refused (#762), in words a user can act on: a browser
-/// warns about the same, and MDM has no way around it.
+/// warns about the same, and ODM has no way around it.
 fn certificate(problem: CertProblem) -> &'static str {
     match problem {
         // i18n: why a download failed: the site's security certificate (what proves a secure, HTTPS, site is the one it says) is past its end date. Browsers warn about the same site
         CertProblem::Expired => t(
-            "the site's security certificate has expired, so MDM can't be sure it's the real site (your browser warns about it too)",
+            "the site's security certificate has expired, so ODM can't be sure it's the real site (your browser warns about it too)",
         ),
         // i18n: why a download failed: the site's security certificate's validity hasn't begun; usually this computer's date or time is wrong
         CertProblem::NotYetValid => t(
@@ -161,31 +161,31 @@ fn certificate(problem: CertProblem) -> &'static str {
         ),
         // i18n: why a download failed: the site's security certificate was signed by the site itself or by an issuer this computer doesn't trust. Browsers warn about the same site
         CertProblem::Untrusted => t(
-            "the site's security certificate isn't trusted (it's self-signed or from an unknown issuer), so MDM can't be sure it's the real site (your browser warns about it too)",
+            "the site's security certificate isn't trusted (it's self-signed or from an unknown issuer), so ODM can't be sure it's the real site (your browser warns about it too)",
         ),
         // i18n: why a download failed: the site's security certificate was made for other site names than the one in the address
         CertProblem::WrongName => t(
-            "the site's security certificate is for another site name, so MDM can't be sure it's the real site (your browser warns about it too)",
+            "the site's security certificate is for another site name, so ODM can't be sure it's the real site (your browser warns about it too)",
         ),
         CertProblem::Revoked => {
             // i18n: why a download failed: the issuer of the site's security certificate took it back
-            t("the site's security certificate was revoked by its issuer, so MDM won't trust it")
+            t("the site's security certificate was revoked by its issuer, so ODM won't trust it")
         }
         // i18n: why a download failed: the site's security certificate is made for other uses than a website (its "extended key usage" leaves out web servers)
         CertProblem::NotForWebsites => t(
-            "the site's security certificate isn't made for websites, so MDM can't be sure it's the real site",
+            "the site's security certificate isn't made for websites, so ODM can't be sure it's the real site",
         ),
         // i18n: why a download failed: the site's security certificate was refused for another reason (a bad signature, a broken certificate)
         CertProblem::Other => t(
-            "the site's security certificate was refused, so MDM can't be sure it's the real site",
+            "the site's security certificate was refused, so ODM can't be sure it's the real site",
         ),
     }
 }
 
 /// A site's refusal to give the file (Google Drive, #34), with what to do about it.
 /// A debrid service's refusal (#44), `{service}` its name ("Real-Debrid").
-pub fn service(service: &str, fault: &mdm_engine::ServiceFault) -> String {
-    use mdm_engine::ServiceFault as F;
+pub fn service(service: &str, fault: &odm_engine::ServiceFault) -> String {
+    use odm_engine::ServiceFault as F;
     let text = match fault {
         // i18n: a download's error through a debrid account (Real-Debrid…): its sign-in no longer works
         F::SignIn => t("{service}: sign in again (Options → Accounts)"),
@@ -195,15 +195,15 @@ pub fn service(service: &str, fault: &mdm_engine::ServiceFault) -> String {
         F::AccountBlocked => t("{service}: the account is locked or not activated"),
         // i18n: a debrid service's error: the account has no premium (or it ended)
         F::NotPremium => t("{service}: this needs a premium account"),
-        // i18n: a debrid service's error: it can't reach the file's host now; MDM retries later
+        // i18n: a debrid service's error: it can't reach the file's host now; ODM retries later
         F::HostDown => {
-            t("{service} can't reach this file host right now; MDM will try again later")
+            t("{service} can't reach this file host right now; ODM will try again later")
         }
         // i18n: a debrid service's error: the account's limit (traffic) for this host is used up
         F::LimitReached => t("{service}: your limit for this file host is used up for now"),
         // i18n: a debrid service's error: too many downloads at once through the account
         F::TooManyActive => {
-            t("{service}: too many downloads at once through your account; MDM will try again")
+            t("{service}: too many downloads at once through your account; ODM will try again")
         }
         // i18n: a debrid service's error: it refuses this computer's address (a VPN or a server address)
         F::IpRefused => t("{service} refuses this connection (a VPN or server address?)"),
@@ -213,8 +213,8 @@ pub fn service(service: &str, fault: &mdm_engine::ServiceFault) -> String {
         F::FileRefused => t("{service} won't give this file"),
         // i18n: a debrid service's error: the file has a password
         F::PasswordNeeded => t("{service}: this file is password-protected"),
-        // i18n: a debrid service's error: too many requests; MDM waits and retries
-        F::TooManyRequests(_) => t("{service} asks to slow down; MDM will try again in a minute"),
+        // i18n: a debrid service's error: too many requests; ODM waits and retries
+        F::TooManyRequests(_) => t("{service} asks to slow down; ODM will try again in a minute"),
         // i18n: a debrid service's error: it isn't answering
         F::ServiceDown => t("{service} is not responding; try again later"),
         // i18n: a debrid service's error: it can't get the torrent sent to it (nobody shares it any more, or its magnet link can't be read)
@@ -275,8 +275,8 @@ fn refusal(r: &Refusal) -> String {
 
 /// Why a torrent couldn't be listed or added, in the interface language. librqbit's own errors
 /// (`Engine`) come in its English.
-pub fn torrent(e: &mdm_torrent::TorrentError) -> String {
-    use mdm_torrent::TorrentError as E;
+pub fn torrent(e: &odm_torrent::TorrentError) -> String {
+    use odm_torrent::TorrentError as E;
     match e {
         E::NotATorrent => t("this is not a magnet link or a .torrent file").to_owned(),
         E::MetadataTimeout => t("no peer sent the torrent's file list in time").to_owned(),
@@ -291,8 +291,8 @@ pub fn torrent(e: &mdm_torrent::TorrentError) -> String {
 }
 
 /// Why the chosen network adapter (#35) didn't let a connection open, in the interface language.
-pub fn adapter(e: &mdm_engine::NetError) -> String {
-    use mdm_engine::NetError as N;
+pub fn adapter(e: &odm_engine::NetError) -> String {
+    use odm_engine::NetError as N;
     match e {
         N::Down { label } => fmt(
             // i18n: an error: the network adapter chosen in Options (a VPN's, usually) is off or gone; {adapter} its name
@@ -321,10 +321,10 @@ pub fn adapter(e: &mdm_engine::NetError) -> String {
     }
 }
 
-/// Why yt-dlp or ffmpeg couldn't be installed, in the interface language (mdm-tools words its
+/// Why yt-dlp or ffmpeg couldn't be installed, in the interface language (odm-tools words its
 /// errors in English, for the command line). File and build names stay as they are.
-pub fn tools(e: &mdm_tools::Error) -> String {
-    use mdm_tools::Error as E;
+pub fn tools(e: &odm_tools::Error) -> String {
+    use odm_tools::Error as E;
     if let Some((host, fault)) = e.network() {
         return reach(&host, fault, cause_of(e).as_deref());
     }
@@ -355,8 +355,8 @@ pub fn tools(e: &mdm_tools::Error) -> String {
             version,
             oldest,
         } => fmt(
-            // i18n: error: a program chosen as a helper is too old; {name} = gallery-dl, {version} = its version, {oldest} = the oldest one MDM can use
-            t("{name} {version} is too old: MDM needs {oldest} or newer"),
+            // i18n: error: a program chosen as a helper is too old; {name} = gallery-dl, {version} = its version, {oldest} = the oldest one ODM can use
+            t("{name} {version} is too old: ODM needs {oldest} or newer"),
             &[("name", name), ("version", version), ("oldest", oldest)],
         ),
     }
@@ -365,13 +365,13 @@ pub fn tools(e: &mdm_tools::Error) -> String {
 /// Why a helper's server (`host`) couldn't be reached, by the kind of failure (#816): a failed
 /// connection through the proxy set in Options is that proxy's. `cause`: the system's words,
 /// kept for a failure of no known kind.
-fn reach(host: &str, fault: mdm_engine::fault::Fault, cause: Option<&str>) -> String {
-    use mdm_engine::fault::Fault as F;
+fn reach(host: &str, fault: odm_engine::fault::Fault, cause: Option<&str>) -> String {
+    use odm_engine::fault::Fault as F;
     if connecting(fault)
         && let Some(proxy) = own_proxy()
     {
         return fmt(
-            // i18n: a helper (yt-dlp, ffmpeg) couldn't be downloaded: the proxy set in Options ({proxy}, its address) didn't let MDM connect
+            // i18n: a helper (yt-dlp, ffmpeg) couldn't be downloaded: the proxy set in Options ({proxy}, its address) didn't let ODM connect
             t("could not connect through the proxy {proxy}"),
             &[("proxy", &ltr(&proxy))],
         );
@@ -421,8 +421,8 @@ fn reach(host: &str, fault: mdm_engine::fault::Fault, cause: Option<&str>) -> St
 }
 
 /// Whether `fault` is a connection that didn't open (through a proxy, the proxy's).
-fn connecting(fault: mdm_engine::fault::Fault) -> bool {
-    use mdm_engine::fault::Fault as F;
+fn connecting(fault: odm_engine::fault::Fault) -> bool {
+    use odm_engine::fault::Fault as F;
     matches!(
         fault,
         F::NoSuchHost | F::Refused | F::Reset | F::Unreachable | F::TimedOut
@@ -433,7 +433,7 @@ fn connecting(fault: mdm_engine::fault::Fault) -> bool {
 /// connections, which the helpers' all are.
 fn own_proxy() -> Option<String> {
     match crate::settings::own_net().proxy {
-        mdm_engine::Proxy::Manual {
+        odm_engine::Proxy::Manual {
             url, https: true, ..
         } => {
             let u = url::Url::parse(&url).ok()?;
@@ -448,8 +448,8 @@ fn own_proxy() -> Option<String> {
 }
 
 /// The system's words for a network failure of `e` (its deepest cause), without an address.
-fn cause_of(e: &mdm_tools::Error) -> Option<String> {
-    let mdm_tools::Error::Http(e) = e else {
+fn cause_of(e: &odm_tools::Error) -> Option<String> {
+    let odm_tools::Error::Http(e) = e else {
         return None;
     };
     let mut cause = None;
@@ -465,10 +465,10 @@ fn cause_of(e: &mdm_tools::Error) -> Option<String> {
 
 /// What to do when helper `name` (yt-dlp, ffmpeg, gallery-dl) couldn't be downloaded (#816), for
 /// why; None when its message says it all (a disk's error, a release not as expected).
-pub fn tools_advice(e: &mdm_tools::Error, name: &str) -> Option<String> {
-    use mdm_engine::fault::Fault as F;
+pub fn tools_advice(e: &odm_tools::Error, name: &str) -> Option<String> {
+    use odm_engine::fault::Fault as F;
     let fault = match e {
-        mdm_tools::Error::BadChecksum => F::CutShort,
+        odm_tools::Error::BadChecksum => F::CutShort,
         _ => e.network()?.1,
     };
     let text = match fault {
@@ -503,7 +503,7 @@ pub fn tools_advice(e: &mdm_tools::Error, name: &str) -> Option<String> {
 
 /// [`tools`], then [`tools_advice`] when there is some: one text for a window that has room for
 /// it (or shows it whole on hover).
-pub fn tools_and_advice(e: &mdm_tools::Error, name: &str) -> String {
+pub fn tools_and_advice(e: &odm_tools::Error, name: &str) -> String {
     let problem = tools(e);
     match tools_advice(e, name) {
         Some(advice) => fmt(
@@ -584,7 +584,7 @@ mod tests {
     /// #762: a refused certificate says it is the certificate, and what is wrong with it.
     #[test]
     fn a_refused_certificate_is_named() {
-        use mdm_engine::CertProblem as P;
+        use odm_engine::CertProblem as P;
         let all = [
             P::Expired,
             P::NotYetValid,
@@ -612,7 +612,7 @@ mod tests {
     /// #816: a helper that couldn't be downloaded names the server and why, and says what to do.
     #[test]
     fn a_helper_failure_names_its_server() {
-        let e = mdm_tools::Error::Download {
+        let e = odm_tools::Error::Download {
             host: "api.github.com".into(),
             error: Error::Status(reqwest::StatusCode::FORBIDDEN),
         };
@@ -626,12 +626,12 @@ mod tests {
             advice.contains("yt-dlp") && advice.contains("Use another program"),
             "{advice}"
         );
-        let cut = mdm_tools::Error::Download {
+        let cut = odm_tools::Error::Download {
             host: "github.com".into(),
             error: Error::ShortBody,
         };
         assert!(tools(&cut).contains("cut short"));
-        let disk = mdm_tools::Error::Io(std::io::Error::other("full"));
+        let disk = odm_tools::Error::Io(std::io::Error::other("full"));
         assert!(tools_advice(&disk, "yt-dlp").is_none());
     }
 }

@@ -2,8 +2,8 @@
 //! allocated, not only by what the engine counts (`HOLD_MAX`, 256 MiB): every allocation of this
 //! test's process is counted (its own binary, so no other test allocates meanwhile).
 
-use mdm_engine::{Destination, Download, Options, Request};
-use mdm_labserver::{Config, Faults, LabServer, content};
+use odm_engine::{Destination, Download, Options, Request};
+use odm_labserver::{Config, Faults, LabServer, content};
 
 #[global_allocator]
 static ALLOC: cap::Cap<std::alloc::System> = cap::Cap::new(std::alloc::System, usize::MAX);
@@ -30,7 +30,7 @@ async fn memory_held_for_the_disk_stays_within_its_cap() {
     .unwrap();
     let dir = tempfile::tempdir().unwrap();
     // A disk as fast as the real one, but for the gate.
-    let disk = mdm_engine::slowdisk::SlowDisk::slow_flush(std::time::Duration::ZERO);
+    let disk = odm_engine::slowdisk::SlowDisk::slow_flush(std::time::Duration::ZERO);
     let gate = disk.gate.clone();
     let before = ALLOC.allocated();
     let d = Download::start(

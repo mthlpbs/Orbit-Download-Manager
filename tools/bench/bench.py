@@ -3,14 +3,14 @@
     python tools/bench/bench.py [--runs N] [--only scenario,...] [--out DIR]
 
 Each run hands one download to a client through its command line (IDM's documented
-`/d URL /p DIR /f NAME /n`, which MDM's app accepts too) and measures:
+`/d URL /p DIR /f NAME /n`, which ODM's app accepts too) and measures:
   * end to end: command issued -> the finished file is complete under its final name, polled
-    every millisecond with a monotonic clock (MDM renames a finished `.mdm.part` into place; IDM
+    every millisecond with a monotonic clock (ODM renames a finished `.odm.part` into place; IDM
     creates the final file early and fills it while assembling, so completion is its full size);
   * the network phase, from the lab server's own log: first request -> last byte sent;
   * connections, requests, bytes sent (over the file size = waste), refusals and drops;
   * CPU time the client used during the run and its peak working set.
-Clients alternate (IDM first on even runs, MDM first on odd ones) so slow drift on the machine
+Clients alternate (IDM first on even runs, ODM first on odd ones) so slow drift on the machine
 hits both alike; one warm-up run per client and scenario is discarded. Raw results go to
 DIR/runs.json, the server's log to DIR/server.jsonl, the machine to DIR/environment.json.
 """
@@ -31,7 +31,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 IDM_EXE = Path(r"C:\Program Files (x86)\Internet Download Manager\IDMan.exe")
-MDM_EXE = ROOT / "target" / "release" / "orbitdownloadmanager.exe"
+ODM_EXE = ROOT / "target" / "release" / "orbitdownloadmanager.exe"
 LAB_EXE = ROOT / "target" / "release" / "labserver.exe"
 PORT = 8097
 
@@ -111,7 +111,7 @@ def vscode_area():
 
 class Tidy(threading.Thread):
     """Keeps the clients' windows on the VS Code monitor and closes 'Download complete' boxes,
-    for IDM and MDM alike (it never touches anything the timing depends on)."""
+    for IDM and ODM alike (it never touches anything the timing depends on)."""
 
     def __init__(self, pids, area):
         super().__init__(daemon=True)
@@ -198,7 +198,7 @@ def settle(limit=240):
 
 def one_run(client, exe, env, url, dest, name, timeout, handle, expected):
     final = dest / name
-    for p in (final, dest / (name + ".mdm.part"), dest / (name + ".mdm.json")):
+    for p in (final, dest / (name + ".odm.part"), dest / (name + ".odm.json")):
         if p.exists():
             p.unlink()
     sampler = Sampler(handle)
@@ -251,7 +251,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     # Both clients save on C:, where IDM keeps its temporary parts, so neither pays a
     # cross-drive copy at the end.
-    dest = Path(os.environ["LOCALAPPDATA"]) / "Temp" / "mdm-bench-dl"
+    dest = Path(os.environ["LOCALAPPDATA"]) / "Temp" / "odm-bench-dl"
     dest.mkdir(parents=True, exist_ok=True)
     scen = [s for s in SCENARIOS if not args.only or s[0] in args.only.split(",")]
 
@@ -259,11 +259,11 @@ def main():
     log = out / "server.jsonl"
     lab = subprocess.Popen([str(LAB_EXE), "--bind", f"127.0.0.1:{PORT}", "--log-file", str(log)],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    # MDM: its own instance, own data folder (the user's copy is untouched).
-    mdm_env = dict(os.environ, MDM_DATA_DIR=str(out / "mdm-data"))
-    mdm = subprocess.Popen([str(MDM_EXE)], env=mdm_env)
+    # ODM: its own instance, own data folder (the user's copy is untouched).
+    odm_env = dict(os.environ, ODM_DATA_DIR=str(out / "odm-data"))
+    odm = subprocess.Popen([str(ODM_EXE)], env=odm_env)
     time.sleep(3)
-    # (MDM is restarted for every scenario, below: what it learns about a server in one scenario
+    # (ODM is restarted for every scenario, below: what it learns about a server in one scenario
     # — e.g. a connection limit — must not carry into the next, which uses the same 127.0.0.1.)
     idm_pids = pid_of("IDMan.exe")
     if not idm_pids:
@@ -272,9 +272,9 @@ def main():
         idm_pids = pid_of("IDMan.exe")
     clients = {
         "IDM": (IDM_EXE, dict(os.environ), open_process(idm_pids[0])),
-        "MDM": (MDM_EXE, mdm_env, open_process(mdm.pid)),
+        "ODM": (ODM_EXE, odm_env, open_process(odm.pid)),
     }
-    tidy = Tidy([idm_pids[0], mdm.pid], vscode_area())
+    tidy = Tidy([idm_pids[0], odm.pid], vscode_area())
     tidy.start()
 
     env = {
@@ -289,7 +289,7 @@ def main():
         "idm_version": subprocess.run(["powershell", "-NoProfile", "-Command",
                                        f"(Get-Item '{IDM_EXE}').VersionInfo.FileVersion"],
                                       capture_output=True, text=True).stdout.strip(),
-        "mdm_commit": subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
+        "odm_commit": subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
                                      capture_output=True, text=True).stdout.strip(),
         "server": f"labserver (this repo), 127.0.0.1:{PORT}, generated content",
         "settings": "both at defaults: 8 connections",
@@ -300,15 +300,15 @@ def main():
     try:
         for sid, title, size, faults, n, timeout in scen:
             n = args.runs or n
-            mdm.terminate()
-            mdm.wait()
-            mdm = subprocess.Popen([str(MDM_EXE)], env=mdm_env)
+            odm.terminate()
+            odm.wait()
+            odm = subprocess.Popen([str(ODM_EXE)], env=odm_env)
             time.sleep(3)
-            clients["MDM"] = (MDM_EXE, mdm_env, open_process(mdm.pid))
-            tidy.pids = {idm_pids[0], mdm.pid}
+            clients["ODM"] = (ODM_EXE, odm_env, open_process(odm.pid))
+            tidy.pids = {idm_pids[0], odm.pid}
             print(f"== {sid}: {title} ({n} runs + warm-up)", flush=True)
             for i in range(-1, n):
-                order = ["IDM", "MDM"] if i % 2 == 0 else ["MDM", "IDM"]
+                order = ["IDM", "ODM"] if i % 2 == 0 else ["ODM", "IDM"]
                 for c in order:
                     exe, cenv, h = clients[c]
                     tag = "w" if i < 0 else f"{i:02d}"
@@ -332,7 +332,7 @@ def main():
         tidy.stop = True
         time.sleep(2)
         lab.terminate()
-        mdm.terminate()
+        odm.terminate()
     print(f"done: {out}", flush=True)
 
 

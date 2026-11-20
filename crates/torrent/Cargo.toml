@@ -1,5 +1,5 @@
 [package]
-name = "mdm-torrent"
+name = "odm-torrent"
 description = "BitTorrent and magnet downloads for Orbit Download Manager (librqbit, D-014)"
 version.workspace = true
 edition.workspace = true
@@ -16,14 +16,14 @@ librqbit = { version = "9.1.0", default-features = false, features = ["rust-tls"
 # Binding as librqbit's listener does, to find a port free for TCP and uTP alike (lib.rs,
 # `port_for_both`); already in the tree through librqbit.
 librqbit-dualstack-sockets = "0.7.0"
-# The TLS setup of the session's HTTP clients (trackers, UPnP), MDM's own: a system without CA
-# certificates still starts a session (mdm_engine::tls).
-mdm-engine.workspace = true
+# The TLS setup of the session's HTTP clients (trackers, UPnP), ODM's own: a system without CA
+# certificates still starts a session (odm_engine::tls).
+odm-engine.workspace = true
 flate2.workspace = true
 # Reading librqbit's saved session (session.json) before it starts (lib.rs).
 serde_json.workspace = true
 thiserror.workspace = true
-# MDM's log: where the session listens (lib.rs).
+# ODM's log: where the session listens (lib.rs).
 tracing.workspace = true
 tokio.workspace = true
 # The blocklist file's URL, and trackers' hosts (lib.rs, trackers.rs).

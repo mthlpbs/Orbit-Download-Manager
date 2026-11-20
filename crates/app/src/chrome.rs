@@ -734,7 +734,7 @@ struct MenuKeys;
 
 impl egui::Plugin for MenuKeys {
     fn debug_name(&self) -> &'static str {
-        "mdm-menu-keys"
+        "odm-menu-keys"
     }
 
     fn input_hook(&mut self, ctx: &egui::Context, input: &mut egui::RawInput) {
@@ -1132,7 +1132,7 @@ pub fn popup<C: Clone>(
 const FOCUS_GRACE: f64 = 0.4;
 
 /// Whether the system says another program's window is in front now: the click that took the
-/// focus away landed outside MDM (the desktop, the taskbar, another program's window), and an
+/// focus away landed outside ODM (the desktop, the taskbar, another program's window), and an
 /// open menu closes on this pass, as Win32's own menus do. Waiting FOCUS_GRACE for it kept a
 /// menu on the screen 0.4 s after such a click (#859): a menu's window never takes the focus on
 /// Windows (WS_EX_NOACTIVATE), so there the grace only ever delayed the close.
@@ -1142,7 +1142,7 @@ fn another_program_in_front() -> bool {
         crate::win32::foreground_is_another_program()
     }
     // Linux and macOS: a program isn't told whose window has the focus (Wayland never says; X11
-    // and macOS would, through calls MDM doesn't make), so FOCUS_GRACE decides there, as before.
+    // and macOS would, through calls ODM doesn't make), so FOCUS_GRACE decides there, as before.
     #[cfg(not(windows))]
     {
         false
@@ -1382,13 +1382,13 @@ fn fit_menu(at: Pos2, size: egui::Vec2, parent: Option<Rect>, area: Rect) -> Pos
 }
 
 /// Whether the menu bar's menus share one window per level ([`menu_viewport`]): on X11 and
-/// XWayland, where MDM places its menus itself.
+/// XWayland, where ODM places its menus itself.
 fn bar_shares_window() -> bool {
     #[cfg(target_os = "linux")]
     {
         !crate::unix::on_wayland()
     }
-    // Windows and macOS: one window per menu, as before. Native Wayland (MDM_WAYLAND=1) too: a
+    // Windows and macOS: one window per menu, as before. Native Wayland (ODM_WAYLAND=1) too: a
     // program can't move its windows there (winit 0.30 has no popup windows on Wayland), so a
     // shared window would stay where the first menu opened.
     #[cfg(not(target_os = "linux"))]
@@ -3223,7 +3223,7 @@ mod tests {
     /// #615: a menu item that opens a system dialog (View → Theme → Add a theme file) is chosen
     /// in a frame that still draws its menu; the dialog starts only once a frame has gone by
     /// without the menu (whose end closed its window): on macOS, started earlier, the menu's
-    /// window stayed on top of every window until MDM quit.
+    /// window stayed on top of every window until ODM quit.
     #[test]
     fn a_system_dialog_waits_for_the_menu_to_close() {
         let [a, b] = ["a", "b"]; // not texts to translate (tools/i18n/extract.py)

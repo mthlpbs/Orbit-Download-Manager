@@ -75,7 +75,7 @@ impl Origin {
     /// Where the link `url` named `name` (found on page `referer`) belongs.
     pub fn of(url: &Url, name: &str, referer: Option<&str>) -> Origin {
         let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
-        if let Some(v) = mdm_extract::volume_key(name) {
+        if let Some(v) = odm_extract::volume_key(name) {
             return Origin::Volumes { host, base: v.base };
         }
         if let Some(page) = referer.and_then(|r| Url::parse(r).ok())
@@ -200,7 +200,7 @@ fn magnet_name(url: &Url) -> String {
         .unwrap_or_else(|| url.to_string())
 }
 
-type Check = Arc<Mutex<Option<Result<mdm_engine::ProbeInfo, LinkState>>>>;
+type Check = Arc<Mutex<Option<Result<odm_engine::ProbeInfo, LinkState>>>>;
 /// A page's links as they were read (`None` until then; empty when it had none or couldn't be
 /// read).
 type Read = Arc<Mutex<Option<Vec<Imported>>>>;
@@ -300,10 +300,10 @@ impl Grabber {
                 continue;
             }
             let magnet = url.scheme() == "magnet";
-            let name = mdm_engine::naming::sanitize(&if magnet {
+            let name = odm_engine::naming::sanitize(&if magnet {
                 magnet_name(&url)
             } else {
-                mdm_engine::naming::file_name(None, &url)
+                odm_engine::naming::file_name(None, &url)
             });
             let known = known(&url);
             let origin = if known {
@@ -632,7 +632,7 @@ impl Grabber {
                     l.state = LinkState::Online;
                     l.page = info.web_page;
                     l.size = info.size;
-                    let named = mdm_engine::naming::sanitize(&info.file_name);
+                    let named = odm_engine::naming::sanitize(&info.file_name);
                     if !named.is_empty() && named != l.name {
                         l.category = category_of(l.magnet, &named);
                         l.name = named;
@@ -1328,38 +1328,38 @@ const REMEDIES: [&str; 5] = [
 ];
 
 /// A look-up's failure as a link's status.
-pub fn state_of(e: &mdm_engine::Error) -> LinkState {
+pub fn state_of(e: &odm_engine::Error) -> LinkState {
     match e {
-        mdm_engine::Error::Status(s) => match s.as_u16() {
+        odm_engine::Error::Status(s) => match s.as_u16() {
             404 | 410 => LinkState::Offline(s.as_u16()),
             401 | 403 => LinkState::NeedsLogin,
             429 | 503 => LinkState::Busy,
             _ => failed(e, None),
         },
-        mdm_engine::Error::Throttled(..) => LinkState::Busy,
+        odm_engine::Error::Throttled(..) => LinkState::Busy,
         // i18n: Link grabber, a link's status: the remedy from the failure's sentence, for a site whose bot check lets only browsers through. The sentence, with the same advice, is the cell's hover tip
-        mdm_engine::Error::BotCheck => failed(e, Some(crate::i18n::t("Alt+click the link"))),
-        mdm_engine::Error::Refused(mdm_engine::Refusal::NeedsBrowser { .. }) => {
+        odm_engine::Error::BotCheck => failed(e, Some(crate::i18n::t("Alt+click the link"))),
+        odm_engine::Error::Refused(odm_engine::Refusal::NeedsBrowser { .. }) => {
             // i18n: Link grabber, a link's status: the remedy from the failure's sentence, for a site link that is a web page, not the file (and a server that sent a web page instead of it). The sentence is the cell's hover tip
             failed(e, Some(crate::i18n::t("Open in browser")))
         }
         // i18n: Link grabber, a link's status: the remedy from the failure's sentence, for a server that sent a web page instead of the file. The sentence is the cell's hover tip
-        mdm_engine::Error::GotWebPage => failed(e, Some(crate::i18n::t("Open in browser"))),
+        odm_engine::Error::GotWebPage => failed(e, Some(crate::i18n::t("Open in browser"))),
         // i18n: Link grabber, a link's status: the remedy from the failure's sentence, for a download link that expired. The sentence is the cell's hover tip
-        mdm_engine::Error::LinkExpired => failed(e, Some(crate::i18n::t("Refresh the address"))),
-        mdm_engine::Error::ChecksumMismatch(_) => {
+        odm_engine::Error::LinkExpired => failed(e, Some(crate::i18n::t("Refresh the address"))),
+        odm_engine::Error::ChecksumMismatch(_) => {
             // i18n: Link grabber, a link's status: the remedy from the failure's sentence, for a file whose checksum didn't match. The sentence is the cell's hover tip
             failed(e, Some(crate::i18n::t("Download it again")))
         }
         // i18n: Link grabber, a link's status: a server that can't send parts of a file, so the download can't resume; there is nothing to do here. The sentence is the cell's hover tip
-        mdm_engine::Error::NoRanges => failed(e, Some(crate::i18n::t("Can't resume"))),
+        odm_engine::Error::NoRanges => failed(e, Some(crate::i18n::t("Can't resume"))),
         _ => failed(e, None),
     }
 }
 
 /// A failure as a link's status: the words the row shows (`short` when the sentence's remedy
 /// fits a narrow column, else the sentence), and the whole sentence for the cell's hover tip.
-fn failed(e: &mdm_engine::Error, short: Option<&str>) -> LinkState {
+fn failed(e: &odm_engine::Error, short: Option<&str>) -> LinkState {
     let full = crate::errors::describe(e);
     LinkState::Failed {
         short: short.map_or_else(|| full.clone(), str::to_owned),
@@ -1449,7 +1449,7 @@ mod tests {
         };
         // Each link compared once: a list 16 times as long costs about as much as 16 short
         // lists (a square: 16 times as much), on any machine.
-        mdm_labserver::growth::assert_linear(1_000, &lists, &add);
+        odm_labserver::growth::assert_linear(1_000, &lists, &add);
         let g = add(lists(20_000));
         assert_eq!(g.links.len(), 20_000);
         // Settled as before: one package of archives, to extract.
@@ -1580,7 +1580,7 @@ mod tests {
         );
         assert!(g.to_check().is_empty());
         let slot: Check = Default::default();
-        *slot.lock().unwrap() = Some(Ok(mdm_engine::ProbeInfo {
+        *slot.lock().unwrap() = Some(Ok(odm_engine::ProbeInfo {
             final_url: g.links[0].url.clone(),
             size: None,
             file_name: "epanet.html".into(),
@@ -1613,7 +1613,7 @@ mod tests {
         // The look-ups: the address is a web page, and so is the link found on a page.
         for (i, url, _) in g.to_check() {
             let slot: Check = Default::default();
-            *slot.lock().unwrap() = Some(Ok(mdm_engine::ProbeInfo {
+            *slot.lock().unwrap() = Some(Ok(odm_engine::ProbeInfo {
                 final_url: url.clone(),
                 size: None,
                 file_name: "epanet.html".into(),
@@ -1802,7 +1802,7 @@ mod tests {
     /// as long.
     #[test]
     fn a_big_pages_links_are_added_and_listed_in_linear_time() {
-        mdm_labserver::growth::assert_linear(
+        odm_labserver::growth::assert_linear(
             1_000,
             |n| (grabber(), big_page(n)),
             |(mut g, found)| {
@@ -1853,7 +1853,7 @@ mod tests {
         assert_eq!(g.packages[0].folder, video.display().to_string());
         // A look-up names one a zip: the package has two kinds, so no folder of its own.
         let slot: Check = Default::default();
-        *slot.lock().unwrap() = Some(Ok(mdm_engine::ProbeInfo {
+        *slot.lock().unwrap() = Some(Ok(odm_engine::ProbeInfo {
             final_url: g.links[1].url.clone(),
             size: Some(5),
             file_name: "b.zip".into(),
@@ -1893,7 +1893,7 @@ mod tests {
         text
     }
 
-    /// The timings in #1063's pull request (`cargo test -p mdm-app --release --bin
+    /// The timings in #1063's pull request (`cargo test -p odm-app --release --bin
     /// orbitdownloadmanager grabber::tests::timings_1063 -- --ignored --nocapture`): adding the
     /// links (a paste: its text read too), one frame's eight answers that renamed a link, and
     /// a frame of the window, for a big page's links and for the report's pasted list.
@@ -1927,7 +1927,7 @@ mod tests {
             // One frame's answers: eight look-ups that renamed their link.
             for i in (0..g.links.len()).step_by(997).take(CHECKS) {
                 let slot: Check = Default::default();
-                *slot.lock().unwrap() = Some(Ok(mdm_engine::ProbeInfo {
+                *slot.lock().unwrap() = Some(Ok(odm_engine::ProbeInfo {
                     final_url: g.links[i].url.clone(),
                     size: Some(1),
                     file_name: format!("renamed-{i}.mkv"),
@@ -1971,20 +1971,20 @@ mod tests {
     #[test]
     fn a_failure_says_its_remedy_and_keeps_its_sentence() {
         let cases = [
-            (mdm_engine::Error::BotCheck, "Alt+click the link"),
+            (odm_engine::Error::BotCheck, "Alt+click the link"),
             (
-                mdm_engine::Error::Refused(mdm_engine::Refusal::NeedsBrowser {
+                odm_engine::Error::Refused(odm_engine::Refusal::NeedsBrowser {
                     site: "gofile".into(),
                 }),
                 "Open in browser",
             ),
-            (mdm_engine::Error::GotWebPage, "Open in browser"),
-            (mdm_engine::Error::LinkExpired, "Refresh the address"),
+            (odm_engine::Error::GotWebPage, "Open in browser"),
+            (odm_engine::Error::LinkExpired, "Refresh the address"),
             (
-                mdm_engine::Error::ChecksumMismatch("SHA-256"),
+                odm_engine::Error::ChecksumMismatch("SHA-256"),
                 "Download it again",
             ),
-            (mdm_engine::Error::NoRanges, "Can't resume"),
+            (odm_engine::Error::NoRanges, "Can't resume"),
         ];
         for (e, remedy) in cases {
             let LinkState::Failed { short, full } = state_of(&e) else {
@@ -1995,7 +1995,7 @@ mod tests {
             assert!(short.len() < full.len(), "{e:?}: {short} / {full}");
         }
         // A failure that offers no remedy keeps the sentence it had, cut as before.
-        let LinkState::Failed { short, full } = state_of(&mdm_engine::Error::ShortBody) else {
+        let LinkState::Failed { short, full } = state_of(&odm_engine::Error::ShortBody) else {
             panic!("ShortBody is not a failure");
         };
         assert_eq!(short, full);
@@ -2006,14 +2006,14 @@ mod tests {
     #[test]
     fn the_column_is_sized_for_every_remedy_it_shows() {
         let cases = [
-            mdm_engine::Error::BotCheck,
-            mdm_engine::Error::Refused(mdm_engine::Refusal::NeedsBrowser {
+            odm_engine::Error::BotCheck,
+            odm_engine::Error::Refused(odm_engine::Refusal::NeedsBrowser {
                 site: "gofile".into(),
             }),
-            mdm_engine::Error::GotWebPage,
-            mdm_engine::Error::LinkExpired,
-            mdm_engine::Error::ChecksumMismatch("SHA-256"),
-            mdm_engine::Error::NoRanges,
+            odm_engine::Error::GotWebPage,
+            odm_engine::Error::LinkExpired,
+            odm_engine::Error::ChecksumMismatch("SHA-256"),
+            odm_engine::Error::NoRanges,
         ];
         let mut shown: Vec<String> = cases
             .iter()

@@ -1,6 +1,6 @@
 //! End to end: a download whose name is answered by the DNS chosen in Options (#36), not the
 //! system's. A small DNS server (`support/fake_dns.rs`: plain, over TCP, on 127.0.0.1) answers
-//! `*.mdm.test` with 127.0.0.1 and logs every name it is asked; the system's DNS knows no such
+//! `*.odm.test` with 127.0.0.1 and logs every name it is asked; the system's DNS knows no such
 //! names.
 //!
 //! And downloads held to a network adapter (#35): the DNS and the file both reached through it,
@@ -9,8 +9,8 @@
 use std::net::IpAddr;
 use std::sync::Arc;
 
-use mdm_engine::{Destination, Dns, DnsChoice, Download, Options, Request};
-use mdm_labserver::{Config, LabServer, content};
+use odm_engine::{Destination, Dns, DnsChoice, Download, Options, Request};
+use odm_labserver::{Config, LabServer, content};
 
 #[path = "support/fake_dns.rs"]
 mod support;
@@ -38,7 +38,7 @@ async fn a_download_goes_by_the_chosen_dns() {
     } = fake_dns().await;
     let dir = tempfile::tempdir().unwrap();
     let req = Request {
-        url: format!("http://files.mdm.test:{port}/gen/1M/dns.bin?seed=36")
+        url: format!("http://files.odm.test:{port}/gen/1M/dns.bin?seed=36")
             .parse()
             .unwrap(),
         headers: Default::default(),
@@ -47,14 +47,14 @@ async fn a_download_goes_by_the_chosen_dns() {
     let out = Download::start(req, options(Dns::Plain(vec![dns])))
         .wait()
         .await
-        .expect("the chosen DNS finds files.mdm.test");
+        .expect("the chosen DNS finds files.odm.test");
     let data = std::fs::read(&out.path).unwrap();
     assert_eq!(data.len(), 1 << 20);
     let mut want = vec![0; data.len()];
     content::fill(36, 0, &mut want);
     assert!(data == want, "content mismatch");
     assert!(
-        asked.lock().unwrap().iter().any(|n| n == "files.mdm.test"),
+        asked.lock().unwrap().iter().any(|n| n == "files.odm.test"),
         "{:?}",
         asked.lock().unwrap()
     );
@@ -66,7 +66,7 @@ async fn a_dead_dns_fails_the_download_and_names_itself() {
     let port = lab.url("/").parse::<url::Url>().unwrap().port().unwrap();
     let dir = tempfile::tempdir().unwrap();
     let req = Request {
-        url: format!("http://files.mdm.test:{port}/gen/64K/x.bin")
+        url: format!("http://files.odm.test:{port}/gen/64K/x.bin")
             .parse()
             .unwrap(),
         headers: Default::default(),
@@ -87,8 +87,8 @@ async fn a_dead_dns_fails_the_download_and_names_itself() {
 /// Options → Proxy / Socks → Network adapter (#35), on this computer's loopback: 127.0.0.2
 /// stands for the adapter's address (Windows and Linux answer on all of 127/8; macOS doesn't,
 /// so the bound download runs elsewhere). `loopback_too` binds what is otherwise left unbound.
-fn bound(v4: [u8; 4]) -> mdm_engine::Route {
-    mdm_engine::Route::Bound(Arc::new(mdm_engine::net::Binding {
+fn bound(v4: [u8; 4]) -> odm_engine::Route {
+    odm_engine::Route::Bound(Arc::new(odm_engine::net::Binding {
         label: "the test adapter".into(),
         name: "lo".into(),
         index: 1,
@@ -123,7 +123,7 @@ async fn a_bound_download_asks_and_fetches_through_the_adapter() {
         route: bound([127, 0, 0, 2]),
         ..options(Dns::Plain(vec![dns]))
     };
-    let url = format!("http://files.mdm.test:{port}/gen/1M/bound.bin?seed=35");
+    let url = format!("http://files.odm.test:{port}/gen/1M/bound.bin?seed=35");
     let out = Download::start(get(url, dir.path()), opts)
         .wait()
         .await
@@ -132,7 +132,7 @@ async fn a_bound_download_asks_and_fetches_through_the_adapter() {
     let mut want = vec![0; data.len()];
     content::fill(35, 0, &mut want);
     assert!(data.len() == 1 << 20 && data == want, "content mismatch");
-    assert!(asked.lock().unwrap().iter().any(|n| n == "files.mdm.test"));
+    assert!(asked.lock().unwrap().iter().any(|n| n == "files.odm.test"));
     // Windows binds the address: every connection, the DNS's and the file's, came from it.
     // (Linux binds the device, `lo`, and the system picks 127.0.0.1 as the source.)
     if cfg!(windows) {
@@ -160,10 +160,10 @@ async fn a_down_adapter_sends_nothing() {
     let dir = tempfile::tempdir().unwrap();
     for url in [
         lab.url("/gen/64K/down.bin"),
-        format!("http://files.mdm.test:{port}/gen/64K/down.bin"),
+        format!("http://files.odm.test:{port}/gen/64K/down.bin"),
     ] {
         let opts = Options {
-            route: mdm_engine::Route::Down {
+            route: odm_engine::Route::Down {
                 label: "WireGuard".into(),
             },
             ..options(Dns::Plain(vec![dns]))

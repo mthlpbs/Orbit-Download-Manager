@@ -1,7 +1,7 @@
 //! IP blocklists for torrents (#40). The usual lists come as PeerGuardian/P2P text
 //! (`name:1.2.3.4-1.2.3.255`) or eMule's `.dat` (`001.002.003.004 - 001.002.003.255 , 000 , name`),
 //! often gzipped. librqbit reads only the first, rejects zero-padded addresses, and a list it
-//! can't read stops the whole torrent session from starting: MDM converts a list itself, to
+//! can't read stops the whole torrent session from starting: ODM converts a list itself, to
 //! plain P2P lines it has checked, and hands librqbit that file.
 
 use std::io::Read;
@@ -10,10 +10,10 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 /// A list, converted.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Converted {
-    /// P2P lines (`mdm:start-end`), one per blocked range.
+    /// P2P lines (`odm:start-end`), one per blocked range.
     pub text: String,
     pub ranges: usize,
-    /// Lines that weren't a range MDM could read, and eMule ranges marked allowed (level > 127).
+    /// Lines that weren't a range ODM could read, and eMule ranges marked allowed (level > 127).
     pub skipped: usize,
 }
 
@@ -45,7 +45,7 @@ pub fn convert(bytes: &[u8]) -> Option<Converted> {
         }
         match range(line) {
             Some(Some((start, end))) => {
-                out.text.push_str(&format!("mdm:{start}-{end}\n"));
+                out.text.push_str(&format!("odm:{start}-{end}\n"));
                 out.ranges += 1;
             }
             // eMule's "allowed": not blocked.
@@ -119,12 +119,12 @@ mod tests {
                 .unwrap();
         assert_eq!(
             c.text,
-            "mdm:1.2.3.0-1.2.3.255\nmdm:2001:db8::-2001:db8::ffff\n"
+            "odm:1.2.3.0-1.2.3.255\nodm:2001:db8::-2001:db8::ffff\n"
         );
         assert_eq!((c.ranges, c.skipped), (2, 0));
         // A name with a comma is still P2P.
         let c = convert(b"Acme, Inc:4.4.4.0-4.4.4.255\n").unwrap();
-        assert_eq!(c.text, "mdm:4.4.4.0-4.4.4.255\n");
+        assert_eq!(c.text, "odm:4.4.4.0-4.4.4.255\n");
     }
 
     /// eMule's format, zero-padded (librqbit refuses that), and its "allowed" levels.
@@ -135,7 +135,7 @@ mod tests {
               010.000.000.000 - 010.255.255.255 , 200 , Allowed\n",
         )
         .unwrap();
-        assert_eq!(c.text, "mdm:1.2.3.0-1.2.3.255\n");
+        assert_eq!(c.text, "odm:1.2.3.0-1.2.3.255\n");
         assert_eq!((c.ranges, c.skipped), (1, 1));
     }
 
@@ -144,7 +144,7 @@ mod tests {
         let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
         gz.write_all(b"x:5.6.7.8-5.6.7.9\n").unwrap();
         let c = convert(&gz.finish().unwrap()).unwrap();
-        assert_eq!(c.text, "mdm:5.6.7.8-5.6.7.9\n");
+        assert_eq!(c.text, "odm:5.6.7.8-5.6.7.9\n");
     }
 
     #[test]

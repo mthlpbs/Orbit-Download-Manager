@@ -1,7 +1,7 @@
 //! The unfinished downloads' resume states, read beside the window at start.
 //!
 //! The list (downloads.json) holds each row's size and bytes so far as it was last saved; the
-//! resume state beside the row's file (`<file>.mdm.json`, the engine's) is the record of what is
+//! resume state beside the row's file (`<file>.odm.json`, the engine's) is the record of what is
 //! on the disk, and after a crash the list may hold less. Reading every state before the window
 //! opened held the window for as long as the slowest folder took to answer: one on a network
 //! share that doesn't answer, 21 s (Windows gives up on it then; found with #1170). Now the window
@@ -18,7 +18,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, TryRecvError, channel};
 
-use mdm_engine::state::{ResumeState, state_path};
+use odm_engine::state::{ResumeState, state_path};
 
 /// What reading one row's state found.
 pub struct Read {
@@ -35,7 +35,7 @@ pub type Loader = Arc<dyn Fn(&Path) -> Option<ResumeState> + Send + Sync>;
 /// The state at `dest` on the disk; files started under the former codename are renamed first,
 /// so that they resume.
 pub fn from_disk(dest: &Path) -> Option<ResumeState> {
-    mdm_engine::state::migrate_legacy(dest);
+    odm_engine::state::migrate_legacy(dest);
     ResumeState::load(&state_path(dest)).ok()
 }
 
@@ -176,7 +176,7 @@ mod tests {
     fn state(dest: &Path, done: u64) -> ResumeState {
         let url = url::Url::parse("http://127.0.0.1/a.bin").unwrap();
         let mut s = ResumeState::new(url.clone(), url, dest.to_owned(), 100, Default::default());
-        s.segments = vec![mdm_engine::planner::SavedSegment {
+        s.segments = vec![odm_engine::planner::SavedSegment {
             start: 0,
             end: 100,
             cursor: done,

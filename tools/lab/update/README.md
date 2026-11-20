@@ -8,31 +8,31 @@ Checks **Help → Check for updates → Update now** the way a user's update goe
 4. put it in place;
 5. start the new copy (`/updated`) while the old one closes.
 
-They also check that MDM refuses a release whose checksum is wrong or whose list is signed by another key, and that closing the window half-way starts nothing.
+They also check that ODM refuses a release whose checksum is wrong or whose list is signed by another key, and that closing the window half-way starts nothing.
 
-Nothing here touches the installed MDM or the real releases:
+Nothing here touches the installed ODM or the real releases:
 
-- **The test copies.** Each run starts a copy of the given build in a folder of its own, off-screen (`MDM_OFFSCREEN=1`).
-- **The releases.** They are fake 9.9.9 ones made by `mkrel.py`, served by the lab server on 127.0.0.1 (`--files`). Their `latest.json` is the release feed (`MDM_UPDATE_FEED`).
-- **The keys.** The checksum lists are signed with two throwaway Ed25519 keys made for each run in its work folder: "test" and "other". MDM's release key is never read or needed.
+- **The test copies.** Each run starts a copy of the given build in a folder of its own, off-screen (`ODM_OFFSCREEN=1`).
+- **The releases.** They are fake 9.9.9 ones made by `mkrel.py`, served by the lab server on 127.0.0.1 (`--files`). Their `latest.json` is the release feed (`ODM_UPDATE_FEED`).
+- **The keys.** The checksum lists are signed with two throwaway Ed25519 keys made for each run in its work folder: "test" and "other". ODM's release key is never read or needed.
 
 ## The build
 
 These checks need the **`test-update`** cargo feature. It is off by default, and no release build turns it on. It adds:
 
-- `MDM_TEST_UPDATE_KEY`: a public key the release's checksum list may be signed with, besides MDM's own.
+- `ODM_TEST_UPDATE_KEY`: a public key the release's checksum list may be signed with, besides ODM's own.
 - `/show update-now`: Update now pressed, with no clicks, in the window `/show updates` opens (that one every build has).
-- `MDM_TEST_UPDATE_HOLD=N`: holds "Installing the update..." for N seconds.
+- `ODM_TEST_UPDATE_HOLD=N`: holds "Installing the update..." for N seconds.
 
 The build must be release mode. A debug build is "built from source", and those never update.
 
 ```powershell
 # Windows
-cargo build --release -p mdm-app --features test-update -p mdm-labserver
+cargo build --release -p odm-app --features test-update -p odm-labserver
 ```
 ```bash
-# Linux (mdm-lab: the vmtest profile)
-cargo build --profile vmtest -p mdm-app --features test-update -p mdm-labserver
+# Linux (odm-lab: the vmtest profile)
+cargo build --profile vmtest -p odm-app --features test-update -p odm-labserver
 ```
 
 ## Windows: the portable zip
@@ -52,13 +52,13 @@ Each copy is portable (`data\` beside its program), so `Install::PortableZip`. T
 ## Linux: the .tar.gz and the AppImage
 
 ```bash
-tools/lab/update/upd-lin.sh ~/src/mdm/target/vmtest                     # every scenario
-tools/lab/update/upd-lin.sh ~/src/mdm/target/vmtest targz-good          # one
+tools/lab/update/upd-lin.sh ~/src/odm/target/vmtest                     # every scenario
+tools/lab/update/upd-lin.sh ~/src/odm/target/vmtest targz-good          # one
 ```
 
-Needs Xvfb, dbus-daemon, Metacity (wmctrl needs a window manager), wmctrl, Python 3 and gpg. mdm-lab has them all.
+Needs Xvfb, dbus-daemon, Metacity (wmctrl needs a window manager), wmctrl, Python 3 and gpg. odm-lab has them all.
 
-The script runs on a virtual screen of its own (`:96`), never the desktop's or WSLg's. Its work folder is `$MDM_UPDATE_E2E_WORK`, else `/tmp/mdm-update-e2e`.
+The script runs on a virtual screen of its own (`:96`), never the desktop's or WSLg's. Its work folder is `$ODM_UPDATE_E2E_WORK`, else `/tmp/odm-update-e2e`.
 
 - A copy run from its folder is `Install::TarGz`.
 - With `APPIMAGE` pointing at the copy, it is `Install::AppImage`. The fake AppImage is the same program with a marker appended, so it can be told apart once replaced.

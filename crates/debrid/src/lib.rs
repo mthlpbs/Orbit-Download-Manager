@@ -1,11 +1,11 @@
 //! Debrid services (#44): the user's own account at a service such as Real-Debrid turns a file
-//! host's link into a direct link, which MDM's engine then downloads as any file (every
+//! host's link into a direct link, which ODM's engine then downloads as any file (every
 //! connection, resume). Only the services' official, documented APIs, with the user's own
-//! account; MDM ships no host lists or link sources, and never shows or copies the direct links
+//! account; ODM ships no host lists or link sources, and never shows or copies the direct links
 //! (the services forbid sharing them).
 //!
 //! The engine knows nothing of accounts: the app asks [`Debrid::unlocker_for`] for each download
-//! (`mdm_engine::Options::unlocker`). Secrets (tokens) are kept by the app, in the system's
+//! (`odm_engine::Options::unlocker`). Secrets (tokens) are kept by the app, in the system's
 //! keychain; here they are only in memory, and never written to a log.
 //!
 //! The services: Real-Debrid (`realdebrid`), AllDebrid (`alldebrid`), Premiumize (`premiumize`)
@@ -25,12 +25,12 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use futures::future::BoxFuture;
-use mdm_engine::{ServiceFault, Unlocked};
+use odm_engine::{ServiceFault, Unlocked};
 use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
 use url::Url;
 
-/// The services MDM knows.
+/// The services ODM knows.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ServiceKind {
     #[default]
@@ -76,7 +76,7 @@ impl ServiceKind {
     }
 
     /// Whether it signs in by code in the browser (Real-Debrid's device flow, AllDebrid's PIN,
-    /// TorBox's device code). Premiumize's needs a client registered by MDM's maintainer: its API
+    /// TorBox's device code). Premiumize's needs a client registered by ODM's maintainer: its API
     /// key is pasted. Mega-Debrid has none: its user name and password, or its API key.
     pub fn signs_in_by_code(self) -> bool {
         !matches!(self, ServiceKind::Premiumize | ServiceKind::MegaDebrid)
@@ -88,13 +88,13 @@ impl ServiceKind {
         matches!(self, ServiceKind::MegaDebrid)
     }
 
-    /// Whether it downloads torrents for MDM (`torrents`). Mega-Debrid's torrent calls don't
+    /// Whether it downloads torrents for ODM (`torrents`). Mega-Debrid's torrent calls don't
     /// document the states a torrent goes through, nor its files' links: not yet.
     pub fn takes_magnets(self) -> bool {
         !matches!(self, ServiceKind::MegaDebrid)
     }
 
-    /// The requests a minute MDM allows itself (each service's published limit, halved or more:
+    /// The requests a minute ODM allows itself (each service's published limit, halved or more:
     /// Real-Debrid 250 a minute, AllDebrid 600, Mega-Debrid 50 a second; Premiumize publishes
     /// none). TorBox: 300 a minute
     /// for each endpoint, per API key, and 60 new web downloads (or uncached torrents) an hour
@@ -233,8 +233,8 @@ struct Budget {
 
 impl Http {
     /// `net`: the downloads' options (proxy, DNS, adapter); `services`: where they answer.
-    pub fn new(net: &mdm_engine::Options, services: Services) -> Result<Self, String> {
-        let client = mdm_engine::http_client(net, &services.rd.rest).map_err(|e| e.to_string())?;
+    pub fn new(net: &odm_engine::Options, services: Services) -> Result<Self, String> {
+        let client = odm_engine::http_client(net, &services.rd.rest).map_err(|e| e.to_string())?;
         Ok(Http {
             client,
             services,
@@ -374,7 +374,7 @@ impl Http {
         let (status, body, retry_after) = self.send(ServiceKind::RealDebrid, req).await?;
         if (200..300).contains(&status) {
             return serde_json::from_slice(&body).map_err(|_| {
-                Fault::Service(ServiceFault::Other("an answer MDM can't read".into()))
+                Fault::Service(ServiceFault::Other("an answer ODM can't read".into()))
             });
         }
         let f = fault(status, &body, retry_after);
@@ -661,7 +661,7 @@ pub(crate) fn plain_id(id: &str) -> Result<&str, Fault> {
         Ok(id)
     } else {
         Err(Fault::Service(ServiceFault::Other(
-            "the service gave an id MDM can't use".into(),
+            "the service gave an id ODM can't use".into(),
         )))
     }
 }
@@ -782,8 +782,8 @@ impl Debrid {
         })
     }
 
-    /// The unlocker for `url` (`mdm_engine::Options::unlocker`), when an account takes its host.
-    pub fn unlocker_for(&self, url: &Url) -> Option<Arc<dyn mdm_engine::Unlocker>> {
+    /// The unlocker for `url` (`odm_engine::Options::unlocker`), when an account takes its host.
+    pub fn unlocker_for(&self, url: &Url) -> Option<Arc<dyn odm_engine::Unlocker>> {
         let (id, _) = self.account_for(url)?;
         let session = self
             .sessions
@@ -795,7 +795,7 @@ impl Debrid {
         Some(Arc::new(AccountUnlocker { session }))
     }
 
-    /// A download of `url` through an account ended (done, or taken off MDM's list): on TorBox,
+    /// A download of `url` through an account ended (done, or taken off ODM's list): on TorBox,
     /// its web downloads leave the account's list, as a torrent does once downloaded. The other
     /// services keep no list of unlocked links.
     pub async fn release(&self, url: &Url) -> Result<(), Fault> {
@@ -910,7 +910,7 @@ async fn account_info(s: &Session) -> Result<AccountInfo, Fault> {
                 })
             }
             // An application's key: the API has no call that says whether its account is
-            // premium (read 2026-11-11), so MDM checks that the key works and says no more. A
+            // premium (read 2026-11-11), so ODM checks that the key works and says no more. A
             // free account's links are refused, with the service's reason, when downloading.
             _ => {
                 megadebrid::token_works(&s.http, &s.token(None).await?).await?;
@@ -969,7 +969,7 @@ impl std::fmt::Debug for AccountUnlocker {
     }
 }
 
-impl mdm_engine::Unlocker for AccountUnlocker {
+impl odm_engine::Unlocker for AccountUnlocker {
     fn name(&self) -> &str {
         self.session.account.service.name()
     }
@@ -990,7 +990,7 @@ impl mdm_engine::Unlocker for AccountUnlocker {
 }
 
 /// Sign-in by code: Real-Debrid's device flow, AllDebrid's PIN, TorBox's device code. The code to
-/// show and the page to type it at, then a poll until the user allowed MDM there.
+/// show and the page to type it at, then a poll until the user allowed ODM there.
 pub mod signin {
     use super::*;
 
@@ -1064,7 +1064,7 @@ pub mod signin {
         }
     }
 
-    /// The page MDM opens in the browser for the user to type the code at comes from the
+    /// The page ODM opens in the browser for the user to type the code at comes from the
     /// service's answer: it is opened only on the service's own site, over https. Anything else
     /// is a service that isn't answering as it should.
     fn own_page(service: ServiceKind, page: &str) -> Result<(), Fault> {

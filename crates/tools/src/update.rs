@@ -1,14 +1,14 @@
 //! Orbit Download Manager updating itself: how this copy was installed, the release file that
 //! replaces it, and that file fetched and checked against the release's SHA256SUMS.txt, whose
-//! signature by MDM's release key ([`crate::signed_by_mdm`]) is checked first. Putting the file
+//! signature by ODM's release key ([`crate::signed_by_odm`]) is checked first. Putting the file
 //! in place is the app's (`crates/app/src/update.rs`): it has to close itself to do it.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::{Error, signed_by_mdm, sum_for};
+use crate::{Error, signed_by_odm, sum_for};
 
-/// How this copy of MDM was installed: what an update replaces, and how.
+/// How this copy of ODM was installed: what an update replaces, and how.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Install {
     /// Windows, the setup program.
@@ -25,7 +25,7 @@ pub enum Install {
     /// Linux, the plain programs.
     TarGz,
     /// Linux, a package of another package manager (pacman, …): that package manager updates
-    /// it, never MDM.
+    /// it, never ODM.
     System,
     /// Built here: never updated from a release.
     Source,
@@ -43,7 +43,7 @@ impl Install {
         if cfg!(debug_assertions) {
             return Install::Source;
         }
-        if mdm_ipc::portable_dir().is_some() {
+        if odm_ipc::portable_dir().is_some() {
             return Install::PortableZip;
         }
         let Some(exe) = std::env::current_exe().ok() else {
@@ -122,7 +122,7 @@ impl Install {
     /// Linux files are named without "-experimental" from the release after 0.2.4
     /// (build-linux.sh), and the macOS ones may lose it too: the plain name is looked for first,
     /// then the `…-experimental` one of the releases before. None for a build from source, or for
-    /// a processor MDM publishes nothing for (32-bit Linux or Mac; `None`, see [`Arch::THIS`]).
+    /// a processor ODM publishes nothing for (32-bit Linux or Mac; `None`, see [`Arch::THIS`]).
     pub fn assets_on(self, arch: Option<Arch>, version: &str) -> Vec<String> {
         let Some(arch) = arch else {
             return Vec::new();
@@ -181,7 +181,7 @@ pub enum Arch {
 
 impl Arch {
     /// This build's processor. A copy built for x64 and run emulated on an ARM PC says x64: it
-    /// updates to the x64 files until the ARM build is installed. None for a processor MDM
+    /// updates to the x64 files until the ARM build is installed. None for a processor ODM
     /// publishes nothing for (a build from source on RISC-V, ...): it never updates itself.
     pub const THIS: Option<Arch> = if cfg!(target_arch = "x86_64") {
         Some(Arch::X64)
@@ -205,8 +205,8 @@ impl Arch {
 
 /// Linux: which package manager's package `exe` is, asking each whether it owns the file
 /// (`owns(program, arguments)`: it ran and said yes). The .deb's (dpkg), the .rpm's (rpm), or
-/// another's (pacman; a program in /usr/bin none of them owns): those MDM leaves to the system's
-/// updates. Else the plain programs (.tar.gz), which MDM replaces itself. A path that isn't
+/// another's (pacman; a program in /usr/bin none of them owns): those ODM leaves to the system's
+/// updates. Else the plain programs (.tar.gz), which ODM replaces itself. A path that isn't
 /// UTF-8 is never one of the packages'.
 fn linux_package(exe: &Path, owns: &dyn Fn(&str, &[&str]) -> bool) -> Install {
     let Some(path) = exe.to_str() else {
@@ -247,24 +247,24 @@ impl Progress {
     }
 }
 
-/// Fetch release file `name` from `assets` (name, download address) into `dir` with MDM's own
-/// engine (`net`), after checking the release's SHA256SUMS.txt is signed by MDM's key, and check
+/// Fetch release file `name` from `assets` (name, download address) into `dir` with ODM's own
+/// engine (`net`), after checking the release's SHA256SUMS.txt is signed by ODM's key, and check
 /// the file against it. Returns the file.
 pub async fn fetch(
     assets: &[(String, String)],
     name: &str,
     dir: &Path,
-    net: &mdm_engine::Options,
+    net: &odm_engine::Options,
     progress: &Progress,
 ) -> Result<PathBuf, Error> {
-    fetch_checked(assets, name, dir, net, progress, signed_by_mdm).await
+    fetch_checked(assets, name, dir, net, progress, signed_by_odm).await
 }
 
 async fn fetch_checked(
     assets: &[(String, String)],
     name: &str,
     dir: &Path,
-    net: &mdm_engine::Options,
+    net: &odm_engine::Options,
     progress: &Progress,
     verify: fn(&[u8], &[u8]) -> bool,
 ) -> Result<PathBuf, Error> {
@@ -301,11 +301,11 @@ pub(crate) async fn fetch_fixture(
     assets: &[(String, String)],
     name: &str,
     dir: &Path,
-    net: &mdm_engine::Options,
+    net: &odm_engine::Options,
     progress: &Progress,
 ) -> Result<PathBuf, Error> {
     fetch_checked(assets, name, dir, net, progress, |data, sig| {
-        crate::signed_by(include_str!("../keys/mdm-release.asc"), data, sig)
+        crate::signed_by(include_str!("../keys/odm-release.asc"), data, sig)
     })
     .await
 }
@@ -441,7 +441,7 @@ Connection: close
     }
 
     #[tokio::test]
-    async fn a_release_file_is_taken_only_from_a_list_signed_by_mdm() {
+    async fn a_release_file_is_taken_only_from_a_list_signed_by_odm() {
         let zip = "MisterDownloadManager-9.9.9-x64.zip";
         let setup = "MisterDownloadManager-9.9.9-setup.exe";
         let assets = |base: &str| -> Vec<(String, String)> {
@@ -451,15 +451,15 @@ Connection: close
                 .collect()
         };
         let base = serve(vec![
-            ("SHA256SUMS.txt", "mdm-SHA256SUMS.txt"),
-            ("SHA256SUMS.txt.sig", "mdm-SHA256SUMS.txt.sig"),
+            ("SHA256SUMS.txt", "odm-SHA256SUMS.txt"),
+            ("SHA256SUMS.txt.sig", "odm-SHA256SUMS.txt.sig"),
             (zip, zip),
             // Not what the signed list says it is.
-            (setup, "mdm-SHA256SUMS.txt"),
+            (setup, "odm-SHA256SUMS.txt"),
         ]);
         let dir = tempfile::tempdir().unwrap();
-        // Through MDM's own engine, as the app fetches it.
-        let net = crate::net(mdm_engine::Proxy::None);
+        // Through ODM's own engine, as the app fetches it.
+        let net = crate::net(odm_engine::Proxy::None);
         let progress = Progress::default();
         let file = fetch_fixture(&assets(&base), zip, dir.path(), &net, &progress)
             .await
@@ -595,7 +595,7 @@ Connection: close
             assert!(install.assets_on(x86, "1.0.0").is_empty());
         }
         assert!(Install::Dmg.assets_on(x86, "1.0.0").is_empty());
-        // A processor MDM publishes nothing for never updates itself.
+        // A processor ODM publishes nothing for never updates itself.
         for install in Install::ALL {
             assert!(install.assets_on(None, "1.0.0").is_empty());
         }
@@ -612,7 +612,7 @@ Connection: close
         }
     }
 
-    /// The Windows names are build.ps1's and mdm.iss's: x64's as before, the others with their
+    /// The Windows names are build.ps1's and odm.iss's: x64's as before, the others with their
     /// processor.
     #[test]
     fn the_windows_names_are_build_ps1_s() {
@@ -622,7 +622,7 @@ Connection: close
         assert!(script.contains("if (-not $InstallerOnly)"));
         assert!(script.contains("$suffix = if ($Arch -eq \"x64\") { \"\" } else { \"-$Arch\" }"));
         assert!(script.contains("[ValidateSet(\"x64\", \"arm64\", \"x86\")]"));
-        let iss = include_str!("../../../tools/installer/mdm.iss").replace("\r\n", "\n");
+        let iss = include_str!("../../../tools/installer/odm.iss").replace("\r\n", "\n");
         assert!(iss.contains(
             "#if Arch == \"x64\"\nOutputBaseFilename=OrbitDownloadManager-{#AppVersion}-setup\n#else\nOutputBaseFilename=OrbitDownloadManager-{#AppVersion}-setup-{#Arch}\n#endif"
         ));
@@ -661,26 +661,26 @@ Connection: close
         let exe = Path::new("/usr/bin/orbitdownloadmanager");
         assert_eq!(linux_package(exe, &owner("dpkg-query")), Install::Deb);
         assert_eq!(linux_package(exe, &owner("rpm")), Install::Rpm);
-        // An Arch package (pacman), or in /usr/bin with no package manager MDM knows: the
+        // An Arch package (pacman), or in /usr/bin with no package manager ODM knows: the
         // system's.
         assert_eq!(linux_package(exe, &owner("pacman")), Install::System);
         assert_eq!(linux_package(exe, &owner("none")), Install::System);
         // On Debian with rpm's tools installed too: still the .deb's.
         let both = |tool: &str, _: &[&str]| tool == "dpkg-query" || tool == "rpm";
         assert_eq!(linux_package(exe, &both), Install::Deb);
-        // The .tar.gz unpacked in the home folder, /opt or /usr/local: MDM's own to replace.
+        // The .tar.gz unpacked in the home folder, /opt or /usr/local: ODM's own to replace.
         let nobody = |_: &str, _: &[&str]| false;
         let home = Path::new("/home/me/OrbitDownloadManager/orbitdownloadmanager");
         assert_eq!(linux_package(home, &nobody), Install::TarGz);
         assert_eq!(
-            linux_package(Path::new("/opt/mdm/orbitdownloadmanager"), &nobody),
+            linux_package(Path::new("/opt/odm/orbitdownloadmanager"), &nobody),
             Install::TarGz
         );
         assert_eq!(
             linux_package(Path::new("/usr/local/bin/orbitdownloadmanager"), &nobody),
             Install::TarGz
         );
-        // MDM updates neither another package manager's copy nor a build of its own.
+        // ODM updates neither another package manager's copy nor a build of its own.
         assert!(Install::System.assets("1.0.0").is_empty());
     }
 
@@ -702,18 +702,18 @@ Connection: close
         let (new, target) = (root.path().join("new"), root.path().join("app"));
         std::fs::create_dir_all(new.join("extension")).unwrap();
         std::fs::create_dir_all(target.join("data")).unwrap();
-        std::fs::write(new.join("mdm.exe"), "new").unwrap();
+        std::fs::write(new.join("odm.exe"), "new").unwrap();
         std::fs::write(new.join("extension").join("manifest.json"), "new").unwrap();
         std::fs::write(new.join("data"), "must not land").unwrap();
-        std::fs::write(target.join("mdm.exe"), "old").unwrap();
+        std::fs::write(target.join("odm.exe"), "old").unwrap();
         std::fs::write(target.join("data").join("downloads.json"), "mine").unwrap();
         replace_files(&new, &target, &["data"]).unwrap();
         assert_eq!(
-            std::fs::read_to_string(target.join("mdm.exe")).unwrap(),
+            std::fs::read_to_string(target.join("odm.exe")).unwrap(),
             "new"
         );
         assert_eq!(
-            std::fs::read_to_string(target.join("mdm.exe.old")).unwrap(),
+            std::fs::read_to_string(target.join("odm.exe.old")).unwrap(),
             "old"
         );
         assert_eq!(
@@ -725,8 +725,8 @@ Connection: close
             "mine"
         );
         remove_old(&target);
-        assert!(!target.join("mdm.exe.old").exists());
-        assert!(target.join("mdm.exe").exists());
+        assert!(!target.join("odm.exe.old").exists());
+        assert!(target.join("odm.exe").exists());
     }
 
     #[test]
@@ -736,7 +736,7 @@ Connection: close
         let zip_path = root.path().join("r.zip");
         let mut w = zip::ZipWriter::new(std::fs::File::create(&zip_path).unwrap());
         let opts = zip::write::SimpleFileOptions::default();
-        w.start_file("OrbitDownloadManager-9.9.9-x64/mdm.exe", opts)
+        w.start_file("OrbitDownloadManager-9.9.9-x64/odm.exe", opts)
             .unwrap();
         w.write_all(b"exe").unwrap();
         w.start_file("../escape.txt", opts).unwrap();
@@ -745,7 +745,7 @@ Connection: close
         let out = root.path().join("out");
         unzip(&zip_path, &out).unwrap();
         let folder = single_folder(&out);
-        assert_eq!(std::fs::read(folder.join("mdm.exe")).unwrap(), b"exe");
+        assert_eq!(std::fs::read(folder.join("odm.exe")).unwrap(), b"exe");
         assert!(!root.path().join("escape.txt").exists());
     }
 }

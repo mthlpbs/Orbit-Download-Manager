@@ -1,6 +1,6 @@
-//! A downloaded file's name, from what a server and a page say of it (`mdm_engine::naming`:
+//! A downloaded file's name, from what a server and a page say of it (`odm_engine::naming`:
 //! `Content-Disposition`, the address, `Content-Type`, the page's title, the first bytes), and an
-//! archive entry's name made a path under the extraction folder (`mdm_extract::safe::rel_path`).
+//! archive entry's name made a path under the extraction folder (`odm_extract::safe::rel_path`).
 //!
 //! The input's lines are the `Content-Disposition` value, the address, the `Content-Type` and the
 //! page's title; the whole input is also the file's first bytes and an archive entry's name.
@@ -9,10 +9,10 @@
 use std::path::Component;
 
 use libfuzzer_sys::fuzz_target;
-use mdm_engine::naming::{self, Answer};
+use odm_engine::naming::{self, Answer};
 use url::Url;
 
-/// What every name MDM makes must be: one plain path component, valid on Windows (the strictest
+/// What every name ODM makes must be: one plain path component, valid on Windows (the strictest
 /// system), so a server can't name a file outside the folder or a device.
 fn check_name(name: &str) {
     assert!(!name.is_empty());
@@ -68,7 +68,7 @@ fuzz_target!(|data: &[u8]| {
     let _ = naming::needs_sniff(&url, Some(disposition), content_type);
 
     // An archive entry: a relative path of plain, safe names, or refused.
-    if let Ok(path) = mdm_extract::safe::rel_path(&text, 64) {
+    if let Ok(path) = odm_extract::safe::rel_path(&text, 64) {
         assert!(path.components().count() <= 64);
         for c in path.components() {
             let Component::Normal(part) = c else {

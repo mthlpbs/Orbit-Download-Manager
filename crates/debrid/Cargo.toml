@@ -1,5 +1,5 @@
 [package]
-name = "mdm-debrid"
+name = "odm-debrid"
 description = "Debrid service accounts for Orbit Download Manager (#44): file-host links unlocked through the user's own account"
 version.workspace = true
 edition.workspace = true
@@ -13,7 +13,7 @@ publish.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 futures.workspace = true
-mdm-engine.workspace = true
+odm-engine.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -22,7 +22,7 @@ tokio-util.workspace = true
 url.workspace = true
 
 [dev-dependencies]
-mdm-labserver.workspace = true
+odm-labserver.workspace = true
 tempfile.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

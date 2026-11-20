@@ -22,7 +22,8 @@ pub fn cache_base(_url: &Url, dest: &Path, configured: Option<&Path>) -> std::pa
     let root = configured
         .map(Path::to_owned)
         .or_else(|| {
-            std::env::var_os("MDM_DATA_DIR")
+            std::env::var_os("ODM_DATA_DIR")
+                .or_else(|| std::env::var_os("MDM_DATA_DIR"))
                 .map(std::path::PathBuf::from)
                 .map(|d| d.join("cache/downloads"))
         })

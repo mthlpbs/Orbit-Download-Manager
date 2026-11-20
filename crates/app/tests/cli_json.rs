@@ -3,7 +3,7 @@
 
 use std::process::Command;
 
-use mdm_labserver::{Config, Faults, LabServer};
+use odm_labserver::{Config, Faults, LabServer};
 use serde_json::Value;
 
 /// The app's program, which runs orbitdownloadmanager-cli's commands when its launcher
@@ -29,7 +29,7 @@ async fn a_download_reports_progress_then_done() {
     let dest = dir.path().join("json.bin");
     let out = tokio::task::spawn_blocking(move || {
         Command::new(APP)
-            .arg(mdm_cli::FLAG)
+            .arg(odm_cli::FLAG)
             .args(["--json", "get", &s.url("/gen/3M?seed=5"), "-o"])
             .arg(&dest)
             .output()
@@ -56,9 +56,9 @@ fn failures_are_json_with_a_failing_exit_code() {
     // No app runs on this data folder.
     let dir = tempfile::tempdir().unwrap();
     let out = Command::new(APP)
-        .arg(mdm_cli::FLAG)
+        .arg(odm_cli::FLAG)
         .args(["--json", "status"])
-        .env("MDM_DATA_DIR", dir.path())
+        .env("ODM_DATA_DIR", dir.path())
         .output()
         .unwrap();
     assert!(!out.status.success());
@@ -69,9 +69,9 @@ fn failures_are_json_with_a_failing_exit_code() {
     );
 
     let out = Command::new(APP)
-        .arg(mdm_cli::FLAG)
+        .arg(odm_cli::FLAG)
         .args(["--json", "resume"])
-        .arg(dir.path().join("missing.mdm.json"))
+        .arg(dir.path().join("missing.odm.json"))
         .output()
         .unwrap();
     assert!(!out.status.success());

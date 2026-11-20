@@ -6,7 +6,7 @@
 
 /// Bytes of `range` (a `Range` header, `bytes=a-b`; none: the whole file) that the saved
 /// segments say were already on disk: outside every segment's part still to fetch.
-pub fn on_disk(range: Option<&str>, saved: &mdm_engine::state::ResumeState) -> u64 {
+pub fn on_disk(range: Option<&str>, saved: &odm_engine::state::ResumeState) -> u64 {
     let (from, to) = match range.and_then(|r| r.strip_prefix("bytes=")?.split_once('-')) {
         Some((a, b)) => (
             a.parse::<u64>().unwrap(),

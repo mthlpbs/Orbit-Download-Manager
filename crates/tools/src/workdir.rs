@@ -1,17 +1,17 @@
 //! Where the helpers run (#834): every one starts in a folder it can write, with TEMP, TMP and
 //! TMPDIR naming that folder.
 //!
-//! A helper used to inherit MDM's own working folder, which is the install folder when MDM is
+//! A helper used to inherit ODM's own working folder, which is the install folder when ODM is
 //! opened from the Start menu (`C:\Program Files\Orbit Download Manager`). yt-dlp writes there:
 //! before it chooses a format a site marks as needing a check (YouTube's streams in pieces of a
 //! video put online in the last two days), it tries the format with a small file of its own in
-//! its working folder (its `temp` path, which MDM doesn't set), and Windows refused it: "[Errno
+//! its working folder (its `temp` path, which ODM doesn't set), and Windows refused it: "[Errno
 //! 13] Permission denied: 'C:\\Program Files\\Orbit Download Manager\\tmp….tmp'".
 //!
 //! The folder is the person's temporary folder when a file can be made in it, else a `work`
-//! folder in MDM's data folder (said once in the log): Python, yt-dlp's and gallery-dl's
+//! folder in ODM's data folder (said once in the log): Python, yt-dlp's and gallery-dl's
 //! language, falls back to the working folder when TEMP can't be written, and so would have
-//! landed in the install folder again. MDM's own files for the helpers (a page's cookies, a
+//! landed in the install folder again. ODM's own files for the helpers (a page's cookies, a
 //! looked-up page) go in the same folder ([`temp_dir`]).
 
 use std::path::{Path, PathBuf};
@@ -21,7 +21,7 @@ use std::process::Command;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Folders {
     /// Their working folder and TEMP, TMP and TMPDIR; `None` when no folder could be written at
-    /// all (they then get what MDM has, as before).
+    /// all (they then get what ODM has, as before).
     pub dir: Option<PathBuf>,
     /// The person's temporary folder, when it couldn't be written and `dir` replaced it.
     pub replaced: Option<PathBuf>,
@@ -31,8 +31,8 @@ pub struct Folders {
 /// every system; Windows' programs read TMP and TEMP, Linux's and macOS's TMPDIR.
 pub const TEMP_VARS: [&str; 3] = ["TMPDIR", "TEMP", "TMP"];
 
-/// `p` as a full path (against MDM's working folder; unchanged if that can't be read): a helper
-/// runs elsewhere, so a relative path MDM gives it would name another file.
+/// `p` as a full path (against ODM's working folder; unchanged if that can't be read): a helper
+/// runs elsewhere, so a relative path ODM gives it would name another file.
 pub fn absolute(p: &Path) -> PathBuf {
     std::path::absolute(p).unwrap_or_else(|_| p.to_owned())
 }
@@ -46,7 +46,7 @@ pub fn writable(dir: &Path) -> bool {
         return false;
     }
     let probe = dir.join(format!(
-        ".mdm-probe-{}-{}",
+        ".odm-probe-{}-{}",
         std::process::id(),
         N.fetch_add(1, Ordering::Relaxed)
     ));
@@ -76,19 +76,19 @@ pub fn choose(user: &Path, data: Option<&Path>) -> Folders {
     }
     let own = data
         .map(|d| absolute(&d.join("work")))
-        .filter(|w| mdm_ipc::private_dir(w).is_ok() && writable(w));
+        .filter(|w| odm_ipc::private_dir(w).is_ok() && writable(w));
     Folders {
         replaced: own.as_ref().map(|_| user),
         dir: own,
     }
 }
 
-/// The helpers' folder, chosen once per run (the system's temporary folder, MDM's data folder).
+/// The helpers' folder, chosen once per run (the system's temporary folder, ODM's data folder).
 /// A replaced temporary folder is said in the log the first time.
 pub fn folders() -> &'static Folders {
     static FOLDERS: std::sync::OnceLock<Folders> = std::sync::OnceLock::new();
     FOLDERS.get_or_init(|| {
-        let chosen = choose(&std::env::temp_dir(), mdm_ipc::data_dir().as_deref());
+        let chosen = choose(&std::env::temp_dir(), odm_ipc::data_dir().as_deref());
         match (&chosen.dir, &chosen.replaced) {
             (Some(dir), Some(user)) => tracing::warn!(
                 "helpers: the temporary folder {} can't be written; yt-dlp, gallery-dl and \
@@ -97,8 +97,8 @@ pub fn folders() -> &'static Folders {
                 dir.display()
             ),
             (None, _) => tracing::warn!(
-                "helpers: neither the temporary folder {} nor MDM's data folder can be \
-                 written; the helpers run where MDM does",
+                "helpers: neither the temporary folder {} nor ODM's data folder can be \
+                 written; the helpers run where ODM does",
                 std::env::temp_dir().display()
             ),
             _ => {}
@@ -107,7 +107,7 @@ pub fn folders() -> &'static Folders {
     })
 }
 
-/// Where MDM puts its own files for a helper (a page's cookies, a looked-up page): the helpers'
+/// Where ODM puts its own files for a helper (a page's cookies, a looked-up page): the helpers'
 /// folder, else the system's temporary folder.
 pub fn temp_dir() -> PathBuf {
     folders().dir.clone().unwrap_or_else(std::env::temp_dir)
@@ -151,7 +151,7 @@ mod tests {
     }
 
     #[test]
-    fn mdms_own_folder_when_the_temporary_folder_is_missing() {
+    fn odms_own_folder_when_the_temporary_folder_is_missing() {
         let data = tempfile::tempdir().unwrap();
         let missing = data.path().join("no-such-temp");
         let f = choose(&missing, Some(data.path()));
@@ -162,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    fn mdms_own_folder_when_the_temporary_folder_is_a_file() {
+    fn odms_own_folder_when_the_temporary_folder_is_a_file() {
         let data = tempfile::tempdir().unwrap();
         let file = data.path().join("temp.txt");
         std::fs::write(&file, b"x").unwrap();
@@ -210,7 +210,7 @@ mod tests {
     }
 
     #[test]
-    fn mdms_own_folder_when_the_temporary_folder_cant_be_written() {
+    fn odms_own_folder_when_the_temporary_folder_cant_be_written() {
         let data = tempfile::tempdir().unwrap();
         let locked = data.path().join("locked");
         std::fs::create_dir(&locked).unwrap();
@@ -260,12 +260,12 @@ mod tests {
     #[test]
     fn the_folder_and_variables_a_helper_gets() {
         let f = Folders {
-            dir: Some(PathBuf::from("/mdm/work")),
+            dir: Some(PathBuf::from("/odm/work")),
             replaced: None,
         };
         let mut cmd = Command::new("x");
         apply(&mut cmd, &f);
-        assert_eq!(cmd.get_current_dir(), Some(Path::new("/mdm/work")));
+        assert_eq!(cmd.get_current_dir(), Some(Path::new("/odm/work")));
         let mut envs: Vec<_> = cmd
             .get_envs()
             .map(|(k, v)| (k.to_owned(), v.map(ToOwned::to_owned)))
@@ -273,7 +273,7 @@ mod tests {
         envs.sort();
         assert_eq!(
             envs,
-            ["TEMP", "TMP", "TMPDIR"].map(|k| (k.into(), Some("/mdm/work".into())))
+            ["TEMP", "TMP", "TMPDIR"].map(|k| (k.into(), Some("/odm/work".into())))
         );
         // What a caller gave stays.
         let mut cmd = Command::new("x");

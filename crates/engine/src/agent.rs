@@ -1,13 +1,13 @@
-//! The User-Agent MDM sends for the links it is given by hand (#668): the one the default browser
+//! The User-Agent ODM sends for the links it is given by hand (#668): the one the default browser
 //! of this computer sends today, at the version installed, so a site sees the browser its user
 //! has rather than a program or a browser from years ago. The app finds that browser once, off
 //! the interface's thread (win32.rs, unix.rs), and hands it here (`set_automatic`); until then,
-//! or when none is found, MDM speaks as a current Chrome on this system (`fallback`).
+//! or when none is found, ODM speaks as a current Chrome on this system (`fallback`).
 //!
 //! A User-Agent typed in Options, or the one a browser hands over with its download (the
 //! extension's), always wins over this one: the download's `Options::automatic_agent` says which.
 //!
-//! MDM's own name (`OWN_USER_AGENT`) is its last word to a site whose bot check refuses whatever
+//! ODM's own name (`OWN_USER_AGENT`) is its last word to a site whose bot check refuses whatever
 //! claims to be a browser without connecting like one (#1422): the hosts that let only it through
 //! are remembered for the session (`remember_own`, `own_for`).
 
@@ -15,19 +15,19 @@ use std::collections::HashSet;
 use std::sync::{Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// MDM's User-Agent before #668: Internet Explorer 11's, as IDM 6.42 sends it (lab S1, D-007).
-/// Still asked with once when a site turns a browser's User-Agent away on MDM's connection
+/// ODM's User-Agent before #668: Internet Explorer 11's, as IDM 6.42 sends it (lab S1, D-007).
+/// Still asked with once when a site turns a browser's User-Agent away on ODM's connection
 /// (#372: a bot check that sees a browser's name on a connection that isn't a browser's lets
 /// this one through), and a setting saved with it means "automatic" (it was the default).
 pub const IE11_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 6.1; Trident/7.0; rv:11.0) like Gecko";
 
-/// MDM naming itself, honestly (#1422): asked with once, on MDM's own connection, when a site's
+/// ODM naming itself, honestly (#1422): asked with once, on ODM's own connection, when a site's
 /// bot check refused the browser's User-Agent and the browser-like connection too
 /// (`Options::own_agent`). SourceForge's lets programs that say what they are through, and
 /// refuses those that claim to be a browser without connecting like one.
 pub const OWN_USER_AGENT: &str = concat!("OrbitDownloadManager/", env!("CARGO_PKG_VERSION"));
 
-/// The sites (host and port) whose bot check let only MDM's own name through, this session.
+/// The sites (host and port) whose bot check let only ODM's own name through, this session.
 static OWN_HOSTS: Mutex<Option<HashSet<String>>> = Mutex::new(None);
 
 /// At most this many are remembered: past it, the list starts again. A forgotten site costs only
@@ -43,7 +43,7 @@ fn site_of(url: &url::Url) -> Option<String> {
     })
 }
 
-/// `url`'s site let MDM through under its own name only (#1422): its next downloads, resumes and
+/// `url`'s site let ODM through under its own name only (#1422): its next downloads, resumes and
 /// looks this session ask that way at once.
 pub fn remember_own(url: &url::Url) {
     let Some(site) = site_of(url) else { return };
@@ -55,7 +55,7 @@ pub fn remember_own(url: &url::Url) {
     hosts.insert(site);
 }
 
-/// `url`'s site refused MDM's own name after all: it is learnt again, if it still lets it
+/// `url`'s site refused ODM's own name after all: it is learnt again, if it still lets it
 /// through, the next time it refuses the browser's.
 pub fn forget_own(url: &url::Url) {
     let Some(site) = site_of(url) else { return };
@@ -64,7 +64,7 @@ pub fn forget_own(url: &url::Url) {
     }
 }
 
-/// Whether `url`'s site let MDM through under its own name only, earlier this session.
+/// Whether `url`'s site let ODM through under its own name only, earlier this session.
 pub fn own_for(url: &url::Url) -> bool {
     site_of(url).is_some_and(|site| {
         OWN_HOSTS
@@ -75,7 +75,7 @@ pub fn own_for(url: &url::Url) -> bool {
     })
 }
 
-/// A browser whose User-Agent MDM knows how to write.
+/// A browser whose User-Agent ODM knows how to write.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Browser {
     Chrome,
@@ -87,7 +87,7 @@ pub enum Browser {
     Chromium,
     Firefox,
     /// LibreWolf counts as Firefox does; Waterfox, Floorp and Zen count their own versions but
-    /// send Firefox's User-Agent (at the Firefox they are built on: MDM's estimate of today's).
+    /// send Firefox's User-Agent (at the Firefox they are built on: ODM's estimate of today's).
     FirefoxFork,
     Safari,
 }
@@ -110,7 +110,7 @@ impl Browser {
     /// The browser `name` is: an executable's file name without its extension (`msedge`), a
     /// `.desktop` file's ID (`com.google.Chrome.desktop`, `firefox_firefox.desktop`), a program
     /// (`google-chrome-stable`) or a macOS bundle ID (`com.brave.Browser`); case ignored. None
-    /// for anything else (an unknown browser: MDM then speaks as Chrome).
+    /// for anything else (an unknown browser: ODM then speaks as Chrome).
     pub fn named(name: &str) -> Option<Browser> {
         let n = name.to_ascii_lowercase();
         let has = |w: &str| n.contains(w);
@@ -188,7 +188,7 @@ pub fn this_arch() -> &'static str {
 pub struct Found {
     pub browser: Browser,
     /// Its version as installed ("157.0.8103.39", Brave's "157.1.99.55", Opera's "122.0.5643.24",
-    /// Firefox's "160.0", Safari's "26.1"); None when it couldn't be read (MDM's estimate then).
+    /// Firefox's "160.0", Safari's "26.1"); None when it couldn't be read (ODM's estimate then).
     pub version: Option<String>,
     /// Firefox built by Ubuntu (its snap) names Ubuntu in its platform: "X11; Ubuntu; Linux …".
     pub ubuntu: bool,
@@ -219,7 +219,7 @@ const FOUR_WEEKS: u64 = 28 * 24 * 3600;
 const A_YEAR: u64 = 365 * 24 * 3600;
 
 /// A browser's current stable major version at `now` (seconds since 1970), counted from one
-/// known release in its rhythm: what MDM says when it can't read the installed version. Never
+/// known release in its rhythm: what ODM says when it can't read the installed version. Never
 /// before the known one, never more than two years past it (a clock far off).
 fn estimate(known: (u32, u64), every: u64, now: u64) -> u32 {
     let steps = now.saturating_sub(known.1) / every;
@@ -252,8 +252,8 @@ fn safari_version(v: &str) -> String {
 }
 
 /// The User-Agent `found` sends on `os` (`arch`: this processor, `this_arch`), at `now` (seconds
-/// since 1970, for the versions MDM estimates): the reduced User-Agents browsers send today,
-/// whose minor version numbers are zeros. Nothing found, or a browser MDM doesn't know: a
+/// since 1970, for the versions ODM estimates): the reduced User-Agents browsers send today,
+/// whose minor version numbers are zeros. Nothing found, or a browser ODM doesn't know: a
 /// current Chrome's on this system.
 pub fn user_agent(found: Option<&Found>, os: Os, arch: &str, now: u64) -> String {
     let browser = found.map_or(Browser::Chrome, |f| f.browser);
@@ -316,14 +316,14 @@ fn now() -> u64 {
 /// looked for yet.
 static AUTOMATIC: RwLock<Option<(Option<String>, String)>> = RwLock::new(None);
 
-/// The default browser the app found (None: none, or one MDM doesn't know): from now on the
+/// The default browser the app found (None: none, or one ODM doesn't know): from now on the
 /// automatic User-Agent is the one it sends.
 pub fn set_automatic(found: Option<Found>) {
     let agent = user_agent(found.as_ref(), Os::this(), this_arch(), now());
     *AUTOMATIC.write().unwrap() = Some((found.map(|f| f.label()), agent));
 }
 
-/// The User-Agent MDM sends for a link given by hand when the user set none: the default
+/// The User-Agent ODM sends for a link given by hand when the user set none: the default
 /// browser's (`set_automatic`), else a current Chrome's on this system (`fallback`).
 pub fn automatic() -> String {
     match &*AUTOMATIC.read().unwrap() {

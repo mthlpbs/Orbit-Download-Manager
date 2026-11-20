@@ -34,7 +34,7 @@ jobs:
           script: |
             const LABEL = 'needs info';
             const DAYS = 14;
-            const MARKER = '<!-- mdm:needs-info-closed -->';
+            const MARKER = '<!-- odm:needs-info-closed -->';
             const NOTE = "closing for now since there's no answer yet; just reply here with the details and it opens again";
             const OURS = ['OWNER', 'MEMBER', 'COLLABORATOR'];
             const dryRun = process.env.DRY_RUN === 'true';
@@ -97,7 +97,7 @@ jobs:
         with:
           script: |
             const LABEL = 'needs info';
-            const MARKER = '<!-- mdm:needs-info-closed -->';
+            const MARKERS = ['<!-- odm:needs-info-closed -->', '<!-- mdm:needs-info-closed -->'];
             const BOT = 'github-actions[bot]';
             const { owner, repo } = context.repo;
             const issue = context.payload.issue;
@@ -116,7 +116,7 @@ jobs:
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number: n, per_page: 100,
             });
-            const marked = comments.some((c) => c.user.login === BOT && c.body.includes(MARKER));
+            const marked = comments.some((c) => c.user.login === BOT && MARKERS.some((marker) => c.body.includes(marker)));
             if (lastClose && lastClose.actor && lastClose.actor.login === BOT && marked) {
               await github.rest.issues.update({ owner, repo, issue_number: n, state: 'open' });
               core.info(`#${n}: closed for want of an answer, opened again`);

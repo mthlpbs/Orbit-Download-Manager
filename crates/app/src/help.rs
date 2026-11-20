@@ -19,8 +19,8 @@ const LATEST: &str = "https://api.github.com/repos/mthlpbs/Orbit-Download-Manage
 /// rate limit (#1337).
 const REPO_PATH: &str = "mthlpbs/Orbit-Download-Manager";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const COMMIT: &str = env!("MDM_COMMIT");
-/// While MDM runs, the automatic check comes again this often (it also checks at every start).
+pub const COMMIT: &str = env!("ODM_COMMIT");
+/// While ODM runs, the automatic check comes again this often (it also checks at every start).
 pub const CHECK_EVERY: i64 = 24 * 3600;
 /// The check at start waits this long (the window, the list and the downloads first).
 pub const CHECK_AFTER_START: std::time::Duration = std::time::Duration::from_secs(5);
@@ -37,7 +37,7 @@ pub fn page_url(doc: &str, _lang: &str) -> String {
 }
 
 /// Open a user guide page from this repository.
-/// Never in an off-screen test run (MDM_OFFSCREEN), whose clicks come from scripts, not from a
+/// Never in an off-screen test run (ODM_OFFSCREEN), whose clicks come from scripts, not from a
 /// person at the browser.
 pub fn open_page(doc: &str) {
     if !crate::offscreen() {
@@ -46,7 +46,7 @@ pub fn open_page(doc: &str) {
 }
 
 /// Open Orbit’s project page when support is requested. Orbit
-/// never brings it up by itself, and never in an off-screen test run (MDM_OFFSCREEN), whose
+/// never brings it up by itself, and never in an off-screen test run (ODM_OFFSCREEN), whose
 /// clicks come from scripts, not from a person at the browser.
 pub fn support() {
     if !crate::offscreen() {
@@ -55,7 +55,7 @@ pub fn support() {
 }
 
 /// A new GitHub issue on the Bug report form (.github/ISSUE_TEMPLATE/bug.yml), filled with
-/// what MDM knows: its version, the system and its version, how it was installed, the
+/// what ODM knows: its version, the system and its version, how it was installed, the
 /// language. The parameters are the form's field ids (all text fields: GitHub's page drops a
 /// dropdown's value from the address).
 pub fn report_problem() {
@@ -74,7 +74,7 @@ pub fn report_problem() {
         });
 }
 
-/// The Bug report form's fields MDM fills in: (field id, value).
+/// The Bug report form's fields ODM fills in: (field id, value).
 fn report_fields() -> Vec<(&'static str, String)> {
     let os_version = crate::win32::windows_version();
     let os = if os_version.contains("Windows 10") {
@@ -82,9 +82,9 @@ fn report_fields() -> Vec<(&'static str, String)> {
     } else {
         "Windows 11"
     };
-    let build = match mdm_tools::update::Arch::THIS {
-        Some(mdm_tools::update::Arch::Arm64) => ", ARM64",
-        Some(mdm_tools::update::Arch::X86) => ", 32-bit",
+    let build = match odm_tools::update::Arch::THIS {
+        Some(odm_tools::update::Arch::Arm64) => ", ARM64",
+        Some(odm_tools::update::Arch::X86) => ", 32-bit",
         _ => "",
     };
     let mut fields = vec![
@@ -94,7 +94,7 @@ fn report_fields() -> Vec<(&'static str, String)> {
     ];
     fields.push((
         "install",
-        mdm_tools::update::Install::detect().label().to_owned(),
+        odm_tools::update::Install::detect().label().to_owned(),
     ));
     fields
 }
@@ -156,20 +156,20 @@ struct Sources {
 }
 
 async fn latest() -> Result<Found, String> {
-    // MDM_UPDATE_FEED: another address for the latest release (tests of Update now, as
-    // MDM_DATA_DIR is for a separate list); MDM_UPDATE_WEB and MDM_UPDATE_RAW: other addresses
+    // ODM_UPDATE_FEED: another address for the latest release (tests of Update now, as
+    // ODM_DATA_DIR is for a separate list); ODM_UPDATE_WEB and ODM_UPDATE_RAW: other addresses
     // for GitHub's pages and files (tests of the way around the API's rate limit: the lab
     // server's fake GitHub, `/gh/web` and `/gh/raw`).
-    let var = |name: &str, default: &str| std::env::var(name).unwrap_or_else(|_| default.into());
+    let var = |name: &str, default: &str| odm_ipc::env_var(name).unwrap_or_else(|_| default.into());
     let sources = Sources {
-        feed: var("MDM_UPDATE_FEED", LATEST),
-        web: var("MDM_UPDATE_WEB", mdm_tools::github::WEB),
-        raw: var("MDM_UPDATE_RAW", mdm_tools::github::RAW),
+        feed: var("ODM_UPDATE_FEED", LATEST),
+        web: var("ODM_UPDATE_WEB", odm_tools::github::WEB),
+        raw: var("ODM_UPDATE_RAW", odm_tools::github::RAW),
     };
     let net = crate::settings::own_net();
     // The chosen DNS and network adapter, as downloads have them (#36, #35).
     let builder = |url: &str| {
-        mdm_engine::net::client_builder(&net.dns, &net.route, url)
+        odm_engine::net::client_builder(&net.dns, &net.route, url)
             .map(|b| {
                 b.user_agent(concat!("OrbitDownloadManager/", env!("CARGO_PKG_VERSION")))
                     .timeout(Duration::from_secs(20))
@@ -178,14 +178,14 @@ async fn latest() -> Result<Found, String> {
     };
     let client = builder(&sources.feed)?.build().map_err(|e| e.to_string())?;
     // GitHub's pages are read without following their redirects: where `releases/latest` sends
-    // MDM is the answer (mdm_tools::github::latest_tag).
+    // ODM is the answer (odm_tools::github::latest_tag).
     let pages = |url: &str| {
         builder(url)?
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|e| e.to_string())
     };
-    let install = mdm_tools::update::Install::detect();
+    let install = odm_tools::update::Install::detect();
     fetch(&client, &pages, &sources, VERSION, install).await
 }
 
@@ -199,10 +199,10 @@ async fn fetch(
     pages: &(dyn Fn(&str) -> Result<reqwest::Client, String> + Sync),
     sources: &Sources,
     current: &str,
-    install: mdm_tools::update::Install,
+    install: odm_tools::update::Install,
 ) -> Result<Found, String> {
-    use mdm_tools::github::Api;
-    let body = match mdm_tools::github::api_get(client, &sources.feed).await {
+    use odm_tools::github::Api;
+    let body = match odm_tools::github::api_get(client, &sources.feed).await {
         Ok(Api::Answer(body)) => body,
         Ok(Api::RateLimited(refusal)) => {
             return match from_pages(pages, sources, current, install).await {
@@ -216,10 +216,10 @@ async fn fetch(
             };
         }
         // No release published yet: nothing newer than this.
-        Err(mdm_tools::Error::Http(e)) if e.status() == Some(reqwest::StatusCode::NOT_FOUND) => {
+        Err(odm_tools::Error::Http(e)) if e.status() == Some(reqwest::StatusCode::NOT_FOUND) => {
             return Ok(Found::Latest);
         }
-        Err(mdm_tools::Error::Http(e)) => return Err(e.to_string()),
+        Err(odm_tools::Error::Http(e)) => return Err(e.to_string()),
         Err(e) => return Err(e.to_string()),
     };
     parse_release(&String::from_utf8_lossy(&body), current)
@@ -234,9 +234,9 @@ async fn from_pages(
     pages: &(dyn Fn(&str) -> Result<reqwest::Client, String> + Sync),
     sources: &Sources,
     current: &str,
-    install: mdm_tools::update::Install,
+    install: odm_tools::update::Install,
 ) -> Result<Found, String> {
-    use mdm_tools::github;
+    use odm_tools::github;
     let client = pages(&github::latest_page(&sources.web, REPO_PATH))?;
     let tag = github::latest_tag(&client, &sources.web, REPO_PATH)
         .await
@@ -310,7 +310,7 @@ fn changelog_section(text: &str, version: &str) -> Option<(String, String)> {
 /// The version a release's tag names (`v0.5.2` → `0.5.2`), or why there is none.
 fn version_of(tag: &str) -> Result<&str, String> {
     let version = tag.trim().trim_start_matches(['v', 'V']);
-    // A number MDM can't read ("next", "1.x") would compare as 0 and pass for older: no answer
+    // A number ODM can't read ("next", "1.x") would compare as 0 and pass for older: no answer
     // is better than a wrong one.
     let numeric = version
         .split_once('-')
@@ -378,7 +378,7 @@ pub struct Updates {
     result: Option<Result<Found, String>>,
     /// Update now: the release file on its way (crate::update).
     job: Option<crate::update::Job>,
-    /// What Update now came to, when it didn't close MDM.
+    /// What Update now came to, when it didn't close ODM.
     status: Option<UpdateStatus>,
     /// Update now pressed by a test (`/show update-now`, feature `test-update`).
     press: bool,
@@ -420,7 +420,7 @@ impl Updates {
     }
 
     /// `weekly`: the automatic check (its switch is here, under the answer). `Done(true)`:
-    /// the update is going in place, MDM closes for it (and starts again).
+    /// the update is going in place, ODM closes for it (and starts again).
     pub fn show(
         &mut self,
         ctx: &egui::Context,
@@ -431,8 +431,8 @@ impl Updates {
             self.result = Some(r);
             self.slot = None;
         }
-        let install = mdm_tools::update::Install::detect();
-        // The release file arrived (checked) and is in place (on the job's thread): MDM closes
+        let install = odm_tools::update::Install::detect();
+        // The release file arrived (checked) and is in place (on the job's thread): ODM closes
         // once the new copy (or the installer) has started.
         if let Some(res) = self.job.as_ref().and_then(crate::update::Job::result) {
             self.job = None;
@@ -511,9 +511,9 @@ impl Updates {
                             "update-line",
                         );
                         // A package of another package manager (pacman, …): that one updates it.
-                        let have = if install == mdm_tools::update::Install::System {
+                        let have = if install == odm_tools::update::Install::System {
                             crate::i18n::fmt(
-                                // i18n: Check for updates, under the new version's line, when MDM was installed by the Linux system's package manager (pacman, ...), which MDM can't update itself
+                                // i18n: Check for updates, under the new version's line, when ODM was installed by the Linux system's package manager (pacman, ...), which ODM can't update itself
                                 crate::i18n::t(
                                     "You have version {version}, from your system's package manager: update it there.",
                                 ),
@@ -569,7 +569,7 @@ impl Updates {
                         .filter(|_| !matches!(self.status, Some(UpdateStatus::Failed(_))))
                 });
                 // Another package manager's copy: no Update now nor Download, the notes only.
-                let managed = install == mdm_tools::update::Install::System;
+                let managed = install == odm_tools::update::Install::System;
                 let close_label = if self.job.is_some() {
                     // i18n: button: stop downloading the update
                     crate::i18n::mark("Cancel")
@@ -667,7 +667,7 @@ impl Updates {
                         ui,
                         o + vec2(11.0, bottom + 4.0),
                         weekly,
-                        // i18n: check box in the update window: look for a new version every time MDM starts
+                        // i18n: check box in the update window: look for a new version every time ODM starts
                         "Check for updates at every start",
                         true,
                         Some(o.x + status_right),
@@ -826,8 +826,8 @@ impl About {
                 let p = ui.painter().clone();
                 let ink = winui::TEXT();
                 egui::Image::from_bytes(
-                    "bytes://mdm-48.png",
-                    include_bytes!("../assets/icons/app/mdm-48.png"),
+                    "bytes://odm-48.png",
+                    include_bytes!("../assets/icons/app/odm-48.png"),
                 )
                 .paint_at(ui, winui::r(o, 16.0, 16.0, 48.0, 48.0));
                 winui::text(
@@ -1353,7 +1353,7 @@ mod tests {
 
     #[test]
     fn the_check_reads_the_feed_and_fails_softly() {
-        use mdm_tools::update::Install;
+        use odm_tools::update::Install;
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -1406,7 +1406,7 @@ mod tests {
     /// check says GitHub refused too many requests from this network.
     #[test]
     fn a_rate_limited_check_reads_the_release_pages() {
-        use mdm_tools::update::{Arch, Install};
+        use odm_tools::update::{Arch, Install};
         let files = tempfile::tempdir().unwrap();
         let repo = files.path().join("gh").join(REPO_PATH);
         let release = repo.join("v9.9.9");
@@ -1429,7 +1429,7 @@ mod tests {
             .build()
             .unwrap();
         rt.block_on(async {
-            let lab = mdm_labserver::LabServer::start(mdm_labserver::Config {
+            let lab = odm_labserver::LabServer::start(odm_labserver::Config {
                 files: Some(files.path().to_owned()),
                 ..Default::default()
             })
@@ -1543,10 +1543,10 @@ mod tests {
                 .any(|s| form.contains(s.as_str()))
         };
         for install in [
-            mdm_tools::update::Install::Installer,
-            mdm_tools::update::Install::PortableZip,
-            mdm_tools::update::Install::PlainZip,
-            mdm_tools::update::Install::Source,
+            odm_tools::update::Install::Installer,
+            odm_tools::update::Install::PortableZip,
+            odm_tools::update::Install::PlainZip,
+            odm_tools::update::Install::Source,
         ] {
             assert!(named(install.label()), "{}", install.label());
         }
@@ -1573,10 +1573,10 @@ mod tests {
 
     /// Every user guide page linked by the app.
     fn linked_docs() -> Vec<String> {
-        let mut docs = vec![mdm_ipc::extension::GUIDE_DOC.to_owned()];
+        let mut docs = vec![odm_ipc::extension::GUIDE_DOC.to_owned()];
         // The sections Options' Test browser integration opens (extension::checks' reasons).
         for why in ["options", "not-installed"] {
-            docs.push(mdm_ipc::extension::help_doc(why));
+            docs.push(odm_ipc::extension::help_doc(why));
         }
         let calls = regex::Regex::new(r#"(?:open_page|HelpPage)\(\s*"([^"]+)""#).unwrap();
         let site = regex::Regex::new(r"https://github\.com/mthlpbs/Orbit-Download-Manager/blob/main/docs/([\w.-]+\.md)(#[\w-]+)?")

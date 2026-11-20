@@ -185,7 +185,7 @@ pub(crate) fn unnamed_tracks(codes: impl IntoIterator<Item = String>) -> Vec<Tra
 
 /// The size of `duration` seconds at `tbr` kbit/s (kbit/s × 125 = bytes/s), as yt-dlp's
 /// `filesize_from_tbr` reckons it: the same operations in the same order, so a stream's variants
-/// come out the same whether yt-dlp listed them or MDM read the stream itself
+/// come out the same whether yt-dlp listed them or ODM read the stream itself
 /// (`crate::manifest`).
 pub(crate) fn estimate(duration: f64, tbr: f64) -> u64 {
     (duration * tbr * 125.0) as u64
@@ -247,8 +247,8 @@ pub fn named_after_address(title: &str, page: &str) -> bool {
 /// yt-dlp's `-J` answer with the real type of a file a server's program sends (#695): yt-dlp
 /// takes a plain file's extension from its address (`stream.php?file=x.mp4` → `php`), lists it
 /// so ("PHP") and then refuses to save it ("The extracted extension (php) is unusual and will
-/// be skipped for safety reasons"). Such a format's extension is the one MDM names the file with
-/// (`mdm_engine::naming`): its address's `file=` value's, else the server's type, which yt-dlp
+/// be skipped for safety reasons"). Such a format's extension is the one ODM names the file with
+/// (`odm_engine::naming`): its address's `file=` value's, else the server's type, which yt-dlp
 /// gives a plain file as its format id (`video/mp4` → `mp4`). The answer is given as it came
 /// when nothing in it is such a format, or it isn't JSON.
 pub fn typed_scripts(json: Vec<u8>) -> Vec<u8> {
@@ -272,7 +272,7 @@ pub fn typed_scripts(json: Vec<u8>) -> Vec<u8> {
 /// [`typed_scripts`] for one format (or the chosen one's fields at the top): true when its
 /// extension, a program's or a page's, became its file's type's.
 fn retype(f: &mut serde_json::Value) -> bool {
-    use mdm_engine::naming;
+    use odm_engine::naming;
     let Some(ext) = f.get("ext").and_then(serde_json::Value::as_str) else {
         return false;
     };
@@ -581,7 +581,7 @@ pub const MP3: &str = "mp3:";
 pub const MP3_RATES: [u32; 4] = [320, 256, 192, 128];
 
 /// yt-dlp's `--audio-quality` for an MP3 choice's `<kbps>` (`MP3`): `0` (the best variable
-/// bitrate) or a bitrate MDM offers, written exactly (`192`, not `+192` or `0192`); none for
+/// bitrate) or a bitrate ODM offers, written exactly (`192`, not `+192` or `0192`); none for
 /// anything else.
 pub fn mp3_quality(selector: &str) -> Option<String> {
     let kbps = selector.strip_prefix(MP3)?;
@@ -1649,7 +1649,7 @@ mod tests {
         assert_eq!(plain[0].selector, "18/b[height=360]");
     }
 
-    /// Live (#352): `MDM_LIVE_YTDLP=<yt-dlp> MDM_LIVE_PAGE=<video page> cargo test -p mdm-tools
+    /// Live (#352): `ODM_LIVE_YTDLP=<yt-dlp> ODM_LIVE_PAGE=<video page> cargo test -p odm-tools
     /// live_look_up -- --ignored --nocapture`. A look-up given cookies; with a yt-dlp that fails
     /// the way a signed-in session does (a wrapper forcing `web_embedded,tv_samsung,web` when it
     /// sees `--cookies`), the second look-up, without them, lists the page's videos.
@@ -1657,8 +1657,8 @@ mod tests {
     #[ignore]
     fn live_look_up_with_cookies() {
         let exe =
-            std::path::PathBuf::from(std::env::var("MDM_LIVE_YTDLP").expect("MDM_LIVE_YTDLP"));
-        let page = std::env::var("MDM_LIVE_PAGE").expect("MDM_LIVE_PAGE");
+            std::path::PathBuf::from(std::env::var("ODM_LIVE_YTDLP").expect("ODM_LIVE_YTDLP"));
+        let page = std::env::var("ODM_LIVE_PAGE").expect("ODM_LIVE_PAGE");
         let browser = proc::FromBrowser {
             cookies: Some("YSC=test".into()),
             ..Default::default()

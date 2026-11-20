@@ -1,5 +1,5 @@
 //! The MCP server end to end: the real program over stdio, as an assistant starts it, against a
-//! stand-in for the app that listens and answers as the app's channel does (mdm_ipc).
+//! stand-in for the app that listens and answers as the app's channel does (odm_ipc).
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
@@ -64,7 +64,7 @@ struct Mcp {
 impl Mcp {
     fn start(data: &std::path::Path) -> Self {
         let mut child = Command::new(env!("CARGO_BIN_EXE_orbitdownloadmanager-mcp"))
-            .env("MDM_DATA_DIR", data)
+            .env("ODM_DATA_DIR", data)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()
@@ -212,7 +212,7 @@ fn an_assistant_lists_adds_and_acts_through_the_app() {
     let (text, err) = mcp.call("stop_queue", json!({ "queue": "Night" }));
     assert!(!err && text.contains(r#"queue "Night""#), "{text}");
 
-    // What reached the app: the fields its channel reads (mdm_ipc::Command), with the token.
+    // What reached the app: the fields its channel reads (odm_ipc::Command), with the token.
     let seen = seen.lock().unwrap();
     let add = seen
         .iter()

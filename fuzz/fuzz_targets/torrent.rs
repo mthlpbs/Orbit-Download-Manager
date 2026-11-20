@@ -1,14 +1,14 @@
-//! A .torrent file (from a page, a folder MDM watches, or the remote control) and a magnet link:
-//! its file list and names checked (`mdm_torrent::files_from_bytes`), its magnet link, and its
-//! trackers read, filtered and added to (`mdm_torrent::trackers`), which rewrite the file around
+//! A .torrent file (from a page, a folder ODM watches, or the remote control) and a magnet link:
+//! its file list and names checked (`odm_torrent::files_from_bytes`), its magnet link, and its
+//! trackers read, filtered and added to (`odm_torrent::trackers`), which rewrite the file around
 //! its info dictionary.
 #![no_main]
 
 use std::path::Component;
 
 use libfuzzer_sys::fuzz_target;
-use mdm_torrent::librqbit;
-use mdm_torrent::trackers;
+use odm_torrent::librqbit;
+use odm_torrent::trackers;
 
 fn info_hash(bytes: &[u8]) -> Option<String> {
     librqbit::torrent_from_bytes(bytes)
@@ -18,8 +18,8 @@ fn info_hash(bytes: &[u8]) -> Option<String> {
 
 fuzz_target!(|data: &[u8]| {
     let text = String::from_utf8_lossy(data);
-    if let Some(source) = mdm_torrent::Source::magnet(&text) {
-        let mdm_torrent::Source::Magnet(link) = source else {
+    if let Some(source) = odm_torrent::Source::magnet(&text) {
+        let odm_torrent::Source::Magnet(link) = source else {
             unreachable!()
         };
         let kept = trackers::in_magnet(&link);
@@ -32,7 +32,7 @@ fuzz_target!(|data: &[u8]| {
         }
     }
 
-    if let Ok(files) = mdm_torrent::files_from_bytes(data) {
+    if let Ok(files) = odm_torrent::files_from_bytes(data) {
         // Every name a torrent may write was checked: each path is relative, of plain names
         // (padding files are never written).
         for f in files.iter().filter(|f| !f.padding) {
@@ -46,7 +46,7 @@ fuzz_target!(|data: &[u8]| {
             }
         }
     }
-    let _ = mdm_torrent::magnet_link(data);
+    let _ = odm_torrent::magnet_link(data);
 
     let hash = info_hash(data);
     let listed = trackers::listed(data);

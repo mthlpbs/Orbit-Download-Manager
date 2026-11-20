@@ -45,7 +45,7 @@ for (const kind of ["chromium", "chrome-store", "firefox"]) {
   }
   if (kind === "firefox") assert.equal(m.browser_specific_settings.gecko.id, firefoxId);
 }
-for (const zip of ["mdm-chromium.zip", "mdm-firefox.xpi", "mdm-chrome-store.zip"]) {
+for (const zip of ["odm-chromium.zip", "odm-firefox.xpi", "odm-chrome-store.zip"]) {
   assert.ok(existsSync(new URL(zip, out)), zip);
 }
 console.log(`packages ok (version ${version}, unpacked ID ${unpackedId})`);

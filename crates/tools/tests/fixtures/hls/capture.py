@@ -1,7 +1,7 @@
 """Makes the HLS parity corpus again (crates/tools/src/manifest.rs, `streams_are_read_as_yt_dlp_lists_them`):
 yt-dlp's own answers for streams served on this computer only. See README.md beside it.
 
-    cargo run -p mdm-labserver -- --bind 127.0.0.1:8093
+    cargo run -p odm-labserver -- --bind 127.0.0.1:8093
     python -I capture.py --ytdlp <yt-dlp 2026.10.26> [--out DIR]
 
 For each case it serves the stream (the lab server's, or one of STREAMS below on 127.0.0.1:8094),
@@ -199,7 +199,7 @@ def get(url, method='GET'):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--ytdlp', required=True, help='yt-dlp ' + YTDLP_VERSION)
-    ap.add_argument('--lab', default='http://127.0.0.1:8093', help='the lab server (mdm-labserver)')
+    ap.add_argument('--lab', default='http://127.0.0.1:8093', help='the lab server (odm-labserver)')
     ap.add_argument('--port', type=int, default=8094, help="the corpus's own streams' port")
     ap.add_argument('--out', default=os.path.dirname(os.path.abspath(__file__)))
     a = ap.parse_args()

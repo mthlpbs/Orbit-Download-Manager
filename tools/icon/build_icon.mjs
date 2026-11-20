@@ -11,17 +11,14 @@ const pngs = new Map();
 for (const size of sizes) {
   const png = new Resvg(svg, { fitTo: { mode: 'width', value: size } }).render().asPng();
   pngs.set(size, png);
-  await writeFile(new URL(`crates/app/assets/icons/app/mdm-${size}.png`, root), png);
+  await writeFile(new URL(`crates/app/assets/icons/app/odm-${size}.png`, root), png);
   if ([16, 32, 48, 128].includes(size)) {
     await writeFile(new URL(`extension/icons/icon-${size}.png`, root), png);
   }
 }
-await writeFile(new URL('crates/app/assets/icons/app/mdm.ico', root), await pngToIco([...pngs.values()]));
+await writeFile(new URL('crates/app/assets/icons/app/odm.ico', root), await pngToIco([...pngs.values()]));
 await writeFile(new URL('docs/images/logo.png', root), pngs.get(256));
 await writeFile(new URL('art/Orbit Download Manager.png', root),
   new Resvg(svg, { fitTo: { mode: 'width', value: 1024 } }).render().asPng());
-const videoUrl = new URL('extension/video.js', root);
-const video = await readFile(videoUrl, 'utf8');
-await writeFile(videoUrl, video.replace(/const LOGO = "data:image\/png;base64,[^"]*";/,
-  `const LOGO = "data:image/png;base64,${pngs.get(48).toString('base64')}";`));
+await import('./build_overlay_icons.mjs');
 console.log('Built Orbit app, installer, browser extension and README icons.');

@@ -3,7 +3,7 @@
 The list in `shots.toml` drives every picture in `docs/images/help/`. On Windows, run:
 
 ```powershell
-cargo build --release -p mdm-app -p mdm-labserver
+cargo build --release -p odm-app -p odm-labserver
 python tools/shots/make.py
 python tools/shots/make.py check
 ```

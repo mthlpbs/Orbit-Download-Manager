@@ -2,25 +2,25 @@
 //! a hidden welcome video in its HTML (`/gen/1M/welcome.mp4`) and declares another as its own
 //! (`/gen/2M/film.mp4`, "The Film") in its JSON-LD, its `og:video` or its `twitter:player`.
 //!
-//! The page's reading (MDM's engine, as the look-up reads it) runs with `cargo test`. The look-up
+//! The page's reading (ODM's engine, as the look-up reads it) runs with `cargo test`. The look-up
 //! and the download through the real yt-dlp are ignored: they need yt-dlp's program.
 //!
-//!   MDM_TEST_YTDLP=…\yt-dlp.exe cargo test -p mdm-tools --test declared -- --ignored --nocapture
+//!   ODM_TEST_YTDLP=…\yt-dlp.exe cargo test -p odm-tools --test declared -- --ignored --nocapture
 
 use std::time::{Duration, Instant};
 
-use mdm_labserver::{Config, LabServer};
-use mdm_tools::declared::{self, Declared};
-use mdm_tools::proc::FromBrowser;
-use mdm_tools::resolve::Looked;
-use mdm_tools::video::{State, Subs, VideoJob};
+use odm_labserver::{Config, LabServer};
+use odm_tools::declared::{self, Declared};
+use odm_tools::proc::FromBrowser;
+use odm_tools::resolve::Looked;
+use odm_tools::video::{State, Subs, VideoJob};
 
-/// What MDM's engine reads `page` declaring, as [`declared::look_up`] reads it.
+/// What ODM's engine reads `page` declaring, as [`declared::look_up`] reads it.
 fn read(rt: &tokio::runtime::Runtime, page: &str) -> Option<Declared> {
     let url = reqwest::Url::parse(page).unwrap();
-    let opts = mdm_engine::Options::default();
+    let opts = odm_engine::Options::default();
     let (at, videos) = rt
-        .block_on(mdm_engine::page_videos(url, Default::default(), &opts))
+        .block_on(odm_engine::page_videos(url, Default::default(), &opts))
         .unwrap();
     declared::chosen(&videos, &at)
 }
@@ -50,7 +50,7 @@ fn look_up(
     rt: &tokio::runtime::Runtime,
     page: &str,
 ) -> (Looked, Option<Declared>) {
-    let reader = mdm_tools::streams::Engine {
+    let reader = odm_tools::streams::Engine {
         handle: rt.handle().clone(),
         opts: Default::default(),
     };
@@ -73,7 +73,7 @@ fn video(looked: &Looked) -> (String, Vec<String>) {
 #[test]
 #[ignore]
 fn the_declared_video_is_looked_up_and_downloaded() {
-    let exe = std::path::PathBuf::from(std::env::var("MDM_TEST_YTDLP").expect("MDM_TEST_YTDLP"));
+    let exe = std::path::PathBuf::from(std::env::var("ODM_TEST_YTDLP").expect("ODM_TEST_YTDLP"));
     let rt = tokio::runtime::Runtime::new().unwrap();
     let lab = rt.block_on(LabServer::start(Config::default())).unwrap();
     // The film is served only with the page as its Referer, as an embed-only video is.
@@ -85,7 +85,7 @@ fn the_declared_video_is_looked_up_and_downloaded() {
     let page = lab.url(&format!("/declared?film={}", urlencode(&film)));
 
     // Before: yt-dlp alone takes the hidden welcome video.
-    let alone = mdm_tools::resolve::look_up(&exe, &page, &FromBrowser::default()).unwrap();
+    let alone = odm_tools::resolve::look_up(&exe, &page, &FromBrowser::default()).unwrap();
     println!("yt-dlp alone: {:?}", video(&alone));
 
     let at = lab.log().len();
@@ -114,7 +114,7 @@ fn the_declared_video_is_looked_up_and_downloaded() {
 
     // The download, as the app starts it: the declared address, the page as its Referer.
     let dir = tempfile::tempdir().unwrap();
-    let engine = mdm_tools::streams::Engine {
+    let engine = odm_tools::streams::Engine {
         handle: rt.handle().clone(),
         opts: Default::default(),
     };

@@ -35,7 +35,7 @@ themed! {
     /// Light: the one grid colour, 1 px lines (light-main.md).
     GRID_H => list_grid;
     GRID_V_RIGHT => list_grid;
-    /// Selected row (list focused): Windows' accent, as every list's (one blue across MDM), with
+    /// Selected row (list focused): Windows' accent, as every list's (one blue across ODM), with
     /// white text and a dotted focus outline in its inverse, #ff9933.
     SELECTED => selection;
     TEXT => text;
@@ -96,7 +96,7 @@ pub fn status_width(code: &str, full: &str, measure: impl Fn(&str) -> f32) -> f3
 
 /// What the Status cell says at its widest while a file is checked or a video joined, in
 /// language `code` (`crate::model::checking` and `merging`): the word with 100 % (as `full`, and
-/// as English writes it) and with "..." before MDM knows how far.
+/// as English writes it) and with "..." before ODM knows how far.
 pub fn finishing_texts(code: &str, full: &str) -> Vec<String> {
     let i18n = crate::i18n::i18n();
     let Some(lang) = i18n.from_code(code) else {

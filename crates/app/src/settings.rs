@@ -1,7 +1,7 @@
 //! App settings, saved with the download list (store.rs). Defaults are IDM 6.42's
 //! (notes/ui-spec/options-dialog.md, scheduler-and-misc.md).
 
-use mdm_ipc::capture::host_matches;
+use odm_ipc::capture::host_matches;
 use serde::{Deserialize, Serialize};
 
 /// View → Window system's choice (Linux, #624), as saved in the settings.
@@ -20,12 +20,12 @@ pub enum WindowSystemPick {
 pub struct DebridAccount {
     /// Stable, for the order and for errors that name the account.
     pub id: u64,
-    pub service: mdm_debrid::ServiceKind,
+    pub service: odm_debrid::ServiceKind,
     pub enabled: bool,
     /// The account's name at the service, and its state as last read ("premium, 143 days").
     pub user: String,
     pub state: String,
-    /// The credential's JSON (`mdm_debrid::Credential`); on disk its keychain reference, or sealed
+    /// The credential's JSON (`odm_debrid::Credential`); on disk its keychain reference, or sealed
     /// (`sealed`, secrets.rs). Never shown, logged or sent anywhere but the service.
     #[serde(with = "sealed")]
     pub secret: String,
@@ -56,11 +56,11 @@ impl std::fmt::Debug for DebridAccount {
 }
 
 impl DebridAccount {
-    /// For `mdm_debrid`: None when its secret can't be read (signed out, or sealed for another
+    /// For `odm_debrid`: None when its secret can't be read (signed out, or sealed for another
     /// Windows account).
-    pub fn account(&self) -> Option<mdm_debrid::Account> {
+    pub fn account(&self) -> Option<odm_debrid::Account> {
         let credential = serde_json::from_str(&self.secret).ok()?;
-        Some(mdm_debrid::Account {
+        Some(odm_debrid::Account {
             id: self.id,
             service: self.service,
             credential,
@@ -90,7 +90,7 @@ pub struct Settings {
     /// Show the "Download complete" dialog (Options → Downloads).
     pub show_complete: bool,
     /// Download complete snoozed until then (unix seconds; its window's Snooze menu, #741):
-    /// `show_complete` stays as it is. A snooze until MDM restarts is not saved.
+    /// `show_complete` stays as it is. A snooze until ODM restarts is not saved.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub complete_snoozed_until: Option<i64>,
     /// List right-click → On Double click: Open (true) or Properties (IDM default).
@@ -115,18 +115,18 @@ pub struct Settings {
     /// View → Dark Mode support (IDM 6.37): follow Windows' dark app mode; off = always light.
     pub dark_mode_support: bool,
     /// View → Always dark (#60): dark whatever the system says (a desktop that reports no
-    /// preference, or a dark MDM on a light desktop).
+    /// preference, or a dark ODM on a light desktop).
     pub always_dark: bool,
     /// The look (#45): a built-in theme's id ("classic", the default) or a theme file's name in
     /// the data folder's `themes` folder (crate::themefile).
     pub theme: String,
     /// View → Draw with (#89): OpenGL or Direct3D (Windows only), used from the next start.
-    /// None: MDM's default (`renderer::DEFAULT`), which may change.
+    /// None: ODM's default (`renderer::DEFAULT`), which may change.
     pub renderer: Option<crate::renderer::Api>,
     /// View → Window system (Linux, in a Wayland session that also runs XWayland, #624): X11
-    /// (XWayland) or Wayland, used from the next start, however MDM is started (its menu entry,
-    /// the browser's helper, the session's autostart). None: MDM decides at each start
-    /// (`unix::window_system`). `MDM_WAYLAND=1` or `0` overrides it for one start.
+    /// (XWayland) or Wayland, used from the next start, however ODM is started (its menu entry,
+    /// the browser's helper, the session's autostart). None: ODM decides at each start
+    /// (`unix::window_system`). `ODM_WAYLAND=1` or `0` overrides it for one start.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window_system: Option<WindowSystemPick>,
     /// View → Interface size (#262), percent: one of `crate::scale::STEPS` (100 to 200). Every
@@ -158,14 +158,14 @@ pub struct Settings {
     pub clipboard_autostart: bool,
     /// General: Minimize hides the main window, and a download's progress window, to the
     /// notification area, as closing the main window does (#63). On by default (the
-    /// maintainer's choice), for existing lists too. Only where a tray shows MDM's icon.
+    /// maintainer's choice), for existing lists too. Only where a tray shows ODM's icon.
     pub minimize_to_tray: bool,
-    /// General: closing the main window keeps MDM running, hidden in the notification area (else
+    /// General: closing the main window keeps ODM running, hidden in the notification area (else
     /// closing quits). On by default, for existing lists too, in every copy. Only where a tray
-    /// shows MDM's icon.
+    /// shows ODM's icon.
     pub close_to_tray: bool,
     /// General: a private (incognito) window's downloads are written to the saved list like any
-    /// other, so they survive MDM closing or restarting (their cookies stay in memory, as every
+    /// other, so they survive ODM closing or restarting (their cookies stay in memory, as every
     /// download's do). Off by default: they live in memory only, as the browser keeps them.
     pub keep_private_downloads: bool,
     /// General (#558): global keyboard shortcut to show or hide the main window (e.g. `Cmd+U`,
@@ -182,7 +182,7 @@ pub struct Settings {
     pub excluded_sites: String,
     pub excluded_addresses: Vec<String>,
     /// General → Download panels: the download button over videos in the browsers, and the
-    /// sites it stays off (space separated; the native host reads both, mdm_ipc::capture).
+    /// sites it stays off (space separated; the native host reads both, odm_ipc::capture).
     pub video_panel: bool,
     pub video_panel_sites: String,
     /// General → Download panels → Button size (#1278): Compact shows the button as its round
@@ -221,9 +221,9 @@ pub struct Settings {
     /// 3 complete → show the complete dialog, else resume.
     pub duplicate_action: u8,
     /// "User-Agent for manually added downloads": the user's, or empty for the automatic one
-    /// (the default browser's, #668: `mdm_engine::agent::automatic`). Saved before #668 as
+    /// (the default browser's, #668: `odm_engine::agent::automatic`). Saved before #668 as
     /// Internet Explorer 11's, the default then: read as empty (`own_user_agent`), which an older
-    /// MDM reads as its default again.
+    /// ODM reads as its default again.
     #[serde(deserialize_with = "automatic_agent")]
     pub user_agent: String,
     /// Connection: per-server connection limits (server, number).
@@ -247,7 +247,7 @@ pub struct Settings {
     pub proxy_ftp: bool,
     /// Connection → DNS (#36): 0 the system's, 1 plain DNS, 2 DNS over TLS, 3 DNS over HTTPS.
     pub dns_mode: u8,
-    /// A service of `mdm_engine::dns::PRESETS` by id, or "custom".
+    /// A service of `odm_engine::dns::PRESETS` by id, or "custom".
     pub dns_provider: String,
     /// Custom: the servers (plain, TLS) or the DoH server's addresses (optional), as typed.
     pub dns_servers: String,
@@ -290,16 +290,16 @@ pub struct Settings {
     /// Its port.
     pub remote_port: u16,
     /// Where it listens: "" every local network address, `127.0.0.1` this computer only, or
-    /// one address (`mdm_remote::addrs::chosen`).
+    /// one address (`odm_remote::addrs::chosen`).
     pub remote_listen: String,
     /// Torrents keep sharing after they finish (D-018: off; a finished torrent stops, like any
     /// download).
     pub torrent_keep_sharing: bool,
     /// Torrent settings' "Open magnet links and .torrent files with Orbit Download Manager":
-    /// the system opens them with MDM (D-018: opt-in, current user), and the browser hands a
+    /// the system opens them with ODM (D-018: opt-in, current user), and the browser hands a
     /// .torrent download over (#1058: off, it stays with the browser for the user's own torrent
     /// client). None: never decided, settled once at the first start (`settle_torrent_handler`)
-    /// and saved. Saved as `torrent_handler`, which mdm_ipc::capture::CaptureRules reads (None
+    /// and saved. Saved as `torrent_handler`, which odm_ipc::capture::CaptureRules reads (None
     /// there: taken, as before): every list before #1058 saved `torrent_associations: false`,
     /// unticked and never looked at alike.
     #[serde(rename = "torrent_handler")]
@@ -352,7 +352,7 @@ pub struct Settings {
     pub drop_target_pos: Option<(i32, i32)>,
     /// Download video from a page: the subtitles last chosen (#68), offered again for the
     /// next video when it has that language (none at first).
-    pub video_subs: mdm_tools::video::Subs,
+    pub video_subs: odm_tools::video::Subs,
     /// Download video from a page → Embed chapters (#827): a video's chapters go into its file
     /// (with ffmpeg). On; a settings file from before has none: on.
     pub video_chapters: bool,
@@ -385,9 +385,9 @@ pub struct Settings {
     pub cnl_sites: Vec<(String, bool)>,
 }
 
-/// Options → File types defaults (IDM 6.42), shared with the browser host (mdm_ipc::capture).
-pub use mdm_ipc::capture::{DEFAULT_AUTO_TYPES, DEFAULT_EXCLUDED_SITES};
-/// The browsers IDM 6.42 lists, plus Firefox's forks MDM tells apart (#41; capture::browser_named),
+/// Options → File types defaults (IDM 6.42), shared with the browser host (odm_ipc::capture).
+pub use odm_ipc::capture::{DEFAULT_AUTO_TYPES, DEFAULT_EXCLUDED_SITES};
+/// The browsers IDM 6.42 lists, plus Firefox's forks ODM tells apart (#41; capture::browser_named),
 /// all captured on.
 pub const BROWSERS: [&str; 12] = [
     "Apple Safari",          // not translated: a product name
@@ -513,7 +513,7 @@ impl Default for Settings {
             sounds: Default::default(),
             automation_api: false,
             remote_on: false,
-            remote_port: mdm_remote::PORT,
+            remote_port: odm_remote::PORT,
             remote_listen: String::new(),
             torrent_keep_sharing: false,
             torrent_associations: None,
@@ -662,12 +662,12 @@ impl Settings {
         self.archive_passwords = list.join("\n");
     }
 
-    /// Options → Archives' folder choice, for mdm-extract.
-    pub fn extract_into(&self) -> mdm_extract::Subfolder {
+    /// Options → Archives' folder choice, for odm-extract.
+    pub fn extract_into(&self) -> odm_extract::Subfolder {
         match self.extract_subfolder {
-            1 => mdm_extract::Subfolder::Always,
-            2 => mdm_extract::Subfolder::Never,
-            _ => mdm_extract::Subfolder::Smart,
+            1 => odm_extract::Subfolder::Always,
+            2 => odm_extract::Subfolder::Never,
+            _ => odm_extract::Subfolder::Smart,
         }
     }
 }
@@ -706,11 +706,11 @@ pub fn remember(list: &mut Vec<String>, value: &str) {
     list.truncate(HISTORY);
 }
 
-/// A saved "User-Agent for manually added downloads": MDM's former default (Internet Explorer
+/// A saved "User-Agent for manually added downloads": ODM's former default (Internet Explorer
 /// 11's, before #668) or nothing is the automatic one (empty).
 fn automatic_agent<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::Error> {
     let saved = String::deserialize(d)?;
-    Ok(if saved.trim() == mdm_engine::agent::IE11_USER_AGENT {
+    Ok(if saved.trim() == odm_engine::agent::IE11_USER_AGENT {
         String::new()
     } else {
         saved
@@ -722,7 +722,7 @@ impl Settings {
     /// default browser's, #668).
     pub fn own_user_agent(&self) -> Option<&str> {
         let ua = self.user_agent.trim();
-        (!ua.is_empty() && ua != mdm_engine::agent::IE11_USER_AGENT).then_some(ua)
+        (!ua.is_empty() && ua != odm_engine::agent::IE11_USER_AGENT).then_some(ua)
     }
 
     /// `live` with the settings a dialog changed (`from` → `to`) put in, field by field: what
@@ -778,7 +778,7 @@ impl Settings {
     /// The torrent engine as Torrent settings say (#40), its data in `state_dir`. None when they
     /// say to use the proxy and Proxy / Socks has no SOCKS5 one: torrents then don't start, never
     /// going around the proxy unasked.
-    pub fn torrent_config(&self, state_dir: std::path::PathBuf) -> Option<mdm_torrent::Config> {
+    pub fn torrent_config(&self, state_dir: std::path::PathBuf) -> Option<odm_torrent::Config> {
         let proxy = match (self.torrent_proxy, self.socks5_proxy()) {
             (true, None) => return None,
             (true, proxy) => proxy,
@@ -786,7 +786,7 @@ impl Settings {
         };
         let blocklist = (!self.torrent_blocklist.trim().is_empty())
             .then(|| state_dir.join(crate::torrents::BLOCKLIST_FILE));
-        Some(mdm_torrent::Config {
+        Some(odm_torrent::Config {
             listen: self.torrent_incoming,
             upnp: self.torrent_upnp,
             port: (self.torrent_port != 0).then_some(self.torrent_port),
@@ -797,12 +797,12 @@ impl Settings {
             blocklist,
             // The chosen network adapter (#35, #143); the session takes it again when it starts.
             bind: crate::torrents::route_bind(&own_route()).ok().flatten(),
-            ..mdm_torrent::Config::new(state_dir)
+            ..odm_torrent::Config::new(state_dir)
         })
     }
 
-    pub fn proxy(&self) -> mdm_engine::Proxy {
-        use mdm_engine::Proxy;
+    pub fn proxy(&self) -> odm_engine::Proxy {
+        use odm_engine::Proxy;
         match self.proxy_mode {
             1 => Proxy::System,
             2 => crate::pacfetch::script(&self.proxy_script)
@@ -837,8 +837,8 @@ impl Settings {
     /// one for it (a VPN or proxy extension, or its settings) and "Use proxy/socks from a
     /// browser's request" is on; else [`Self::proxy`]. A proxy the extension logs in to is
     /// refused (`browser_proxy_refused`), never replaced by a direct connection.
-    pub fn proxy_for(&self, context: &mdm_ipc::Command) -> mdm_engine::Proxy {
-        use mdm_engine::Proxy;
+    pub fn proxy_for(&self, context: &odm_ipc::Command) -> odm_engine::Proxy {
+        use odm_engine::Proxy;
         if self.proxy_from_browser {
             if let Some(url) = &context.proxy {
                 return Proxy::Manual {
@@ -858,11 +858,11 @@ impl Settings {
     }
 
     /// Why a download from the browser can't start (#42): its proxy asks for a login that the
-    /// VPN or proxy extension gives, which MDM can't have. Going around it would show the
+    /// VPN or proxy extension gives, which ODM can't have. Going around it would show the
     /// user's own address, so the download stops and says so.
-    pub fn browser_proxy_refused(&self, context: &mdm_ipc::Command) -> Option<String> {
+    pub fn browser_proxy_refused(&self, context: &odm_ipc::Command) -> Option<String> {
         (self.proxy_from_browser && context.proxy_login).then(|| {
-            // i18n: an error: the browser's VPN or proxy extension logs in to its proxy itself, and MDM can't; Options → Proxy / Socks → Network adapter is where an adapter can be chosen
+            // i18n: an error: the browser's VPN or proxy extension logs in to its proxy itself, and ODM can't; Options → Proxy / Socks → Network adapter is where an adapter can be chosen
             crate::i18n::t(
                 "the browser's proxy (a VPN or proxy extension) asks for a login only that extension has: use the VPN's own app, or choose its network adapter in Options → Proxy / Socks",
             )
@@ -872,7 +872,7 @@ impl Settings {
 
     /// Options → Connection → DNS for the engine. A setting that can't work (no server typed,
     /// an address that isn't one) gives the system's DNS; Options won't take one with OK.
-    pub fn dns(&self) -> mdm_engine::DnsChoice {
+    pub fn dns(&self) -> odm_engine::DnsChoice {
         dns_choice(
             self.dns_mode,
             &self.dns_provider,
@@ -889,9 +889,9 @@ impl Settings {
     /// allowed.
     pub fn connection_limit(&self) -> u32 {
         if self.many_connections {
-            mdm_engine::download::MAX_CONNECTIONS_UNLOCKED
+            odm_engine::download::MAX_CONNECTIONS_UNLOCKED
         } else {
-            mdm_engine::download::MAX_CONNECTIONS
+            odm_engine::download::MAX_CONNECTIONS
         }
     }
 
@@ -926,9 +926,9 @@ impl Settings {
     }
 
     /// Should a copied link named `name` be offered? Fewer types than a browser hands over
-    /// (`mdm_ipc::capture::clipboard_type`).
+    /// (`odm_ipc::capture::clipboard_type`).
     pub fn clipboard_type(&self, name: &str) -> bool {
-        mdm_ipc::capture::clipboard_type(&self.auto_types, name)
+        odm_ipc::capture::clipboard_type(&self.auto_types, name)
     }
 
     /// Set (or forget, with `None`) the category's own folder.
@@ -999,8 +999,8 @@ impl Settings {
 }
 
 /// DNS mode numbers (`Settings::dns_mode`) as the engine's.
-pub fn dns_mode(n: u8) -> Option<mdm_engine::dns::Mode> {
-    use mdm_engine::dns::Mode;
+pub fn dns_mode(n: u8) -> Option<odm_engine::dns::Mode> {
+    use odm_engine::dns::Mode;
     match n {
         1 => Some(Mode::Plain),
         2 => Some(Mode::Tls),
@@ -1018,10 +1018,10 @@ pub fn dns_choice(
     doh_url: &str,
     nextdns_id: &str,
     fallback: bool,
-) -> Result<mdm_engine::DnsChoice, String> {
-    use mdm_engine::dns::{Dns, Mode, Preset, parse_servers, valid_nextdns_profile};
+) -> Result<odm_engine::DnsChoice, String> {
+    use odm_engine::dns::{Dns, Mode, Preset, parse_servers, valid_nextdns_profile};
     let Some(m) = dns_mode(mode) else {
-        return Ok(mdm_engine::DnsChoice::default());
+        return Ok(odm_engine::DnsChoice::default());
     };
     let how = match m {
         // i18n: a way of asking a DNS, in its name in messages: "Cloudflare (plain DNS)"
@@ -1100,24 +1100,24 @@ pub fn dns_choice(
             }
         }
     };
-    Ok(mdm_engine::DnsChoice {
+    Ok(odm_engine::DnsChoice {
         dns,
         fallback,
         label,
     })
 }
 
-/// The proxy MDM's own downloads go through (its helpers, its updates, a crash report's
+/// The proxy ODM's own downloads go through (its helpers, its updates, a crash report's
 /// symbols): Options → Proxy / Socks, kept in step by the app ([`share_proxy`]); Windows' own
 /// settings in a process without them (the crash monitor).
-static OWN_PROXY: std::sync::RwLock<Option<mdm_engine::Proxy>> = std::sync::RwLock::new(None);
+static OWN_PROXY: std::sync::RwLock<Option<odm_engine::Proxy>> = std::sync::RwLock::new(None);
 /// The same for Options → Connection → DNS ([`share_dns`]).
-static OWN_DNS: std::sync::RwLock<Option<mdm_engine::DnsChoice>> = std::sync::RwLock::new(None);
+static OWN_DNS: std::sync::RwLock<Option<odm_engine::DnsChoice>> = std::sync::RwLock::new(None);
 
 /// Keep [`own_net`] on the settings' proxy (cheap when it didn't change).
-pub fn share_proxy(proxy: mdm_engine::Proxy) {
+pub fn share_proxy(proxy: odm_engine::Proxy) {
     // yt-dlp and gallery-dl go through it too (#363).
-    mdm_tools::proc::set_proxy(proxy.clone());
+    odm_tools::proc::set_proxy(proxy.clone());
     if OWN_PROXY.read().unwrap().as_ref() != Some(&proxy) {
         *OWN_PROXY.write().unwrap() = Some(proxy);
     }
@@ -1126,57 +1126,57 @@ pub fn share_proxy(proxy: mdm_engine::Proxy) {
 /// Keep [`own_net`] on the settings' DNS (cheap when it didn't change), and the helpers' relay
 /// (#35: the servers of video pages and galleries are looked up with it while an adapter is
 /// chosen).
-pub fn share_dns(dns: mdm_engine::DnsChoice) {
+pub fn share_dns(dns: odm_engine::DnsChoice) {
     if OWN_DNS.read().unwrap().as_ref() != Some(&dns) {
         *OWN_DNS.write().unwrap() = Some(dns.clone());
     }
-    mdm_tools::proc::set_dns(dns);
+    odm_tools::proc::set_dns(dns);
 }
 
-static OWN_ROUTE: std::sync::RwLock<mdm_engine::Route> =
-    std::sync::RwLock::new(mdm_engine::Route::Any);
+static OWN_ROUTE: std::sync::RwLock<odm_engine::Route> =
+    std::sync::RwLock::new(odm_engine::Route::Any);
 
 /// Keep [`own_net`], yt-dlp and the media-server checks on the chosen network adapter as it is
 /// now (#35; the adapter watch in `netwatch`).
-pub fn share_route(route: mdm_engine::Route) {
+pub fn share_route(route: odm_engine::Route) {
     if *OWN_ROUTE.read().unwrap() != route {
         *OWN_ROUTE.write().unwrap() = route.clone();
     }
-    mdm_tools::proc::set_route(route);
+    odm_tools::proc::set_route(route);
 }
 
 impl Settings {
     /// Options → Sites Logins → Cookies for video sites, as yt-dlp is given it (None: off, or
     /// a browser yt-dlp doesn't read).
-    pub fn video_cookies(&self) -> Option<mdm_tools::proc::BrowserCookies> {
-        mdm_tools::proc::BrowserCookies::new(&self.video_cookies, &self.video_cookies_profile)
+    pub fn video_cookies(&self) -> Option<odm_tools::proc::BrowserCookies> {
+        odm_tools::proc::BrowserCookies::new(&self.video_cookies, &self.video_cookies_profile)
     }
 }
 
 /// Keep every yt-dlp run on Options' cookies for video sites (cheap when they didn't change),
 /// and every video started on Embed chapters (#827).
 pub fn share_video_settings(s: &Settings) {
-    mdm_tools::proc::set_browser_cookies(s.video_cookies());
-    mdm_tools::video::set_chapters(s.video_chapters);
+    odm_tools::proc::set_browser_cookies(s.video_cookies());
+    odm_tools::video::set_chapters(s.video_chapters);
 }
 
-/// The network adapter MDM's connections go through now (#35).
-pub fn own_route() -> mdm_engine::Route {
+/// The network adapter ODM's connections go through now (#35).
+pub fn own_route() -> odm_engine::Route {
     OWN_ROUTE.read().unwrap().clone()
 }
 
-/// How MDM downloads its own files: its engine, as itself, through the user's proxy, DNS and
+/// How ODM downloads its own files: its engine, as itself, through the user's proxy, DNS and
 /// network adapter.
-pub fn own_net() -> mdm_engine::Options {
+pub fn own_net() -> odm_engine::Options {
     let proxy = OWN_PROXY
         .read()
         .unwrap()
         .clone()
-        .unwrap_or(mdm_engine::Proxy::System);
-    mdm_engine::Options {
+        .unwrap_or(odm_engine::Proxy::System);
+    odm_engine::Options {
         dns: OWN_DNS.read().unwrap().clone().unwrap_or_default(),
         route: own_route(),
-        ..mdm_tools::net(proxy)
+        ..odm_tools::net(proxy)
     }
 }
 
@@ -1185,12 +1185,12 @@ mod tests {
     use std::path::Path;
 
     /// #668: the User-Agent for links added by hand is the default browser's unless one is set.
-    /// Saved before, MDM's former default (Internet Explorer 11's) or nothing reads as automatic;
-    /// automatic is saved empty, which an older MDM reads as its own default again.
+    /// Saved before, ODM's former default (Internet Explorer 11's) or nothing reads as automatic;
+    /// automatic is saved empty, which an older ODM reads as its own default again.
     #[test]
     fn the_user_agent_is_automatic_unless_one_is_set() {
         use super::Settings;
-        let ie11 = mdm_engine::agent::IE11_USER_AGENT;
+        let ie11 = odm_engine::agent::IE11_USER_AGENT;
         assert_eq!(Settings::default().user_agent, "");
         assert_eq!(Settings::default().own_user_agent(), None);
         for saved in [
@@ -1238,7 +1238,7 @@ mod tests {
     }
 
     /// #1278: the video button's size is Full unless Compact was chosen, kept across a save,
-    /// and read by the native host under the same name (mdm_ipc::capture::CaptureRules).
+    /// and read by the native host under the same name (odm_ipc::capture::CaptureRules).
     #[test]
     fn the_video_buttons_size_is_saved_and_read_by_the_host() {
         use super::Settings;
@@ -1252,9 +1252,9 @@ mod tests {
         let saved = serde_json::to_value(&s).unwrap();
         let again: Settings = serde_json::from_value(saved.clone()).unwrap();
         assert!(again.video_panel_compact);
-        let rules: mdm_ipc::capture::CaptureRules = serde_json::from_value(saved).unwrap();
+        let rules: odm_ipc::capture::CaptureRules = serde_json::from_value(saved).unwrap();
         assert!(rules.video_panel_compact);
-        let rules: mdm_ipc::capture::CaptureRules =
+        let rules: odm_ipc::capture::CaptureRules =
             serde_json::from_value(serde_json::to_value(Settings::default()).unwrap()).unwrap();
         assert!(!rules.video_panel_compact);
     }
@@ -1312,12 +1312,12 @@ mod tests {
         );
     }
 
-    /// #1058: the browser integration (the native host, mdm_ipc::capture::CaptureRules) reads
+    /// #1058: the browser integration (the native host, odm_ipc::capture::CaptureRules) reads
     /// the capture settings from the saved list by the app's own names: Torrent settings' switch
     /// too, as settled; not decided yet, it takes torrents, as before.
     #[test]
     fn the_host_reads_the_capture_settings_as_saved() {
-        use mdm_ipc::capture::CaptureRules;
+        use odm_ipc::capture::CaptureRules;
         let read = |s: &Settings| -> CaptureRules {
             serde_json::from_value(serde_json::to_value(s).unwrap()).unwrap()
         };
@@ -1348,7 +1348,7 @@ mod tests {
             let changed = s.settle_torrent_handler(installer, || registered);
             (s.torrent_associations, changed)
         };
-        // Never decided: MDM opens .torrent files now (the installer's task, an earlier tick,
+        // Never decided: ODM opens .torrent files now (the installer's task, an earlier tick,
         // an all-users association) → on; it doesn't → off.
         assert_eq!(settle(undecided(), None, true), (Some(true), true));
         assert_eq!(settle(undecided(), None, false), (Some(false), true));
@@ -1449,7 +1449,7 @@ mod tests {
     #[test]
     fn listed_file_types() {
         let s = Settings::default();
-        let listed = |name| mdm_ipc::capture::type_listed(&s.auto_types, name);
+        let listed = |name| odm_ipc::capture::type_listed(&s.auto_types, name);
         assert!(listed("setup.EXE") && listed("a.r01") && listed("x.zip"));
         assert!(!listed("page.html") && !listed("noext"));
     }
@@ -1480,16 +1480,16 @@ mod tests {
         assert_eq!(old.connections_for(&url("https://fast.org/a")), 32);
         // IDM's default: no proxy, but "use the browser's proxy" ticked — the browser's is
         // Windows' (none set there: direct).
-        assert_eq!(s.proxy(), mdm_engine::Proxy::System);
+        assert_eq!(s.proxy(), odm_engine::Proxy::System);
         s.proxy_from_browser = false;
-        assert_eq!(s.proxy(), mdm_engine::Proxy::None);
+        assert_eq!(s.proxy(), odm_engine::Proxy::None);
         s.proxy_mode = 3;
         s.proxy_host = "10.0.0.1".into();
         s.proxy_port = "3128".into();
         s.proxy_https = true;
         assert!(matches!(
             s.proxy(),
-            mdm_engine::Proxy::Manual { ref url, https: true, http: false, .. }
+            odm_engine::Proxy::Manual { ref url, https: true, http: false, .. }
                 if url == "http://10.0.0.1:3128"
         ));
     }
@@ -1530,7 +1530,7 @@ mod sealed_logins {
 /// system's keychain once it holds it: the settings then keep its reference (secrets.rs,
 /// `keychain:…`, written by [`Settings::for_disk`]). Until then, and where no keychain is used:
 /// Windows seals it with DPAPI, for this account on this computer; Linux and macOS keep it as it
-/// is, in the data folder only its owner may read (mdm_ipc::private_dir). A secret that can't be
+/// is, in the data folder only its owner may read (odm_ipc::private_dir). A secret that can't be
 /// opened (the file copied to another account) reads as none: sign in again.
 pub(crate) mod sealed {
     use serde::{Deserialize, Deserializer, Serializer};
@@ -1663,7 +1663,7 @@ pub(crate) mod sealed {
         }
 
         #[test]
-        fn the_close_button_keeps_mdm_running_unless_told_otherwise() {
+        fn the_close_button_keeps_odm_running_unless_told_otherwise() {
             let s: crate::settings::Settings =
                 serde_json::from_value(serde_json::json!({})).unwrap();
             assert!(

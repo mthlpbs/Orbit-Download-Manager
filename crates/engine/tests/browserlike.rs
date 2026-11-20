@@ -1,4 +1,4 @@
-//! #668: a site whose bot check refuses MDM's own connection (`Error::BotCheck`) is asked once
+//! #668: a site whose bot check refuses ODM's own connection (`Error::BotCheck`) is asked once
 //! more the way a browser connects, and the download goes on through that connection only. The
 //! lab server's `browser_only` fault stands in for the bot check: it refuses, with Cloudflare's
 //! `cf-mitigated: challenge`, every request without the headers browsers send (`Sec-Fetch-Mode`).
@@ -7,9 +7,9 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::{Duration, Instant};
 
-use mdm_engine::download::State;
-use mdm_engine::{Destination, Download, Options, Request};
-use mdm_labserver::{Config, Faults, LabServer, LogEntry, content};
+use odm_engine::download::State;
+use odm_engine::{Destination, Download, Options, Request};
+use odm_labserver::{Config, Faults, LabServer, LogEntry, content};
 use reqwest::header::{COOKIE, HeaderMap, REFERER, USER_AGENT};
 
 const SETTLE: Duration = Duration::from_secs(20);
@@ -72,7 +72,7 @@ async fn a_bot_check_is_passed_the_way_a_browser_connects() {
         .expect("the browser-like connection gets through");
     same_content(&out.path, 668, 3 << 20);
     let log = settled_log(&s).await;
-    // MDM's own request first, refused; then the browser-like connection's.
+    // ODM's own request first, refused; then the browser-like connection's.
     assert_eq!(log[0].outcome, "fault:browser_only", "{log:?}");
     assert!(log[0].sec_fetch_mode.is_none());
     let through: Vec<_> = log[1..].iter().collect();
@@ -184,11 +184,11 @@ async fn a_stopped_download_resumes_through_the_same_connection() {
         assert!(Instant::now() < deadline, "the download never started");
     };
     dl.cancel();
-    assert!(matches!(dl.wait().await, Err(mdm_engine::Error::Cancelled)));
+    assert!(matches!(dl.wait().await, Err(odm_engine::Error::Cancelled)));
     s.set_faults(Faults::parse("browser_only=1&rate=4M").unwrap());
     tokio::time::timeout(SETTLE, s.settled()).await.unwrap();
-    let state = mdm_engine::state::state_path(&file);
-    let saved = mdm_engine::state::ResumeState::load(&state).unwrap();
+    let state = odm_engine::state::state_path(&file);
+    let saved = odm_engine::state::ResumeState::load(&state).unwrap();
     assert!(saved.browser_like, "the state says how it got through");
     s.clear_log();
     let out = Download::resume(state.clone(), handed_over(), opts())
@@ -245,7 +245,7 @@ async fn the_speed_limit_holds() {
 #[tokio::test]
 async fn a_look_gets_past_the_bot_check_too() {
     let s = server("browser_only=1").await;
-    let info = mdm_engine::probe(
+    let info = odm_engine::probe(
         s.url("/gen/2M/look.apk?seed=1").parse().unwrap(),
         Default::default(),
         &opts(),
@@ -257,14 +257,14 @@ async fn a_look_gets_past_the_bot_check_too() {
 }
 
 /// #954: a look and a download that got through only on the browser-like connection tell their
-/// server: its address, and the round trip of MDM's own connection, which the bot check refused
+/// server: its address, and the round trip of ODM's own connection, which the bot check refused
 /// at the same server.
 #[tokio::test]
 async fn through_the_browser_like_connection_the_server_is_told() {
     let s = server("browser_only=1&rate=1M").await;
     let url: url::Url = s.url("/gen/2M/where.apk?seed=954").parse().unwrap();
     let localhost = Some(IpAddr::V4(Ipv4Addr::LOCALHOST));
-    let info = mdm_engine::probe(url.clone(), Default::default(), &opts())
+    let info = odm_engine::probe(url.clone(), Default::default(), &opts())
         .await
         .expect("the look gets through");
     let server = info.server.expect("the look told the server");
@@ -321,11 +321,11 @@ async fn stop_ends_it() {
     let stopped = tokio::time::timeout(Duration::from_secs(5), dl.wait())
         .await
         .expect("stop is prompt");
-    assert!(matches!(stopped, Err(mdm_engine::Error::Cancelled)));
+    assert!(matches!(stopped, Err(odm_engine::Error::Cancelled)));
 }
 
 /// Over HTTPS the lab's bot check looks at the TLS handshake itself, as real ones do: a plain
-/// client that sends a browser's headers is still refused; MDM's own request is refused, and the
+/// client that sends a browser's headers is still refused; ODM's own request is refused, and the
 /// browser-like connection, whose handshake is Chrome's, gets the file.
 #[tokio::test]
 async fn over_https_the_handshake_itself_is_what_gets_through() {
@@ -385,7 +385,7 @@ async fn over_https_the_handshake_itself_is_what_gets_through() {
 async fn a_look_and_its_download_ask_once_more_in_all() {
     let s = server("browser_only=1").await;
     let url: url::Url = s.url("/gen/1M/kept.apk?seed=5").parse().unwrap();
-    let (info, kept) = mdm_engine::probe_kept(url.clone(), handed_over(), &opts())
+    let (info, kept) = odm_engine::probe_kept(url.clone(), handed_over(), &opts())
         .await
         .expect("the look gets through");
     assert_eq!(info.size, Some(1 << 20));
@@ -441,7 +441,7 @@ async fn it_goes_through_the_proxy() {
             dest: Destination::Dir(dir.path().to_owned()),
         },
         Options {
-            proxy: mdm_engine::Proxy::Manual {
+            proxy: odm_engine::Proxy::Manual {
                 url: s.url(""),
                 login: None,
                 http: true,
@@ -479,12 +479,12 @@ async fn a_second_refusal_stays_the_bot_check() {
     .wait()
     .await
     .unwrap_err();
-    assert!(matches!(err, mdm_engine::Error::BotCheck), "{err:?}");
+    assert!(matches!(err, odm_engine::Error::BotCheck), "{err:?}");
     let log = settled_log(&s).await;
     assert_eq!(log.len(), 2, "{log:?}");
 }
 
-/// FileHippo's way (#630): 412 Precondition Failed, empty, to whatever isn't a browser. MDM's
+/// FileHippo's way (#630): 412 Precondition Failed, empty, to whatever isn't a browser. ODM's
 /// first request carries no precondition, so that 412 can only refuse the program: it is asked
 /// once more the way a browser connects too, and the file comes.
 #[tokio::test]
@@ -513,7 +513,7 @@ async fn a_412_to_a_request_without_preconditions_is_asked_once_more_too() {
 }
 
 /// A download to its end, with its event log's lines.
-async fn to_the_end(dl: Download) -> (Result<mdm_engine::Outcome, mdm_engine::Error>, Vec<String>) {
+async fn to_the_end(dl: Download) -> (Result<odm_engine::Outcome, odm_engine::Error>, Vec<String>) {
     let deadline = Instant::now() + Duration::from_secs(60);
     let events = loop {
         let snap = dl.snapshot();
@@ -573,7 +573,7 @@ async fn the_browser_like_connection_downloads_on_several_connections() {
             .filter(|e| e.outcome.starts_with("fault:"))
             .count(),
         1,
-        "only MDM's own first request was refused: {log:?}"
+        "only ODM's own first request was refused: {log:?}"
     );
     for e in &log[1..] {
         assert!(e.sec_fetch_mode.is_some(), "{e:?}");

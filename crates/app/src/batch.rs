@@ -132,7 +132,7 @@ impl Batch {
         let urls: Vec<url::Url> = parts
             .iter()
             .filter_map(|p| crate::model::parse_address(&format!("{head}{p}{tail}")).ok())
-            .filter(mdm_engine::supported)
+            .filter(odm_engine::supported)
             .collect();
         if urls.is_empty() {
             // i18n: why Batch download's OK is greyed
@@ -202,7 +202,7 @@ impl Batch {
             o.x + 11.0,
             o.y + 17.0,
             crate::i18n::t(
-                "It's possible to add a group of sequential file names like img001.jpg, img002.jpg, etc.,\nimg100.jpg to MDM download queue. Use the asterisk wildcard for the file name pattern.",
+                "It's possible to add a group of sequential file names like img001.jpg, img002.jpg, etc.,\nimg100.jpg to ODM download queue. Use the asterisk wildcard for the file name pattern.",
             ),
             LIGHT_TEXT(),
             o.x + 470.0,
@@ -349,7 +349,7 @@ impl Batch {
 
         // Preview: first, second and last file.
         let name = |i: Option<&url::Url>| {
-            i.map(|u| mdm_engine::naming::file_name(None, u))
+            i.map(|u| odm_engine::naming::file_name(None, u))
                 .unwrap_or_default()
         };
         let rows = [

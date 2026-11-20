@@ -1,10 +1,10 @@
 # Screenshots for the README and docs/ (raw PNGs; `python tools/shots/make.py docs <run>` makes
 # GitHub's Windows runner (.github/workflows/docs-shots.yml), a stock Windows whose file icons are
-# Windows' own; a run here shows this PC's. At 1x: MDM_ZOOM=2 draws the content
+# Windows' own; a run here shows this PC's. At 1x: ODM_ZOOM=2 draws the content
 # twice as large but Windows keeps the title bar at the display's scale, out of proportion. Runs its
-# own Orbit Download Manager instance (its own data folder, MDM_DATA_DIR) and its own labserver,
+# own Orbit Download Manager instance (its own data folder, ODM_DATA_DIR) and its own labserver,
 # both addressed by process id: the user's own instance and anything else running are never
-# touched. Nothing shows on the screen: with MDM_OFFSCREEN=1 the app opens every window far off
+# touched. Nothing shows on the screen: with ODM_OFFSCREEN=1 the app opens every window far off
 # the screens, without focus, taskbar button, tray icon or sound, and PrintWindow captures them
 # there (cap-own.ps1). Dialogs open through the app's
 # own command line (/show <window>), so nothing is clicked or typed on the screen.
@@ -25,7 +25,7 @@ param(
   [string[]]$Only = @(),
   # Dark mode for every window (View → Always dark: Windows' own mode doesn't matter).
   [switch]$Dark,
-  # Where the main window opens instead of far off the screens (MDM_OFFSCREEN_AT, "x,y"): on a
+  # Where the main window opens instead of far off the screens (ODM_OFFSCREEN_AT, "x,y"): on a
   # machine nobody watches whose OpenGL is software (GitHub's runner, docs-shots.yml), which
   # draws nothing off the screens.
   [string]$At = "",
@@ -133,7 +133,7 @@ function Shot([int]$procId, [string]$title, [string]$name, [switch]$All) {
   "  $name.png  ($title)"
 }
 
-# MDM starts itself again when its renderer fails (a lost Direct3D device, renderer.rs): the
+# ODM starts itself again when its renderer fails (a lost Direct3D device, renderer.rs): the
 # shots go on in the new copy, ours too (our program, started after this run with /updated).
 $started = Get-Date
 function Ours { Get-CimInstance Win32_Process -Filter "Name='$(Split-Path -Leaf $Exe)'" |
@@ -141,8 +141,8 @@ function Ours { Get-CimInstance Win32_Process -Filter "Name='$(Split-Path -Leaf 
 function Follow {
   if (-not $script:app.HasExited) { return }
   $n = @(Ours | Where-Object { $_.CommandLine -like "*/updated*" })[0]
-  if (-not $n) { throw "MDM ended" }
-  Write-Warning "MDM started again (pid $($n.ProcessId)); the shots go on there"
+  if (-not $n) { throw "ODM ended" }
+  Write-Warning "ODM started again (pid $($n.ProcessId)); the shots go on there"
   $script:app = Get-Process -Id $n.ProcessId
   Start-Sleep 4
   $script:main = @(Titles $script:app.Id | Where-Object { $_ -like "Orbit Download Manager*" })[0]
@@ -171,12 +171,12 @@ try {
   $srv = Start-Process -PassThru -WindowStyle Hidden $Server -ArgumentList "--bind 127.0.0.1:$Port"
   $base = if ($Port -eq 80) { "http://$UrlHost" } else { "http://${UrlHost}:$Port" }
   # /show crash-test:freeze for the crash report window's shot.
-  $env:MDM_CRASH_TEST = "1"
-  $env:MDM_DATA_DIR = "$work\data"
-  # Only when asked: MDM_ZOOM overrides View → Interface size (-Settings '"interface_size":150').
-  if ($Zoom -ne 1) { $env:MDM_ZOOM = "$Zoom" } else { Remove-Item Env:MDM_ZOOM -ErrorAction SilentlyContinue }
-  $env:MDM_OFFSCREEN = "1"
-  if ($At) { $env:MDM_OFFSCREEN_AT = $At }
+  $env:ODM_CRASH_TEST = "1"
+  $env:ODM_DATA_DIR = "$work\data"
+  # Only when asked: ODM_ZOOM overrides View → Interface size (-Settings '"interface_size":150').
+  if ($Zoom -ne 1) { $env:ODM_ZOOM = "$Zoom" } else { Remove-Item Env:ODM_ZOOM -ErrorAction SilentlyContinue }
+  $env:ODM_OFFSCREEN = "1"
+  if ($At) { $env:ODM_OFFSCREEN_AT = $At }
   $app = Start-Process -PassThru $Exe
   Start-Sleep 3
   $main = @(Titles $app.Id | Where-Object { $_ -like "Orbit Download Manager*" })[0]
@@ -203,7 +203,7 @@ try {
   Start-Sleep 2
   $main = @(Titles $app.Id | Where-Object { $_ -like "Orbit Download Manager*" })[0]
 
-  # Each window opened by name through the app's own command line (/show, mdm_ipc), so no
+  # Each window opened by name through the app's own command line (/show, odm_ipc), so no
   # click or key ever goes to the screen. name = /show argument. These are the README's and the
   # site's pictures and the few docs pages not yet in the help's shot list; the help pages'
   # own come from tools/shots/shots.toml (-Show).
@@ -326,7 +326,7 @@ try {
     if ($Only.Count -eq 1) { Start-Sleep 10 }
     if (Want $name) { Shot $app.Id $main $name }
   }
-  # The crash report window, from a freeze on purpose (MDM_CRASH_TEST): last, as it leaves MDM
+  # The crash report window, from a freeze on purpose (ODM_CRASH_TEST): last, as it leaves ODM
   # frozen. The window is the crash monitor's, a process of its own, found by its title.
   $crashShot = if ($dark) { "crash-report-dark" } else { "crash-report" }
   if (Want $crashShot) {
@@ -351,7 +351,7 @@ try {
   # A copy started again by itself, and its crash monitor: ours as well.
   Ours | ForEach-Object { Stop-Process -Id $_.ProcessId -ErrorAction SilentlyContinue }
   if ($srv) { Stop-Process -Id $srv.Id -ErrorAction SilentlyContinue }
-  Remove-Item Env:MDM_DATA_DIR, Env:MDM_ZOOM, Env:MDM_OFFSCREEN, Env:MDM_OFFSCREEN_AT, Env:MDM_CRASH_TEST -ErrorAction SilentlyContinue
+  Remove-Item Env:ODM_DATA_DIR, Env:ODM_ZOOM, Env:ODM_OFFSCREEN, Env:ODM_OFFSCREEN_AT, Env:ODM_CRASH_TEST -ErrorAction SilentlyContinue
   # The downloads (a 6 GB file partly fetched) don't stay behind.
   Start-Sleep 1
   Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue

@@ -101,13 +101,13 @@ Install Inno Setup 6.3 or later to produce the installer, and Node.js for extens
 ```powershell
 git clone https://github.com/mthlpbs/Orbit-Download-Manager.git
 cd Orbit-Download-Manager
-cargo build --release -p mdm-app -p mdm-nmhost -p mdm-cli -p mdm-mcp
-cargo run -p mdm-app
+cargo build --release -p odm-app -p odm-nmhost -p odm-cli -p odm-mcp
+cargo run -p odm-app
 powershell -ExecutionPolicy Bypass -File tools/release/build-windows.ps1 -Date 2026-11-19 -Arch x64 -InstallerOnly
 ```
 
 Replace `x64` with `arm64` or `x86` for another Windows processor. Internal Rust crate names
-retain the `mdm-` prefix; the installed executables use `orbitdownloadmanager`.
+retain the `odm-` prefix; the installed executables use `orbitdownloadmanager`.
 
 The CI workflow formats, lints and tests Windows builds. The Release workflow publishes
 Windows installers, archives and browser extensions on a matching date-version tag such as

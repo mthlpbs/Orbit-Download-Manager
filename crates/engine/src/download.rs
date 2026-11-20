@@ -106,18 +106,18 @@ pub struct Options {
     /// The download's User-Agent: by default the automatic one (`agent::automatic`, the default
     /// browser's), else the user's or the one a browser handed over.
     pub user_agent: String,
-    /// `user_agent` is MDM's automatic one, not one the user set or a browser handed over: a
+    /// `user_agent` is ODM's automatic one, not one the user set or a browser handed over: a
     /// site that wants an agent of its own (Google Drive's hosts, `sites::user_agent`) gets it.
     /// [`Options::speak_as`] sets another agent and clears this.
     pub automatic_agent: bool,
     /// Asked with instead of `user_agent` when the server refuses the first request with 403
     /// (#372): a browser's User-Agent on a connection that isn't a browser's trips some sites'
-    /// bot checks (Cloudflare, seen on a public PDF), while MDM's own passes. Set when
+    /// bot checks (Cloudflare, seen on a public PDF), while ODM's own passes. Set when
     /// `user_agent` is the browser's. A later 403 is left to the download.
     pub agent_fallback: Option<String>,
     /// The download's last try at a site whose bot check refused it (`refused_as_a_program`)
-    /// and the browser-like connection too (#668): its first request once more, on MDM's own
-    /// connection, with this User-Agent instead (#1422). MDM's own name
+    /// and the browser-like connection too (#668): its first request once more, on ODM's own
+    /// connection, with this User-Agent instead (#1422). ODM's own name
     /// (`agent::OWN_USER_AGENT`): SourceForge's check lets programs that say what they are
     /// through, and refuses whatever claims to be a browser without connecting like one. The
     /// site is then remembered for the session (`agent::own_for`): its next downloads ask this
@@ -197,7 +197,7 @@ pub struct Options {
     /// quarantine attribute — stays with the finished file.
     pub on_file_created: Option<FileHook>,
     /// From the browser: the MIME type its own download had. A web page where it had another
-    /// type is the server refusing MDM (a firewall's "The requested URL was rejected"), an error
+    /// type is the server refusing ODM (a firewall's "The requested URL was rejected"), an error
     /// and never saved as the file (#533, `expects_other_file`).
     pub expected_type: Option<String>,
     /// From the browser: the size its own download announced. A file larger than any waiting
@@ -321,7 +321,7 @@ impl Options {
     }
 
     /// A site's own User-Agent may replace this download's (`request_agent`): the agent is the
-    /// automatic one, or MDM's former one (#372's fallback, D-007), as before #668.
+    /// automatic one, or ODM's former one (#372's fallback, D-007), as before #668.
     fn site_agent(&self) -> bool {
         self.automatic_agent || self.user_agent == crate::agent::IE11_USER_AGENT
     }
@@ -424,9 +424,9 @@ pub enum Error {
     #[error("the path is too long for Windows: {}", .0.display())]
     PathTooLong(PathBuf),
     /// A web page came instead of the file (a file host's countdown or captcha, a sign-in wall,
-    /// an expired link's notice, #533, #701): the browser gets past it, MDM doesn't.
+    /// an expired link's notice, #533, #701): the browser gets past it, ODM doesn't.
     #[error(
-        "the site sent a web page instead of the file (a waiting page, a captcha or a sign-in): open the link in your browser, finish there, and the download comes back to MDM"
+        "the site sent a web page instead of the file (a waiting page, a captcha or a sign-in): open the link in your browser, finish there, and the download comes back to ODM"
     )]
     GotWebPage,
     /// A full answer to a range request for the same, unchanged file: the server (or one CDN
@@ -747,7 +747,7 @@ fn post_for(opts: &Options, as_get: bool, headers: &mut HeaderMap) -> Option<Byt
 
 /// A request for `url` with `headers`: a POST with `post` as its body, else a GET. The client
 /// sends the download's User-Agent (`Options::user_agent`); a site that wants a browser's gets
-/// it instead when `site_agent` (`Options::site_agent`: the agent is MDM's automatic one).
+/// it instead when `site_agent` (`Options::site_agent`: the agent is ODM's automatic one).
 fn build(
     client: &Client,
     url: Url,
@@ -770,7 +770,7 @@ fn build(
 
 /// The User-Agent a request to `url` carries instead of the download's own: a site's browser
 /// agent (`sites::user_agent`: Google Drive's hosts), only when `site_agent` (the download's is
-/// MDM's automatic one, `Options::site_agent`). A browser's agent handed over with the download,
+/// ODM's automatic one, `Options::site_agent`). A browser's agent handed over with the download,
 /// or one the user set, always wins.
 fn request_agent(site_agent: bool, url: &Url) -> Option<&'static str> {
     site_agent.then(|| sites::user_agent(url)).flatten()
@@ -931,7 +931,7 @@ pub struct KeptAnswer {
     /// The browser-like connection it came through, when only that one got past the site's
     /// bot check (#668): the download goes on with it.
     browser: Option<Arc<crate::browserlike::Browser>>,
-    /// The User-Agent it got through with, when only MDM's own name got past the site's bot
+    /// The User-Agent it got through with, when only ODM's own name got past the site's bot
     /// check (#1422): the download goes on under it.
     own_agent: Option<String>,
     headers: HeaderMap,
@@ -1012,7 +1012,7 @@ pub async fn probe_kept(
         None => (url.clone(), headers),
     };
     let seen = Arc::new(crate::server::ServerSeen::default());
-    // #1422: MDM's own name, when the site's bot check let only it through earlier this
+    // #1422: ODM's own name, when the site's bot check let only it through earlier this
     // session: asked so at once; otherwise the last try, after the browser-like connection.
     let own = own_agent(opts, &headers).filter(|_| unlocked.is_none());
     let remembered = own.clone().filter(|_| crate::agent::own_for(&target));
@@ -1027,7 +1027,7 @@ pub async fn probe_kept(
     );
     // Where the look asked, and with what: asked again there if the site refuses (#668).
     let (asked_at, asked_with) = (target.clone(), headers.clone());
-    // A browser's User-Agent refused (#372): asked once more as MDM.
+    // A browser's User-Agent refused (#372): asked once more as ODM.
     let (client, asked) = match get(
         &client,
         target.clone(),
@@ -1060,7 +1060,7 @@ pub async fn probe_kept(
     let (mut client, mut own_agent) = (client, remembered);
     let (head, body, browser, headers, took) = match asked {
         Ok((resp, headers, took)) => (Head::of(&resp), Body::Http(resp), None, headers, took),
-        // #668: the site refused MDM's connection as a program's (`refused_as_a_program`):
+        // #668: the site refused ODM's connection as a program's (`refused_as_a_program`):
         // looked at once more the way a browser connects, its answer kept for the download
         // (which then asks no more).
         Err(e) if refused_as_a_program(&e) && unlocked.is_none() && opts.post.is_none() => {
@@ -1072,7 +1072,7 @@ pub async fn probe_kept(
             match browser_ask(opts, &asked_at, &asked_with, expects, &cancel).await {
                 Ok((b, (head, body, headers, took))) => (head, body, Some(b), headers, took),
                 Err(other @ (Error::Cancelled | Error::Adapter(_))) => return Err(other),
-                // #1422: refused that way too; once more under MDM's own name, the last try.
+                // #1422: refused that way too; once more under ODM's own name, the last try.
                 Err(_) => match own.filter(|_| as_own.is_none()) {
                     Some(own) => {
                         let o = speaking_own(opts, own.clone());
@@ -1163,7 +1163,7 @@ pub fn http_client(opts: &Options, url: &Url) -> Result<Client, Error> {
 /// A client for one request to `url`'s server, as [`http_client`]'s, that follows no redirect
 /// and adds no `Referer` of its own: its caller follows each hop itself, with a client for that
 /// hop's server (its proxy and adapter checks are that server's), and decides which of its
-/// headers go there (the browser's quality menu reading a stream's manifest, mdm-tools'
+/// headers go there (the browser's quality menu reading a stream's manifest, odm-tools'
 /// `manifest`: the browser's cookie never reaches another server).
 pub fn hop_client(opts: &Options, url: &Url) -> Result<Client, Error> {
     client_with(opts, url, &AsGet::default(), &Default::default(), false)
@@ -1494,7 +1494,7 @@ impl Found {
     }
 }
 
-/// Download `url` to `path` and wait for it: MDM's own downloads that aren't in the list (its
+/// Download `url` to `path` and wait for it: ODM's own downloads that aren't in the list (its
 /// helpers, its updates, a crash report's symbols) use the engine like every download. An
 /// earlier attempt cut off at `path` resumes; `progress(done, total)` while it runs.
 pub async fn fetch(
@@ -1909,7 +1909,7 @@ impl Ctx {
 /// with its headers: `given`, the address the user gave, when it led elsewhere; else the page a
 /// site gives `target` on when its file addresses expire (`sites::origin`: MediaFire's, #952;
 /// Rapidgator's, one of `pages`), credentials kept to their host. None for a browser-like
-/// download: asked again through MDM's own connection, which the site's bot check refuses, it
+/// download: asked again through ODM's own connection, which the site's bot check refuses, it
 /// keeps the address it has (#668).
 fn origin_of(
     given: &Url,
@@ -2039,7 +2039,7 @@ fn client_with(
             }
             b
         }
-        // The script's first route MDM can use: a proxy, or straight to the server.
+        // The script's first route ODM can use: a proxy, or straight to the server.
         (Proxy::Pac { script }, _) => {
             let first = crate::pac::routes(script, url).ok().and_then(|routes| {
                 routes.into_iter().find_map(|r| match r {
@@ -2202,8 +2202,8 @@ async fn run_fresh(
 ) -> Result<Outcome, Error> {
     let mut opts = opts;
     // The first request had to give up the browser's User-Agent (#372).
-    let mut asked_as_mdm = false;
-    // It went under MDM's own name, the only one the site's bot check let through (#1422).
+    let mut asked_as_odm = false;
+    // It went under ODM's own name, the only one the site's bot check let through (#1422).
     let mut asked_own = false;
     shared.limiter.set(opts.speed_limit);
     let (shared, cancel) = (&shared, &cancel);
@@ -2236,7 +2236,7 @@ async fn run_fresh(
             );
             let _ = shared.seen.set(k.seen);
             browser = k.browser;
-            // The look got through under MDM's own name (#1422): so does the rest.
+            // The look got through under ODM's own name (#1422): so does the rest.
             if let Some(own) = k.own_agent {
                 opts = speaking_own(&opts, own);
                 asked_own = true;
@@ -2261,9 +2261,9 @@ async fn run_fresh(
             let as_get = AsGet::default();
             let seen = shared.seen.get_or_init(Default::default).clone();
             // The download's own User-Agent, which the browser-like connection carries (#668),
-            // even when MDM's connection had to give it up (#372, #1422).
+            // even when ODM's connection had to give it up (#372, #1422).
             let given_agent = (opts.user_agent.clone(), opts.automatic_agent);
-            // #1422: a site whose bot check let only MDM's own name through earlier this
+            // #1422: a site whose bot check let only ODM's own name through earlier this
             // session is asked so at once, not refused twice more first.
             let own = own_agent(&opts, &asked).filter(|_| unlocked.is_none());
             if let Some(own) = own.clone().filter(|_| crate::agent::own_for(&target)) {
@@ -2285,8 +2285,8 @@ async fn run_fresh(
                 shared,
                 cancel,
             };
-            let (mut client0, mut first, as_mdm) = ask.at(&mut opts, &target, &asked).await?;
-            asked_as_mdm = as_mdm;
+            let (mut client0, mut first, as_odm) = ask.at(&mut opts, &target, &asked).await?;
+            asked_as_odm = as_odm;
             // #630: the link refused, where the browser's own download of it ended is asked
             // once, as the link was (the browser's User-Agent first). The link's refusal is
             // the one told if that fails too.
@@ -2304,8 +2304,8 @@ async fn run_fresh(
                 let mut again = as_given;
                 let headers = scoped_headers(&asked, &target, &other);
                 match ask.at(&mut again, &other, &headers).await {
-                    Ok((client1, Ok(answer), as_mdm)) => {
-                        (opts, client0, first, asked_as_mdm) = (again, client1, Ok(answer), as_mdm);
+                    Ok((client1, Ok(answer), as_odm)) => {
+                        (opts, client0, first, asked_as_odm) = (again, client1, Ok(answer), as_odm);
                     }
                     Ok((_, Err(Error::Cancelled), _)) | Err(Error::Cancelled) => {
                         return Err(Error::Cancelled);
@@ -2315,7 +2315,7 @@ async fn run_fresh(
                     }
                 }
             }
-            // #668: the site refused MDM's connection as a program's (its bot check, or a 412):
+            // #668: the site refused ODM's connection as a program's (its bot check, or a 412):
             // asked once more, the way a browser connects, at the same address with the same
             // headers. Its refusal stays the one told if that fails too.
             match first {
@@ -2324,9 +2324,9 @@ async fn run_fresh(
                     (as_get, client0, (head, Body::Http(resp)), headers, ttfb)
                 }
                 Err(e) if refused_as_a_program(&e) && unlocked.is_none() && opts.post.is_none() => {
-                    if asked_as_mdm || asked_own {
+                    if asked_as_odm || asked_own {
                         (opts.user_agent, opts.automatic_agent) = given_agent;
-                        (asked_as_mdm, asked_own) = (false, false);
+                        (asked_as_odm, asked_own) = (false, false);
                     }
                     if own_tried {
                         // Remembered, but no longer let through: learnt again next time.
@@ -2337,7 +2337,7 @@ async fn run_fresh(
                             browser = Some(b);
                             (as_get, client0, (head, body), headers, ttfb)
                         }
-                        // #1422: refused the way a browser connects too; once more under MDM's
+                        // #1422: refused the way a browser connects too; once more under ODM's
                         // own name, the last try.
                         Err(refused) if refused_as_a_program(&refused) && !own_tried => {
                             let Some(own) = own else {
@@ -2483,7 +2483,7 @@ async fn run_fresh(
         saved.content_type = content_type.clone();
         saved.checksum = checksum.clone();
         saved.final_get = opts.post.is_some() && post.is_none();
-        saved.asked_as_mdm = asked_as_mdm;
+        saved.asked_as_odm = asked_as_odm;
         saved.asked_as_own = asked_own;
         saved.browser_like = browser.is_some();
         let ctx = Arc::new(Ctx {
@@ -2788,12 +2788,12 @@ async fn run_resume(
         return mega_download::resume(saved, state_file, opts, shared, cancel).await;
     }
     let mut opts = opts;
-    if saved.asked_as_mdm
+    if saved.asked_as_odm
         && let Some(agent) = opts.agent_fallback.take()
     {
         opts.user_agent = agent;
     }
-    // Only MDM's own name got past the site's bot check (#1422), for this download or for its
+    // Only ODM's own name got past the site's bot check (#1422), for this download or for its
     // site earlier this session: it goes on under it.
     if !saved.browser_like
         && (saved.asked_as_own || crate::agent::own_for(&saved.url))
@@ -2835,7 +2835,7 @@ async fn run_resume(
     let seen = shared.seen.get_or_init(Default::default).clone();
     let client = client(&opts, &saved.url, &as_get, &seen)?;
     // Only the browser-like connection got past the site's bot check (#668): it goes on with
-    // it, at the address it had (MDM's own connection would be refused); its first connection
+    // it, at the address it had (ODM's own connection would be refused); its first connection
     // asks for its part before the others follow (`wait_for_ranges`).
     let browser = match saved.browser_like && crate::browserlike::AVAILABLE {
         true => Some(Arc::new(crate::browserlike::Browser::new(
@@ -3451,7 +3451,7 @@ struct FirstAsk<'a> {
     cancel: &'a CancellationToken,
 }
 
-/// A first request's client, its answer (or why not) and whether it went as MDM (#372).
+/// A first request's client, its answer (or why not) and whether it went as ODM (#372).
 type FirstAnswer = (
     Client,
     Result<((Response, HeaderMap), Duration), Error>,
@@ -3459,8 +3459,8 @@ type FirstAnswer = (
 );
 
 impl FirstAsk<'_> {
-    /// `first_get` at `url` with its client; asked once more as MDM when the browser's
-    /// User-Agent is refused (#372, `opts` then goes on as MDM: the third value says so).
+    /// `first_get` at `url` with its client; asked once more as ODM when the browser's
+    /// User-Agent is refused (#372, `opts` then goes on as ODM: the third value says so).
     async fn at(
         &self,
         opts: &mut Options,
@@ -3471,7 +3471,7 @@ impl FirstAsk<'_> {
         let client0 = client(opts, url, self.as_get, self.seen)?;
         match first_get(&client0, url, headers, opts, expects, shared, cancel).await {
             Err(e) if agent_refused(&e) && opts.agent_fallback.is_some() => {
-                // #372: the rest of the download goes as MDM too.
+                // #372: the rest of the download goes as ODM too.
                 opts.user_agent = opts.agent_fallback.take().unwrap_or_default();
                 shared.event(
                     "The server refused the browser's User-Agent; asking as Orbit Download Manager",
@@ -3486,7 +3486,7 @@ impl FirstAsk<'_> {
 
     /// #1422: the first request once more, after the site's bot check refused the download's
     /// User-Agent and the browser-like connection too (`refused`, the error told if this fails
-    /// as well): on MDM's own connection under `own` (`Options::own_agent`), at the same address
+    /// as well): on ODM's own connection under `own` (`Options::own_agent`), at the same address
     /// with the same headers (cookies, Referer, range), once. With the answer, the options and
     /// client the download goes on with; the site is remembered for the session.
     async fn as_own(
@@ -3500,7 +3500,7 @@ impl FirstAsk<'_> {
         let (shared, cancel) = (self.shared, self.cancel);
         let host = url.host_str().unwrap_or("?");
         shared.event(format!(
-            "{host}: refused the way a browser connects too; asking once more as Mister \
+            "{host}: refused the way a browser connects too; asking once more as Orbit \
              Download Manager itself ({own})"
         ));
         let opts = speaking_own(opts, own);
@@ -3524,13 +3524,13 @@ impl FirstAsk<'_> {
 }
 
 /// A plain 403, which a browser's User-Agent may have brought on (#372). A site's bot check
-/// isn't asked again as MDM: it gets one try the way a browser connects (`browser_first`).
+/// isn't asked again as ODM: it gets one try the way a browser connects (`browser_first`).
 fn agent_refused(e: &Error) -> bool {
     matches!(e, Error::Status(s) if s.as_u16() == 403)
 }
 
-/// A first answer that refuses MDM's connection for not being a browser's (#668): the site's bot
-/// check (`Error::BotCheck`, Cloudflare's), or 412 Precondition Failed, which MDM's first
+/// A first answer that refuses ODM's connection for not being a browser's (#668): the site's bot
+/// check (`Error::BotCheck`, Cloudflare's), or 412 Precondition Failed, which ODM's first
 /// request, sent without any precondition (no `If-…` header), can only get as such a refusal
 /// (FileHippo's, #630).
 fn refused_as_a_program(e: &Error) -> bool {
@@ -3546,7 +3546,7 @@ fn own_agent(opts: &Options, headers: &HeaderMap) -> Option<String> {
         .filter(|own| *own != opts.user_agent && !headers.contains_key(header::USER_AGENT))
 }
 
-/// `opts` speaking under MDM's own name `own` (#1422): no other User-Agent is tried after it.
+/// `opts` speaking under ODM's own name `own` (#1422): no other User-Agent is tried after it.
 fn speaking_own(opts: &Options, own: String) -> Options {
     let mut opts = opts.clone();
     opts.speak_as(own);
@@ -3554,7 +3554,7 @@ fn speaking_own(opts: &Options, own: String) -> Options {
     opts
 }
 
-/// #668: the first request once more, after the site refused MDM's own connection as a
+/// #668: the first request once more, after the site refused ODM's own connection as a
 /// program's (`refused_as_a_program`, its error `refused`): through the browser-like connection
 /// (`crate::browserlike`), at the same address with the same headers, once, its answer checked
 /// as the first one is. When that fails too, `refused` is what is told (the error users know,
@@ -5683,42 +5683,95 @@ async fn single_stream(
     global: Option<&Limiter>,
     cancel: &CancellationToken,
 ) -> Result<u64, Error> {
+    const MAX_CHUNKS: usize = 32;
+    const PROGRESS_EVERY: Duration = Duration::from_millis(250);
     shared.conn(0, |c| c.status = ConnStatus::Receiving);
     let expected = body.len();
     let mut pos = 0u64;
-    loop {
-        let next = tokio::select! {
-            _ = cancel.cancelled() => return Err(Error::Cancelled),
-            n = body.chunk() => n,
-        };
-        let Some(chunk) = next? else { break };
-        // Stop ends a limiter's wait too (under a low limit it is seconds long).
-        let paid = async {
+    let mut pending = Vec::new();
+    let mut pending_bytes = 0;
+    let flush = tokio::time::sleep(PROGRESS_EVERY);
+    tokio::pin!(flush);
+    let result = loop {
+        let next = async {
+            let Some(chunk) = body.chunk().await? else {
+                return Ok(None);
+            };
             shared.limiter.acquire(chunk.len() as u64).await;
             if let Some(g) = global {
                 g.acquire(chunk.len() as u64).await;
             }
+            Ok(Some(chunk))
         };
-        tokio::select! {
-            _ = cancel.cancelled() => return Err(Error::Cancelled),
-            _ = paid => {}
+        tokio::pin!(next);
+        // Keep the same read (and limiter wait) alive across a timed flush. Restarting a read
+        // would also restart its timeout on a stalled server.
+        let chunk = loop {
+            tokio::select! {
+                biased;
+                () = cancel.cancelled() => break Err(Error::Cancelled),
+                () = &mut flush, if !pending.is_empty() => {
+                    write_single_batch(file, shared, &mut pending, &mut pos).await?;
+                    pending_bytes = 0;
+                }
+                result = &mut next => break result,
+            }
+        };
+        let chunk = match chunk {
+            Ok(Some(chunk)) => chunk,
+            Ok(None) => break Ok(()),
+            Err(e) => break Err(e),
+        };
+        if pending.is_empty() {
+            flush
+                .as_mut()
+                .reset(tokio::time::Instant::now() + PROGRESS_EVERY);
         }
-        let (f, at, n) = (file.clone(), pos, chunk.len() as u64);
-        tokio::task::spawn_blocking(move || write_all_at(&f, at, &chunk))
-            .await
-            .expect("writer panicked")?;
-        pos += n;
-        let mut v = shared.view.lock().unwrap();
-        v.downloaded = pos;
-        if let Some(c) = v.connections.first_mut() {
-            c.downloaded = pos;
+        pending_bytes += chunk.len();
+        pending.push(chunk);
+        if pending_bytes >= BATCH || pending.len() >= MAX_CHUNKS {
+            write_single_batch(file, shared, &mut pending, &mut pos).await?;
+            pending_bytes = 0;
         }
-    }
+    };
+    // Finish the writes already accepted from the connection before reporting EOF, failure or
+    // cancellation. The caller may close, rename or remove the part as soon as this returns.
+    write_single_batch(file, shared, &mut pending, &mut pos).await?;
+    result?;
     if expected.is_some_and(|e| e != pos) {
         return Err(Error::ShortBody);
     }
     shared.conn(0, ConnView::finish);
     Ok(pos)
+}
+
+async fn write_single_batch(
+    file: &Arc<File>,
+    shared: &Shared,
+    pending: &mut Vec<Bytes>,
+    pos: &mut u64,
+) -> Result<(), Error> {
+    if pending.is_empty() {
+        return Ok(());
+    }
+    let file = file.clone();
+    let at = *pos;
+    let mut chunks = std::mem::take(pending);
+    let len: usize = chunks.iter().map(Bytes::len).sum();
+    *pending = tokio::task::spawn_blocking(move || {
+        write_batches(&file, at, &chunks)?;
+        chunks.clear();
+        Ok::<_, io::Error>(chunks)
+    })
+    .await
+    .expect("writer panicked")?;
+    *pos += len as u64;
+    let mut v = shared.view.lock().unwrap();
+    v.downloaded = *pos;
+    if let Some(c) = v.connections.iter_mut().find(|c| c.id == 0) {
+        c.downloaded = *pos;
+    }
+    Ok(())
 }
 
 fn read_at(file: &File, mut at: u64, len: usize) -> io::Result<Vec<u8>> {
@@ -5739,8 +5792,9 @@ fn read_at(file: &File, mut at: u64, len: usize) -> io::Result<Vec<u8>> {
 }
 
 /// `batches` one after the other into `file` from `at`.
-fn write_batches(file: &File, mut at: u64, batches: &[Vec<u8>]) -> io::Result<()> {
+fn write_batches(file: &File, mut at: u64, batches: &[impl AsRef<[u8]>]) -> io::Result<()> {
     for b in batches {
+        let b = b.as_ref();
         write_all_at(file, at, b)?;
         at += b.len() as u64;
     }
@@ -6164,7 +6218,7 @@ mod tests {
     fn drive_gets_a_browsers_agent_and_only_drive() {
         let u = |s: &str| Url::parse(s).unwrap();
         let browser = Some(sites::gdrive::USER_AGENT);
-        // MDM's automatic agent (the default browser's, #668), by default.
+        // ODM's automatic agent (the default browser's, #668), by default.
         let auto = Options::default();
         assert!(auto.automatic_agent && auto.site_agent());
         for drive in [
@@ -6200,7 +6254,7 @@ mod tests {
                 None
             );
         }
-        // MDM's former agent, asked with when a browser's is refused (#372), still gets it.
+        // ODM's former agent, asked with when a browser's is refused (#372), still gets it.
         let mut fallback = Options::default();
         fallback.speak_as(crate::agent::IE11_USER_AGENT.to_owned());
         assert!(fallback.site_agent());

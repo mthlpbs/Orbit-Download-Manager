@@ -2,8 +2,8 @@
 //! (notes/ui-spec/progress-dialog.md). Coordinates are client pixels from the spec.
 
 use egui::{Color32, Pos2, Ui, ViewportId, vec2};
-use mdm_engine::Snapshot;
-use mdm_engine::download::ConnStatus;
+use odm_engine::Snapshot;
+use odm_engine::download::ConnStatus;
 
 use crate::dialogs::display_path;
 use crate::model::{self, Item, Status, size3};
@@ -141,7 +141,7 @@ pub const NO_DIAL_UP: &str = crate::i18n::mark("This system has no dial-up conne
 /// The window's frames while its bar glides ([`Glide`]): as often as the bar moves a pixel, 25 a
 /// second at most, only while its download runs and its figures move ([`glide_frame`]).
 const GLIDE_FRAME: std::time::Duration = std::time::Duration::from_millis(40);
-/// The same while MDM's main window is shown: each frame draws it again too, about three times a
+/// The same while ODM's main window is shown: each frame draws it again too, about three times a
 /// progress window's work (measured: 25 a second then took 5 % of a core more, 12.5 half that).
 const GLIDE_FRAME_MAIN: std::time::Duration = std::time::Duration::from_millis(80);
 /// The app's own frames while a download runs (app.rs): a bar slower than a pixel in this long
@@ -317,11 +317,11 @@ pub struct Progress {
     /// Hidden in the notification area (#63): not shown, its tab and choices kept for when it
     /// comes back (the tray's "Downloads in progress", or the download double-clicked).
     pub hidden: bool,
-    /// A tray shows MDM's icon, so the window can be hidden there (set by the app each frame).
+    /// A tray shows ODM's icon, so the window can be hidden there (set by the app each frame).
     pub tray: bool,
     /// Options → General → "Minimize to the notification area": Minimize hides it there too.
     pub minimize_to_tray: bool,
-    /// MDM's main window is shown (set by the app each frame): the glide's frames draw it too.
+    /// ODM's main window is shown (set by the app each frame): the glide's frames draw it too.
     pub main_shown: bool,
     /// The speed limit holding the download back (set by the app each frame, #1191): its
     /// Transfer rate names it.
@@ -568,7 +568,7 @@ impl Progress {
         #[cfg(not(windows))]
         let hwnd = None;
         let native_title = if cfg!(windows) && hwnd.is_none() {
-            format!("mdm-progress-{}", self.id)
+            format!("odm-progress-{}", self.id)
         } else {
             title
         };
@@ -798,7 +798,7 @@ impl Progress {
             ButtonKind::Normal
         };
         // The site sent its page instead of the file (#701): a button opens the link in the
-        // browser, which gets past the page (its download then comes back to MDM).
+        // browser, which gets past the page (its download then comes back to ODM).
         let web_page = item.got_web_page();
         // i18n: button in a download's progress window when the site sent a web page (a waiting page, a captcha) instead of the file: opens the download's link in the web browser
         let open_label = crate::i18n::mark("Open in browser");
@@ -951,7 +951,7 @@ impl Progress {
             self.tab = tabs[i].0;
         }
         self.tab_row_menu(ui, r(o, 18.0, 6.0, 514.0, 22.0));
-        // MDM's (#63): IDM puts this in its title bar, which here is the system's own (it takes
+        // ODM's (#63): IDM puts this in its title bar, which here is the system's own (it takes
         // no buttons of ours), so it sits at the tab row's end, over the page's corner.
         tab_button
             && winui::to_tray_button(
@@ -1399,7 +1399,7 @@ impl Progress {
                 // file named; nothing is connecting.
                 let completing = item.torrent.is_none()
                     && snap.is_some_and(|s| {
-                        s.state == mdm_engine::download::State::Completing
+                        s.state == odm_engine::download::State::Completing
                             || (s.size.is_some_and(|t| t > 0 && s.downloaded >= t)
                                 && !s
                                     .connections
@@ -1550,8 +1550,8 @@ impl Progress {
                 16.0,
             );
         }
-        // Where its server is (#140): a file download's, and a video's whose streams MDM's engine
-        // downloads (#769; a torrent or a gallery has no single server of MDM's own). As the
+        // Where its server is (#140): a file download's, and a video's whose streams ODM's engine
+        // downloads (#769; a torrent or a gallery has no single server of ODM's own). As the
         // running download sees it, else as its last run did.
         let seen = snap
             .and_then(|s| s.server.as_ref())
@@ -2268,7 +2268,7 @@ fn number_column_extra(widest: f32, title: f32) -> f32 {
 /// How far the check or the merge after the last byte has come (#736), when it is under way
 /// and that is known.
 fn finishing_fraction(snap: Option<&Snapshot>) -> Option<f64> {
-    use mdm_engine::download::State;
+    use odm_engine::download::State;
     let s = snap.filter(|s| matches!(s.state, State::Verifying | State::Merging))?;
     s.finishing.map(|f| f.clamp(0.0, 1.0))
 }
@@ -2330,18 +2330,18 @@ fn segment_bar(p: &egui::Painter, o: Pos2, item: &Item, segments: &[(u64, f64)])
     }
 }
 
-/// Why yt-dlp downloads a video itself rather than MDM's engine (#769), as one short line.
-fn helper_line(why: &mdm_tools::streams::Helper) -> String {
-    use mdm_tools::streams::Helper;
+/// Why yt-dlp downloads a video itself rather than ODM's engine (#769), as one short line.
+fn helper_line(why: &odm_tools::streams::Helper) -> String {
+    use odm_tools::streams::Helper;
     match why {
-        // i18n: progress window, a video's line: MDM's own downloader can't take a live broadcast, so the helper program yt-dlp records it
+        // i18n: progress window, a video's line: ODM's own downloader can't take a live broadcast, so the helper program yt-dlp records it
         Helper::Live => crate::i18n::t("yt-dlp downloads it itself: a live stream").to_owned(),
         Helper::Pieces(_) => {
             // i18n: progress window, a video's line: a stream sent in many small pieces of a rare kind (Adobe HDS, Smooth Streaming), which the helper program yt-dlp downloads itself
             crate::i18n::t("yt-dlp downloads it itself: a stream in pieces").to_owned()
         }
         Helper::Protocol(protocol) => crate::i18n::fmt(
-            // i18n: progress window, a video's line: {protocol} = a streaming protocol's short name (rtmp, rtsp, mms); MDM's own downloader doesn't speak it, so the helper program yt-dlp downloads it
+            // i18n: progress window, a video's line: {protocol} = a streaming protocol's short name (rtmp, rtsp, mms); ODM's own downloader doesn't speak it, so the helper program yt-dlp downloads it
             crate::i18n::t("yt-dlp downloads it itself: {protocol}"),
             &[("protocol", &protocol.to_ascii_uppercase())],
         ),
@@ -2349,7 +2349,7 @@ fn helper_line(why: &mdm_tools::streams::Helper) -> String {
             // i18n: progress window, a video's line: the stream is copy-protected (DRM), left to the helper program yt-dlp, which refuses it
             crate::i18n::t("yt-dlp downloads it itself: protected (DRM)").to_owned()
         }
-        // i18n: progress window, a video's line: the helper program yt-dlp gave no address MDM's own downloader could use
+        // i18n: progress window, a video's line: the helper program yt-dlp gave no address ODM's own downloader could use
         Helper::NoAddress => crate::i18n::t("yt-dlp downloads it itself").to_owned(),
     }
 }

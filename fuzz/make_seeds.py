@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SEEDS = ROOT / "fuzz" / "seeds"
 TOOLS = ROOT / "crates" / "tools" / "tests" / "fixtures"
 ENGINE = ROOT / "crates" / "engine" / "tests" / "data"
-SEP = b"\n--mdm-fuzz--\n"  # fuzz_targets/signature.rs
+SEP = b"\n--odm-fuzz--\n"  # fuzz_targets/signature.rs
 
 
 def seed(target: str, name: str, data: bytes) -> None:
@@ -152,8 +152,8 @@ def torrents() -> None:
 
 def signatures() -> None:
     keys = TOOLS.parent.parent / "keys"
-    mdm = (TOOLS / "mdm-SHA256SUMS.txt").read_bytes()
-    seed("signature", "mdm", b"\x00" + (TOOLS / "mdm-SHA256SUMS.txt.sig").read_bytes() + SEP + mdm)
+    odm = (TOOLS / "odm-SHA256SUMS.txt").read_bytes()
+    seed("signature", "odm", b"\x00" + (TOOLS / "odm-SHA256SUMS.txt.sig").read_bytes() + SEP + odm)
     seed(
         "signature",
         "ytdlp",
@@ -169,13 +169,13 @@ def signatures() -> None:
     )
     seed(
         "signature",
-        "mdm-key",
+        "odm-key",
         b"\x03"
-        + (keys / "mdm-release.asc").read_bytes()
+        + (keys / "odm-release.asc").read_bytes()
         + SEP
-        + (TOOLS / "mdm-SHA256SUMS.txt.sig").read_bytes()
+        + (TOOLS / "odm-SHA256SUMS.txt.sig").read_bytes()
         + SEP
-        + mdm,
+        + odm,
     )
 
 

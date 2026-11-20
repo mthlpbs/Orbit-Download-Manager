@@ -1,4 +1,4 @@
-//! Rapidgator's links against the lab's fake Rapidgator (`mdm_labserver::rapidgator`): its host
+//! Rapidgator's links against the lab's fake Rapidgator (`odm_labserver::rapidgator`): its host
 //! names resolve to the lab server, which answers as Rapidgator does for a premium account (a
 //! file's page with a download link on a file host, links that answer 404 once they expire), over
 //! plain http on the lab's port. The browser hands over the file host's link itself, its Referer
@@ -7,8 +7,8 @@
 
 use std::time::{Duration, Instant};
 
-use mdm_engine::{Destination, Download, Error, Options, Request};
-use mdm_labserver::{Config, Faults, LabServer, LogEntry, content, rapidgator};
+use odm_engine::{Destination, Download, Error, Options, Request};
+use odm_labserver::{Config, Faults, LabServer, LogEntry, content, rapidgator};
 use reqwest::header::{COOKIE, HeaderMap, HeaderValue, REFERER};
 use url::Url;
 
@@ -201,9 +201,9 @@ async fn a_download_resumed_after_its_link_expired_goes_on() {
     let state = std::fs::read_dir(dir.path())
         .unwrap()
         .map(|e| e.unwrap().path())
-        .find(|p| p.to_string_lossy().ends_with(".mdm.json"))
+        .find(|p| p.to_string_lossy().ends_with(".odm.json"))
         .expect("a resume state");
-    let saved = mdm_engine::state::ResumeState::load(&state).unwrap();
+    let saved = odm_engine::state::ResumeState::load(&state).unwrap();
     let kept = saved.downloaded();
     assert!(kept > 0 && kept < size as u64, "partly downloaded: {kept}");
     while now_ms() <= expires {

@@ -19,9 +19,9 @@ fn main() {
     // Embed the Orbit icon and Windows version resources.
     #[cfg(windows)]
     if windows {
-        println!("cargo:rerun-if-changed=assets/icons/app/mdm.ico");
+        println!("cargo:rerun-if-changed=assets/icons/app/odm.ico");
         let mut res = winresource::WindowsResource::new();
-        res.set_icon("assets/icons/app/mdm.ico")
+        res.set_icon("assets/icons/app/odm.ico")
             .set("ProductName", "Orbit Download Manager")
             .set("FileDescription", "Orbit Download Manager")
             .set("CompanyName", "Mithila Prabashwara")
@@ -37,7 +37,7 @@ fn main() {
     }
 }
 
-/// The commit this is built from (`MDM_COMMIT`, "unknown" outside a git checkout), for Help →
+/// The commit this is built from (`ODM_COMMIT`, "unknown" outside a git checkout), for Help →
 /// About and problem reports.
 fn commit() {
     println!("cargo:rerun-if-changed=../../.git/HEAD");
@@ -50,5 +50,5 @@ fn commit() {
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
         .filter(|h| !h.is_empty())
         .unwrap_or_else(|| "unknown".into());
-    println!("cargo:rustc-env=MDM_COMMIT={hash}");
+    println!("cargo:rustc-env=ODM_COMMIT={hash}");
 }

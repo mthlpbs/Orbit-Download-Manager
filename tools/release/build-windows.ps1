@@ -41,9 +41,9 @@ if ($LASTEXITCODE) { throw "Windows packaging failed" }
 if ($LASTEXITCODE) { throw "extension validation failed" }
 $version = [regex]::Match((Get-Content (Join-Path $root "Cargo.toml") -Raw), '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
 $dist = Join-Path $root "target\dist"
-Copy-Item -LiteralPath (Join-Path $root "target\extension\mdm-chromium.zip") -Destination (Join-Path $dist "OrbitDownloadManager-$version-extension-chromium.zip")
-Copy-Item -LiteralPath (Join-Path $root "target\extension\mdm-firefox.xpi") -Destination (Join-Path $dist "OrbitDownloadManager-$version-extension-firefox.xpi")
-Copy-Item -LiteralPath (Join-Path $root "target\extension\mdm-chrome-store.zip") -Destination (Join-Path $dist "OrbitDownloadManager-$version-extension-chrome-store.zip")
+Copy-Item -LiteralPath (Join-Path $root "target\extension\odm-chromium.zip") -Destination (Join-Path $dist "OrbitDownloadManager-$version-extension-chromium.zip")
+Copy-Item -LiteralPath (Join-Path $root "target\extension\odm-firefox.xpi") -Destination (Join-Path $dist "OrbitDownloadManager-$version-extension-firefox.xpi")
+Copy-Item -LiteralPath (Join-Path $root "target\extension\odm-chrome-store.zip") -Destination (Join-Path $dist "OrbitDownloadManager-$version-extension-chrome-store.zip")
 $files = Get-ChildItem -LiteralPath $dist -File | Where-Object Name -Like "OrbitDownloadManager-$version-*" | Sort-Object Name
 $files | ForEach-Object { "{0}  {1}" -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name } |
   Set-Content -Encoding ascii (Join-Path $dist "SHA256SUMS.txt")

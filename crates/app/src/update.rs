@@ -1,7 +1,7 @@
 //! Updating in place (Help → Check for updates → Update now): this copy's release file, fetched
-//! and checked in the background (`mdm_tools::update`: the release's signed checksum list), then
+//! and checked in the background (`odm_tools::update`: the release's signed checksum list), then
 //! put where this copy is, on a thread of its own too (unpacking, `tar`, `hdiutil`, `ditto`: the
-//! window's thread waits for none of them, #222). MDM closes for it; the new copy starts with
+//! window's thread waits for none of them, #222). ODM closes for it; the new copy starts with
 //! `/updated`, waits for the old one to be gone, and removes what the update set aside.
 
 use std::path::{Path, PathBuf};
@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use mdm_tools::update::{Arch, Install, Progress};
+use odm_tools::update::{Arch, Install, Progress};
 
 /// The switch the updated copy starts with.
 pub const UPDATED: &str = "/updated";
@@ -18,11 +18,11 @@ pub const UPDATED: &str = "/updated";
 /// What follows once the file is in place.
 #[derive(Debug)]
 pub enum Next {
-    /// MDM closes once this has started: the new copy (or the installer, which starts it).
+    /// ODM closes once this has started: the new copy (or the installer, which starts it).
     /// Started on the worker, but only when not cancelled meanwhile ([`Job::drop`]: closing the
     /// window starts nothing).
     Restart,
-    /// Handed to the system's package installer (a .deb or .rpm): MDM stays open.
+    /// Handed to the system's package installer (a .deb or .rpm): ODM stays open.
     Opened,
 }
 
@@ -52,7 +52,7 @@ fn asset_on(
 
 /// Where update files are kept until the next start.
 fn folder() -> Option<PathBuf> {
-    mdm_ipc::data_dir().map(|d| d.join("updates"))
+    odm_ipc::data_dir().map(|d| d.join("updates"))
 }
 
 /// A release file on its way: its progress, then the checked file put in place ([`apply`]), or
@@ -97,7 +97,7 @@ impl Job {
         let net = crate::settings::own_net();
         let task = rt.spawn(async move {
             let fetched = match folder() {
-                Some(dir) => mdm_tools::update::fetch(&assets, &name, &dir, &net, &p)
+                Some(dir) => odm_tools::update::fetch(&assets, &name, &dir, &net, &p)
                     .await
                     .map_err(|e| e.to_string()),
                 None => Err("no data folder".into()),
@@ -142,7 +142,7 @@ impl Job {
 fn apply(install: Install, file: &Path, cancelled: &AtomicBool) -> Result<Next, String> {
     // Tests only (feature `test-update`): "Installing the update..." held this many seconds.
     #[cfg(feature = "test-update")]
-    if let Some(secs) = std::env::var("MDM_TEST_UPDATE_HOLD")
+    if let Some(secs) = std::env::var("ODM_TEST_UPDATE_HOLD")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
     {
@@ -166,8 +166,8 @@ fn apply(install: Install, file: &Path, cancelled: &AtomicBool) -> Result<Next, 
         Ok(Next::Restart)
     };
     match install {
-        // The installer closes MDM itself (/exit), installs where it was (the same install
-        // mode), and starts it again (/relaunch, tools/installer/mdm.iss).
+        // The installer closes ODM itself (/exit), installs where it was (the same install
+        // mode), and starts it again (/relaunch, tools/installer/odm.iss).
         Install::Installer => {
             if cancelled.load(Ordering::Acquire) {
                 return Err("cancelled".into());
@@ -184,10 +184,10 @@ fn apply(install: Install, file: &Path, cancelled: &AtomicBool) -> Result<Next, 
         }
         Install::PortableZip | Install::PlainZip => {
             let out = unpack_dir()?;
-            mdm_tools::update::unzip(file, &out).map_err(|e| e.to_string())?;
-            let new = mdm_tools::update::single_folder(&out);
+            odm_tools::update::unzip(file, &out).map_err(|e| e.to_string())?;
+            let new = odm_tools::update::single_folder(&out);
             // A portable copy's list and settings stay where they are.
-            mdm_tools::update::replace_files(&new, &dir, &["data"]).map_err(|e| e.to_string())?;
+            odm_tools::update::replace_files(&new, &dir, &["data"]).map_err(|e| e.to_string())?;
             restart(&exe)
         }
         Install::TarGz => {
@@ -202,8 +202,8 @@ fn apply(install: Install, file: &Path, cancelled: &AtomicBool) -> Result<Next, 
             if !ok {
                 return Err("couldn't unpack the update".into());
             }
-            let new = mdm_tools::update::single_folder(&out);
-            mdm_tools::update::replace_files(&new, &dir, &[]).map_err(|e| e.to_string())?;
+            let new = odm_tools::update::single_folder(&out);
+            odm_tools::update::replace_files(&new, &dir, &[]).map_err(|e| e.to_string())?;
             restart(&exe)
         }
         Install::AppImage => {
@@ -222,7 +222,7 @@ fn apply(install: Install, file: &Path, cancelled: &AtomicBool) -> Result<Next, 
             restart(&target)
         }
         Install::Dmg => {
-            let bundle = mdm_tools::update::app_bundle(&exe).ok_or("not in an app bundle")?;
+            let bundle = odm_tools::update::app_bundle(&exe).ok_or("not in an app bundle")?;
             let mount = folder().ok_or("no data folder")?.join("mount");
             std::fs::create_dir_all(&mount).map_err(|e| e.to_string())?;
             let run = |c: &mut Command| c.status().is_ok_and(|s| s.success());
@@ -273,7 +273,7 @@ fn apply(install: Install, file: &Path, cancelled: &AtomicBool) -> Result<Next, 
 pub fn lock_after_update() -> Option<std::fs::File> {
     let start = Instant::now();
     loop {
-        if let Some(lock) = mdm_ipc::instance_lock() {
+        if let Some(lock) = odm_ipc::instance_lock() {
             return Some(lock);
         }
         if start.elapsed() > Duration::from_secs(20) {
@@ -290,9 +290,9 @@ pub fn tidy() {
         return;
     };
     if let Some(dir) = exe.parent() {
-        mdm_tools::update::remove_old(dir);
+        odm_tools::update::remove_old(dir);
     }
-    if let Some(bundle) = mdm_tools::update::app_bundle(&exe) {
+    if let Some(bundle) = odm_tools::update::app_bundle(&exe) {
         let _ = std::fs::remove_dir_all(bundle.with_extension("app.old"));
     }
     if let Some(dir) = folder() {

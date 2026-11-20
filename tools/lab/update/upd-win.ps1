@@ -1,5 +1,5 @@
 # Update now, end to end, on Windows: the portable zip path (README.md). Off-screen test copies in
-# folders of their own (never the installed MDM), fake 9.9.9 releases signed with a throwaway key
+# folders of their own (never the installed ODM), fake 9.9.9 releases signed with a throwaway key
 # made for this run (mkrel.py), served by the lab server on 127.0.0.1. Needs a release-mode build
 # with the `test-update` feature (Install::detect says "built from source" in debug builds).
 #
@@ -108,16 +108,16 @@ json.dump({"next_id": 1, "items": [], "version": 2, "settings": s}, open(path, "
   if ($close -eq "download") {
     $slow = Start-Process -PassThru -WindowStyle Hidden python -ArgumentList "`"$PSScriptRoot\slowserve.py`"", "`"$relDir`"", "$SlowPort", "1000000"
   }
-  $env:MDM_OFFSCREEN = "1"
-  $env:MDM_UPDATE_FEED = "$base/latest.json"
-  $env:MDM_TEST_UPDATE_KEY = $key
-  if ($hold) { $env:MDM_TEST_UPDATE_HOLD = "$hold" } else { Remove-Item Env:MDM_TEST_UPDATE_HOLD -ErrorAction SilentlyContinue }
+  $env:ODM_OFFSCREEN = "1"
+  $env:ODM_UPDATE_FEED = "$base/latest.json"
+  $env:ODM_TEST_UPDATE_KEY = $key
+  if ($hold) { $env:ODM_TEST_UPDATE_HOLD = "$hold" } else { Remove-Item Env:ODM_TEST_UPDATE_HOLD -ErrorAction SilentlyContinue }
   $r = @{ started = $false; oldEnded = $false; marker = $false }
   try {
     $app = Start-Process -PassThru "$copy\orbitdownloadmanager.exe"
     $main = $null
     for ($i = 0; $i -lt 200 -and -not $main; $i++) { Start-Sleep -Milliseconds 100; $main = [UW]::Of([uint32]$app.Id) | Select-Object -First 1 }
-    if (-not $main) { throw "$name`: MDM showed no window" }
+    if (-not $main) { throw "$name`: ODM showed no window" }
     Start-Sleep 2
     $suffix = "$lang-" + $(if ($dark) { "dark" } else { "light" })
     if ($shots) {
@@ -178,7 +178,7 @@ json.dump({"next_id": 1, "items": [], "version": 2, "settings": s}, open(path, "
     if ($app -and -not $app.HasExited) { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue }
     Stop-Process -Id $srv.Id -Force -ErrorAction SilentlyContinue
     if ($slow) { Stop-Process -Id $slow.Id -Force -ErrorAction SilentlyContinue }
-    Remove-Item Env:MDM_OFFSCREEN, Env:MDM_UPDATE_FEED, Env:MDM_TEST_UPDATE_KEY, Env:MDM_TEST_UPDATE_HOLD -ErrorAction SilentlyContinue
+    Remove-Item Env:ODM_OFFSCREEN, Env:ODM_UPDATE_FEED, Env:ODM_TEST_UPDATE_KEY, Env:ODM_TEST_UPDATE_HOLD -ErrorAction SilentlyContinue
     Start-Sleep 1
   }
 }

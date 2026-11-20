@@ -4,8 +4,8 @@
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use mdm_engine::state::{ResumeState, state_path};
-use mdm_labserver::{Config, Faults, LabServer, content};
+use odm_engine::state::{ResumeState, state_path};
+use odm_labserver::{Config, Faults, LabServer, content};
 
 /// The app's program, which runs orbitdownloadmanager-cli's commands when its launcher
 /// (crates/cli) starts it with `--cli`.
@@ -24,7 +24,7 @@ async fn killed_download_resumes_correctly() {
     let size: u64 = 24 << 20;
 
     let mut child = Command::new(APP)
-        .arg(mdm_cli::FLAG)
+        .arg(odm_cli::FLAG)
         .args(["get", &s.url("/gen/24M?seed=11"), "-o"])
         .arg(&dest)
         .stdout(Stdio::null())
@@ -52,7 +52,7 @@ async fn killed_download_resumes_correctly() {
     assert!(!dest.exists(), "not complete yet");
 
     let status = Command::new(APP)
-        .arg(mdm_cli::FLAG)
+        .arg(odm_cli::FLAG)
         .arg("resume")
         .arg(&state)
         .stdout(Stdio::null())

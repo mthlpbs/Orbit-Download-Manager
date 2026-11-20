@@ -10,7 +10,7 @@
 //! - `POST /flash/add`: `urls`, the links as they are ("plain CNL2"), with the same fields.
 //!
 //! The two checks that page documents aren't answered: `GET /jdcheck.js` is a script that sets a
-//! variable named after JDownloader, and `GET /flash/` a page with its name in it. MDM doesn't
+//! variable named after JDownloader, and `GET /flash/` a page with its name in it. ODM doesn't
 //! say it is another program, so a page that asks first sees no program here; one that posts
 //! its form is taken (#486).
 //!
@@ -20,7 +20,7 @@
 //! it. The site is the one the browser names (`Origin`, else `Referer`), never one the page
 //! names itself; links to this computer or its network are left out. Off unless the user turns
 //! it on. (`/flash/addcrypted`, a DLC container, isn't taken: reading one needs a
-//! key MDM can't use, #486.)
+//! key ODM can't use, #486.)
 
 mod crypto;
 

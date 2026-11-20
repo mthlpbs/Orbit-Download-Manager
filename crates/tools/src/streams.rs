@@ -1,5 +1,5 @@
-//! A video's streams downloaded by MDM's engine (#769). yt-dlp looks the page up and chooses the
-//! formats (its `-f`); MDM's engine downloads each stream as it downloads any file, over the
+//! A video's streams downloaded by ODM's engine (#769). yt-dlp looks the page up and chooses the
+//! formats (its `-f`); ODM's engine downloads each stream as it downloads any file, over the
 //! connections Options → Connection gives, under the speed limits, with pause and resume and
 //! retries, into the very file yt-dlp would have written (`<stem>.f<id>.<ext>` for a stream it
 //! merges, `<stem>.<ext>` for a choice of one). yt-dlp then does what it does after its own
@@ -24,9 +24,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use futures::future::BoxFuture;
-use mdm_engine::browserlike::{self, Connection};
-use mdm_engine::download::{ConnView, SegmentView, State as DlState};
-use mdm_engine::{Destination, Download, Request, ServiceFault, Unlocked, Unlocker};
+use odm_engine::browserlike::{self, Connection};
+use odm_engine::download::{ConnView, SegmentView, State as DlState};
+use odm_engine::{Destination, Download, Request, ServiceFault, Unlocked, Unlocker};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
@@ -412,13 +412,13 @@ impl Unlocker for StreamLink {
     }
 }
 
-/// MDM's engine for a video's streams: the app's runtime, and the options a file from the page
+/// ODM's engine for a video's streams: the app's runtime, and the options a file from the page
 /// would get (connections, proxy, network adapter, DNS, the limit for all downloads, the hosts'
 /// learned limits, this download's own speed limit).
 #[derive(Clone)]
 pub struct Engine {
     pub handle: tokio::runtime::Handle,
-    pub opts: mdm_engine::Options,
+    pub opts: odm_engine::Options,
 }
 
 /// The engine's download under way and its speed limit, shared with [`crate::video::VideoJob`]:
@@ -429,7 +429,7 @@ pub struct Current {
     pieces: Mutex<Option<CancellationToken>>,
     limit: Mutex<Option<u64>>,
     /// The pieces' own speed limit (the download's), shared by their connections.
-    limiter: Arc<mdm_engine::limiter::Limiter>,
+    limiter: Arc<odm_engine::limiter::Limiter>,
     /// An engine download is under way or ending: its resume state isn't saved yet.
     busy: AtomicBool,
 }
@@ -440,7 +440,7 @@ impl Current {
             dl: Mutex::new(None),
             pieces: Mutex::new(None),
             limit: Mutex::new(limit),
-            limiter: Arc::new(mdm_engine::limiter::Limiter::new(limit)),
+            limiter: Arc::new(odm_engine::limiter::Limiter::new(limit)),
             busy: AtomicBool::new(false),
         }
     }
@@ -478,7 +478,7 @@ impl Current {
     }
 
     /// The download's own speed limit, shared by its pieces' connections.
-    pub fn limiter(&self) -> Arc<mdm_engine::limiter::Limiter> {
+    pub fn limiter(&self) -> Arc<odm_engine::limiter::Limiter> {
         self.limiter.clone()
     }
 }
@@ -489,7 +489,7 @@ impl Current {
 pub struct View {
     pub segments: Vec<SegmentView>,
     pub connections: Vec<ConnView>,
-    pub server: Option<mdm_engine::Server>,
+    pub server: Option<odm_engine::Server>,
     /// The address the stream under way comes from, as yt-dlp gave it (#795): the windows'
     /// "Address", the page being the web page it was obtained from.
     pub address: Option<Url>,
@@ -571,7 +571,7 @@ pub fn fetch(
         if report.stopped() {
             return Fetched::Stopped;
         }
-        let state = mdm_engine::state::state_path(&s.path);
+        let state = odm_engine::state::state_path(&s.path);
         // Whole already (an earlier run's, its merge not done): yt-dlp takes it as it is.
         if !state.exists() && s.path.is_file() {
             known[i] = std::fs::metadata(&s.path).ok().map(|m| m.len());
@@ -622,7 +622,7 @@ pub fn fetch(
                             s.format_id
                         ));
                         let _ = std::fs::remove_file(&state);
-                        let _ = std::fs::remove_file(mdm_engine::naming::part_path(&s.path));
+                        let _ = std::fs::remove_file(odm_engine::naming::part_path(&s.path));
                         fresh(page, s, opts)
                     }
                 }
@@ -645,7 +645,7 @@ pub fn fetch(
                     s.path.display()
                 ));
             }
-            (DlState::Cancelled, _) | (_, Some(Err(mdm_engine::Error::Cancelled))) => {
+            (DlState::Cancelled, _) | (_, Some(Err(odm_engine::Error::Cancelled))) => {
                 return Fetched::Stopped;
             }
             (_, Some(Err(e))) => return Fetched::Failed(e.to_string()),
@@ -664,10 +664,10 @@ enum Unlisted {
 
 /// The pieces of stream `s` (an HLS playlist fetched and read, DASH's as yt-dlp listed them),
 /// and the browser-like connection when the playlist only came on it (#1289: its site's bot
-/// check refused MDM's own connection; its pieces then start on it).
+/// check refused ODM's own connection; its pieces then start on it).
 async fn list_pieces(
     s: &Stream,
-    opts: &mdm_engine::Options,
+    opts: &odm_engine::Options,
 ) -> Result<(Vec<crate::pieces::Piece>, Option<Connection>), Unlisted> {
     use crate::pieces::Unlisted as U;
     let (extra, extra_key) = match &s.kind {
@@ -677,7 +677,7 @@ async fn list_pieces(
     };
     let failed = |e: String| Unlisted::Failed(format!("the playlist: {e}"));
     let headers = header_map(&s.headers);
-    let client = mdm_engine::http_client(opts, &s.url).map_err(|e| failed(e.to_string()))?;
+    let client = odm_engine::http_client(opts, &s.url).map_err(|e| failed(e.to_string()))?;
     let resp = client
         .get(s.url.clone())
         .headers(headers.clone())
@@ -825,7 +825,7 @@ fn fetch_pieces(
     }
 }
 
-fn fresh(page: &Url, s: &Stream, opts: mdm_engine::Options) -> Download {
+fn fresh(page: &Url, s: &Stream, opts: odm_engine::Options) -> Download {
     Download::start(
         Request {
             url: page.clone(),

@@ -9,7 +9,7 @@
 //! nothing but the next read.
 //!
 //! The watch for copied links (Options → General, [`watch`]) looks at the clipboard from its own
-//! thread, once a second, and wakes the window only when a new text was copied: an idle MDM
+//! thread, once a second, and wakes the window only when a new text was copied: an idle ODM
 //! draws no frame for it (each one cost the processor much on a software renderer, #847). On
 //! Windows it reads the clipboard only when its sequence number changed.
 //!
@@ -171,7 +171,7 @@ impl Drop for Reader {
 /// The window woken when an answer comes (set once the window exists).
 static WINDOW: OnceLock<egui::Context> = OnceLock::new();
 
-/// MDM's reader, of the system clipboard ([`crate::clipboard_text`]); started at its first ask.
+/// ODM's reader, of the system clipboard ([`crate::clipboard_text`]); started at its first ask.
 fn reader() -> &'static Reader {
     static READER: OnceLock<Reader> = OnceLock::new();
     READER.get_or_init(|| {
@@ -279,7 +279,7 @@ pub fn copied() -> Option<String> {
 }
 
 /// The watch's thread: a look each second while it is on, through the reader (one read at a
-/// time in MDM), quietly: the window is woken only for a new text.
+/// time in ODM), quietly: the window is woken only for a new text.
 fn watching() {
     let mut seen = Watch::default();
     loop {
@@ -482,7 +482,7 @@ mod tests {
     fn a_failed_read_offers_no_link_twice() {
         let text = |t: &'static str| move || Some(Read::Text(t.to_owned()));
         let failed = || Some(Read::Failed);
-        let url = "https://mdm.example/setup.exe";
+        let url = "https://odm.example/setup.exe";
         let mut w = Watch::default();
         assert_eq!(w.look(Some(1), text(url)), None, "only noted");
         // The clipboard changes, but is held by another program as the watch reads.
@@ -494,17 +494,17 @@ mod tests {
         // A new link copied while the clipboard couldn't be read: offered once it is.
         assert_eq!(w.look(Some(5), failed), None);
         assert_eq!(
-            w.look(Some(5), text("https://mdm.example/new.zip"))
+            w.look(Some(5), text("https://odm.example/new.zip"))
                 .as_deref(),
-            Some("https://mdm.example/new.zip")
+            Some("https://odm.example/new.zip")
         );
         // Emptied (read: no text), then the same link copied: a new copy, offered.
         assert_eq!(w.look(Some(6), || Some(Read::NoText)), None);
         assert_eq!(w.look(Some(7), failed), None);
         assert_eq!(
-            w.look(Some(8), text("https://mdm.example/new.zip"))
+            w.look(Some(8), text("https://odm.example/new.zip"))
                 .as_deref(),
-            Some("https://mdm.example/new.zip")
+            Some("https://odm.example/new.zip")
         );
         // A failed read is read again at the next look, even with no new change number.
         let mut reads = 0;
@@ -518,7 +518,7 @@ mod tests {
         assert_eq!(reads, 2);
         // No answer in time (an owner that hung) is the same: nothing seen, read again.
         assert_eq!(w.look(Some(10), || None), None);
-        assert_eq!(w.look(Some(10), text("https://mdm.example/new.zip")), None);
+        assert_eq!(w.look(Some(10), text("https://odm.example/new.zip")), None);
         // Failed first looks: the first read that succeeds only notes what is there.
         let mut w = Watch::default();
         assert_eq!(w.look(Some(1), failed), None);

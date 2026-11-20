@@ -1,4 +1,4 @@
-//! Resume state: `<file>.mdm.json` beside the part file (notes/ENGINE.md §3).
+//! Resume state: `<file>.odm.json` beside the part file (notes/ENGINE.md §3).
 //!
 //! Request headers (cookies, authorization) are deliberately not stored: whoever resumes the
 //! download supplies them again, so no credentials sit in the download folder.
@@ -41,9 +41,13 @@ pub struct ResumeState {
     pub checksum: Option<crate::verify::Hash>,
     /// The first run got past a refusal by asking with `Options::agent_fallback` instead of the
     /// browser's User-Agent (#372): a resume asks the same way.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub asked_as_mdm: bool,
-    /// Only MDM's own name (`Options::own_agent`) got past the site's bot check (#1422): a
+    #[serde(
+        default,
+        alias = "asked_as_mdm",
+        skip_serializing_if = "std::ops::Not::not"
+    )]
+    pub asked_as_odm: bool,
+    /// Only ODM's own name (`Options::own_agent`) got past the site's bot check (#1422): a
     /// resume asks under it too.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub asked_as_own: bool,
@@ -70,7 +74,7 @@ impl ResumeState {
             segments: Vec::new(),
             content_type: None,
             checksum: None,
-            asked_as_mdm: false,
+            asked_as_odm: false,
             asked_as_own: false,
             final_get: false,
             browser_like: false,
@@ -205,11 +209,26 @@ fn is_strong_date(last_modified: &str, date: Option<&str>) -> bool {
     date >= lm + std::time::Duration::from_secs(1)
 }
 
-/// `<dest>.mdm.json`.
+/// `<dest>.odm.json`.
 pub fn state_path(dest: &Path) -> PathBuf {
-    let mut s = dest.as_os_str().to_owned();
-    s.push(".mdm.json");
-    PathBuf::from(s)
+    artifact_path(dest, "json")
+}
+
+/// Use the ODM name for a new download. An unfinished download can still have
+/// the previous name, which must stay attached to its existing state and bytes.
+pub fn artifact_path(base: &Path, kind: &str) -> PathBuf {
+    let with_suffix = |prefix| {
+        let mut path = base.as_os_str().to_owned();
+        path.push(prefix);
+        path.push(kind);
+        PathBuf::from(path)
+    };
+    let current = with_suffix(".odm.");
+    let previous = with_suffix(".mdm.");
+    if previous.exists() && !current.exists() {
+        return previous;
+    }
+    current
 }
 
 /// Downloads started under the app's former codename keep `<dest>.idmnext.json` and
@@ -236,6 +255,25 @@ pub fn migrate_legacy(dest: &Path) -> bool {
 #[cfg(test)]
 mod migrate_tests {
     use super::*;
+
+    #[test]
+    fn previous_orbit_downloads_use_their_existing_artifacts() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("a.zip");
+        let old_state = dir.path().join("a.zip.mdm.json");
+        let old_part = dir.path().join("a.zip.mdm.part");
+        let old_pieces = dir.path().join("a.zip.mdm.pieces");
+        assert_eq!(state_path(&dest), dir.path().join("a.zip.odm.json"));
+        std::fs::write(&old_state, b"{}").unwrap();
+        std::fs::write(&old_part, b"data").unwrap();
+        std::fs::create_dir(&old_pieces).unwrap();
+        assert_eq!(state_path(&dest), old_state);
+        assert_eq!(crate::naming::part_path(&dest), old_part);
+        assert_eq!(artifact_path(&dest, "pieces"), old_pieces);
+        let new_state = dir.path().join("a.zip.odm.json");
+        std::fs::write(&new_state, b"{}").unwrap();
+        assert_eq!(state_path(&dest), new_state);
+    }
 
     #[test]
     fn legacy_files_are_renamed_once() {
@@ -315,7 +353,7 @@ mod tests {
     #[test]
     fn the_old_single_validator_is_migrated() {
         let dir = tempfile::tempdir().unwrap();
-        let p = dir.path().join("a.bin.mdm.json");
+        let p = dir.path().join("a.bin.odm.json");
         let old = r#"{"version":1,"url":"http://x/a","final_url":"http://cdn/a","dest":"a.bin",
             "size":5,"validator":"\"e\"","segments":[]}"#;
         std::fs::write(&p, old).unwrap();
@@ -338,7 +376,7 @@ mod tests {
     #[test]
     fn a_segment_that_goes_backwards_holds_no_bytes() {
         let dir = tempfile::tempdir().unwrap();
-        let p = dir.path().join("a.bin.mdm.json");
+        let p = dir.path().join("a.bin.odm.json");
         std::fs::write(
             &p,
             br#"{"version":1,"url":"http://x/a","final_url":"http://x/a","dest":"a.bin",

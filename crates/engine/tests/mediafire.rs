@@ -1,12 +1,12 @@
-//! MediaFire links (#952) against the lab's fake MediaFire (`mdm_labserver::mediafire`): its host
+//! MediaFire links (#952) against the lab's fake MediaFire (`odm_labserver::mediafire`): its host
 //! names resolve to the lab server, which answers as MediaFire does (a file's page with its
 //! download button, file host addresses whose tickets expire, the repair page after), over plain
 //! http on the lab's port.
 
 use std::time::{Duration, Instant};
 
-use mdm_engine::{Destination, Download, Options, Request};
-use mdm_labserver::{Config, Faults, LabServer, LogEntry, content, mediafire};
+use odm_engine::{Destination, Download, Options, Request};
+use odm_labserver::{Config, Faults, LabServer, LogEntry, content, mediafire};
 use url::Url;
 
 #[path = "support/resume.rs"]
@@ -99,7 +99,7 @@ async fn a_files_page_gives_the_file() {
     }
 }
 
-/// The browser's address, expired before MDM asks it (a download added for later): the repair
+/// The browser's address, expired before ODM asks it (a download added for later): the repair
 /// page it leads to goes back to the file's page, whose button has today's address.
 #[tokio::test]
 async fn an_expired_address_leads_to_todays() {
@@ -173,7 +173,7 @@ async fn a_download_resumed_after_its_address_expired_goes_on() {
         assert!(Instant::now() < deadline, "the download never started");
     }
     dl.cancel();
-    assert!(matches!(dl.wait().await, Err(mdm_engine::Error::Cancelled)));
+    assert!(matches!(dl.wait().await, Err(odm_engine::Error::Cancelled)));
     // The held-back answers go on (into connections the download closed), and end.
     s.set_faults(Faults::default());
     tokio::time::timeout(Duration::from_secs(10), s.settled())
@@ -182,9 +182,9 @@ async fn a_download_resumed_after_its_address_expired_goes_on() {
     let state = std::fs::read_dir(dir.path())
         .unwrap()
         .map(|e| e.unwrap().path())
-        .find(|p| p.to_string_lossy().ends_with(".mdm.json"))
+        .find(|p| p.to_string_lossy().ends_with(".odm.json"))
         .expect("a resume state");
-    let saved = mdm_engine::state::ResumeState::load(&state).unwrap();
+    let saved = odm_engine::state::ResumeState::load(&state).unwrap();
     let kept = saved.downloaded();
     assert!(kept > 0 && kept < size as u64, "partly downloaded: {kept}");
     // Its address expires meanwhile.

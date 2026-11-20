@@ -5,7 +5,7 @@ blank_issues_enabled: false
 contact_links:
   - name: Suggest an idea
     url: https://github.com/mthlpbs/Orbit-Download-Manager/discussions/new?category=ideas
-    about: Something MDM should do, or do differently. Ideas are talked over and voted on in Discussions.
+    about: Something ODM should do, or do differently. Ideas are talked over and voted on in Discussions.
   - name: Security problem
     url: https://github.com/mthlpbs/Orbit-Download-Manager/security/policy
     about: Report it privately, not as an issue.

@@ -1,9 +1,9 @@
 //! Orbit Download Manager's browser native messaging host (Chrome, Edge, Brave, Firefox).
 //!
 //! - Started by the browser: reads native messages (u32 LE length + JSON) from stdin, hands each
-//!   download to the running Orbit Download Manager over mdm-ipc (starting Orbit Download Manager if needed), answers
+//!   download to the running Orbit Download Manager over odm-ipc (starting Orbit Download Manager if needed), answers
 //!   `{"ok": …}`. A download Options says to leave to the browser (file type, excluded site or
-//!   address, browser, integration off: `mdm_ipc::capture`) is answered `{"ok": false}` without
+//!   address, browser, integration off: `odm_ipc::capture`) is answered `{"ok": false}` without
 //!   starting anything, and the extension lets the browser have it. `{"rules": true}` asks for
 //!   the file types to offer: `{"ok": true, "types": "EXE ZIP …"}`.
 //! - The download button over videos: `{"panel": true, "url": page}` asks whether it may show on
@@ -17,11 +17,11 @@
 //!   `rules`): `{"videoLookup": {page, src, title, referrer, storeId}}` has the running app look
 //!   the video up, `{"videoPoll": {token}}` asks how it goes, `{"videoPick": {token, choice,
 //!   storeId}}` downloads the choice made. Each is answered `{"ok": true, "lookup": {state, …}}`
-//!   (`mdm_ipc::api::VideoLookupAnswer`), never with a `why`; none of them starts the app
+//!   (`odm_ipc::api::VideoLookupAnswer`), never with a `why`; none of them starts the app
 //!   (`use-window`: the button's click then opens the Download video window as before). A
 //!   question waits here while the look-up runs, up to 1.5 s ([`POLL_WAIT`]).
 //! - The right-click menu's links (a page's, a selection's): `{"links": [...], referrer, cookies}`,
-//!   handed over as one list. A list longer than a message may be (`mdm_ipc::MAX_MESSAGE`, 1 MB)
+//!   handed over as one list. A list longer than a message may be (`odm_ipc::MAX_MESSAGE`, 1 MB)
 //!   comes in parts, each with `"linksPart": {batch, index, count}` and the page's context, each
 //!   handed over as it comes; the app puts them back together (crates/app/src/linkparts.rs).
 //! - `orbitdownloadmanager-nmhost --register` / `--unregister`: writes / removes the host
@@ -54,10 +54,10 @@ use serde::{Deserialize, Serialize};
 #[cfg(windows)]
 mod win32;
 
-use mdm_ipc::browsers::HOST_NAME;
+use odm_ipc::browsers::HOST_NAME;
 #[cfg(windows)]
-use mdm_ipc::browsers::{Family, Holder, Repair, WINDOWS_HOST_KEYS};
-use mdm_ipc::extension::{FIREFOX_ID, STORE_ID, chromium_ids, store_id};
+use odm_ipc::browsers::{Family, Holder, Repair, WINDOWS_HOST_KEYS};
+use odm_ipc::extension::{FIREFOX_ID, STORE_ID, chromium_ids, store_id};
 
 /// Chrome's external extensions: an entry naming the store's extension makes Chrome offer it at
 /// its next start ("New extension added"), the user turning it on there. HKLM's is read from the
@@ -79,12 +79,12 @@ struct Message {
     v: Option<String>,
     url: String,
     referrer: Option<String>,
-    /// The web page the download was started from, whole (#607; `mdm_ipc::Command::page_url`).
+    /// The web page the download was started from, whole (#607; `odm_ipc::Command::page_url`).
     page_url: Option<String>,
     cookies: Option<String>,
-    /// The same cookies with their domains and flags (`mdm_ipc::Command::cookie_jar`); an older
+    /// The same cookies with their domains and flags (`odm_ipc::Command::cookie_jar`); an older
     /// extension sends none.
-    cookie_jar: Vec<mdm_ipc::BrowserCookie>,
+    cookie_jar: Vec<odm_ipc::BrowserCookie>,
     use_site_cookies: Option<bool>,
     user_agent: Option<String>,
     /// `navigator.userAgentData` brands: Brave and Opera name themselves there, not in the
@@ -107,7 +107,7 @@ struct Message {
     /// From a private window.
     private: bool,
     /// The browser's proxy for `url` (#42): its address, or its auto-config script, and whether it
-    /// asked for a login (see mdm_ipc::Command).
+    /// asked for a login (see odm_ipc::Command).
     proxy: Option<String>,
     proxy_pac: Option<String>,
     proxy_login: bool,
@@ -143,7 +143,7 @@ struct Message {
     /// With `links`: their part of a list too long for one message (`MAX_MESSAGE`), which the
     /// app puts back together. An older host ignores it and hands each part over as a list of
     /// its own, which Link grabber adds to the one it shows.
-    links_part: Option<mdm_ipc::LinksPart>,
+    links_part: Option<odm_ipc::LinksPart>,
     /// The toolbar button: leave this site (a host name) to the browser.
     exclude_site: Option<String>,
     /// The popup's Undo (#404): take this host name off the excluded sites again.
@@ -151,7 +151,7 @@ struct Message {
     /// The toolbar button: bring Orbit Download Manager's window up.
     open: bool,
     /// The extension left a download to the browser by Options' rules (it has them from
-    /// `rules`) without asking about it: for MDM's log. Under its own key, with no `url`: an
+    /// `rules`) without asking about it: for ODM's log. Under its own key, with no `url`: an
     /// older host takes it for an address it can't download, and hands nothing over.
     declined: Option<Notice>,
     /// The video button's quality menu: look this video up (with the message's `cookies`,
@@ -291,9 +291,9 @@ struct Reply {
     #[serde(skip_serializing_if = "Option::is_none")]
     video_lookup: Option<bool>,
     /// The quality menu's answer: where the look-up is, or what became of the choice. Its
-    /// states are never a `why`: they say nothing of whether MDM is reachable.
+    /// states are never a `why`: they say nothing of whether ODM is reachable.
     #[serde(skip_serializing_if = "Option::is_none")]
-    lookup: Option<mdm_ipc::api::VideoLookupAnswer>,
+    lookup: Option<odm_ipc::api::VideoLookupAnswer>,
     /// For `panel` when it may show (#1278): Options → Download panels → Button size is
     /// Compact (the round button over every video). An older host doesn't say: Full.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -309,7 +309,7 @@ impl Reply {
     }
 
     /// The quality menu's answer.
-    fn lookup(answer: mdm_ipc::api::VideoLookupAnswer) -> Reply {
+    fn lookup(answer: odm_ipc::api::VideoLookupAnswer) -> Reply {
         Reply {
             ok: true,
             lookup: Some(answer),
@@ -326,9 +326,9 @@ impl Reply {
     }
 }
 
-/// The right-click menu's links (a page's, a selection's) as the app's command: those MDM
+/// The right-click menu's links (a page's, a selection's) as the app's command: those ODM
 /// downloads, with the page's referrer and cookies; or why not (the reply's `why` and `error`).
-fn links_command(m: &Message) -> Result<mdm_ipc::Command, (&'static str, &'static str)> {
+fn links_command(m: &Message) -> Result<odm_ipc::Command, (&'static str, &'static str)> {
     let links: Vec<String> = m
         .links
         .iter()
@@ -338,12 +338,12 @@ fn links_command(m: &Message) -> Result<mdm_ipc::Command, (&'static str, &'stati
     if m.links_part.as_ref().is_some_and(|p| !p.valid()) {
         return Err(("refused", "a part of a page's links that doesn't fit"));
     }
-    // A part goes to the app even with nothing in it MDM downloads: the list is complete only
+    // A part goes to the app even with nothing in it ODM downloads: the list is complete only
     // with all its parts.
     if links.is_empty() && m.links_part.is_none() {
-        return Err(("refused", "no link MDM downloads"));
+        return Err(("refused", "no link ODM downloads"));
     }
-    Ok(mdm_ipc::Command {
+    Ok(odm_ipc::Command {
         links,
         links_part: m.links_part.clone(),
         referer: m.referrer.clone().filter(|r| !r.is_empty()),
@@ -377,11 +377,11 @@ fn file_name_of(m: &Message) -> String {
 
 /// The browser `m` comes from, by the names Options lists.
 fn browser(m: &Message) -> &'static str {
-    mdm_ipc::capture::browser_named(m.user_agent.as_deref().unwrap_or_default(), &m.brands)
+    odm_ipc::capture::browser_named(m.user_agent.as_deref().unwrap_or_default(), &m.brands)
 }
 
 /// The answer to one message, under `rules` (the app's saved Options).
-fn answer(m: Message, rules: &mdm_ipc::capture::CaptureRules) -> Reply {
+fn answer(m: Message, rules: &odm_ipc::capture::CaptureRules) -> Reply {
     let browser = browser(&m);
     if m.rules || m.hello {
         return Reply {
@@ -433,17 +433,17 @@ fn answer(m: Message, rules: &mdm_ipc::capture::CaptureRules) -> Reply {
         .map(str::trim)
         .filter(|a| a.starts_with("http://") || a.starts_with("https://"));
     let panel_cmd = if let Some(host) = hide {
-        Some(mdm_ipc::Command {
+        Some(odm_ipc::Command {
             panel_hide_site: Some(host.to_owned()),
             ..Default::default()
         })
     } else if let Some(host) = show_site {
-        Some(mdm_ipc::Command {
+        Some(odm_ipc::Command {
             panel_show_site: Some(host.to_owned()),
             ..Default::default()
         })
     } else if let Some(address) = show_download {
-        Some(mdm_ipc::Command {
+        Some(odm_ipc::Command {
             show_download: Some(address.to_owned()),
             ..Default::default()
         })
@@ -452,20 +452,20 @@ fn answer(m: Message, rules: &mdm_ipc::capture::CaptureRules) -> Reply {
             Some("general") => "options:general",
             _ => "options:panels",
         };
-        Some(mdm_ipc::Command {
+        Some(odm_ipc::Command {
             show: Some(page.into()),
             ..Default::default()
         })
     } else if m.open {
         // An empty command: the running app comes to the front (a second launch's).
-        Some(mdm_ipc::Command::default())
+        Some(odm_ipc::Command::default())
     } else if let Some(host) = m
         .exclude_site
         .as_deref()
         .map(str::trim)
         .filter(|h| !h.is_empty())
     {
-        Some(mdm_ipc::Command {
+        Some(odm_ipc::Command {
             exclude_site: Some(host.to_owned()),
             ..Default::default()
         })
@@ -475,7 +475,7 @@ fn answer(m: Message, rules: &mdm_ipc::capture::CaptureRules) -> Reply {
         .map(str::trim)
         .filter(|h| !h.is_empty())
     {
-        Some(mdm_ipc::Command {
+        Some(odm_ipc::Command {
             include_site: Some(host.to_owned()),
             ..Default::default()
         })
@@ -499,7 +499,7 @@ fn answer(m: Message, rules: &mdm_ipc::capture::CaptureRules) -> Reply {
         return Reply::failed("refused", "not an http(s) or ftp(s) URL");
     }
     if let Err(why) = verdict(&m, rules) {
-        let site = mdm_ipc::capture::host_of(&m.url);
+        let site = odm_ipc::capture::host_of(&m.url);
         log_left(browser, &site, &file_name_of(&m), why.reason(), m.private);
         return Reply {
             declined: Some(why.code()),
@@ -514,7 +514,7 @@ fn answer(m: Message, rules: &mdm_ipc::capture::CaptureRules) -> Reply {
 
 /// Why the extension left a download alone, from its notice's code.
 fn notice_reason(code: &str) -> String {
-    match mdm_ipc::capture::Declined::from_code(code) {
+    match odm_ipc::capture::Declined::from_code(code) {
         Some(d) => d.reason().to_owned(),
         None if code == "site-access" => {
             "the browser doesn't let the extension read this site (its site access is limited)"
@@ -558,29 +558,29 @@ fn log_left(browser: &str, site: &str, name: &str, reason: impl AsRef<str>, priv
     log_line(&left_line(browser, site, name, reason.as_ref(), private));
 }
 
-/// A line in MDM's log (`<data>/logs/mdm.log`, crates/crash/src/logs.rs), dated as the app's
+/// A line in ODM's log (`<data>/logs/odm.log`, crates/crash/src/logs.rs), dated as the app's
 /// own lines: the host runs apart from the app, which may not be running at all. Appended
 /// whole, so it never splits a line the app writes at the same time.
 fn log_line(message: &str) {
-    // Unit tests run without a data folder of their own: never into the real MDM's log
+    // Unit tests run without a data folder of their own: never into the real ODM's log
     // (tests/host.rs runs the program with its own and reads what it wrote).
     if cfg!(test) {
         return;
     }
-    let Some(dir) = mdm_ipc::data_dir().map(|d| d.join("logs")) else {
+    let Some(dir) = odm_ipc::data_dir().map(|d| d.join("logs")) else {
         return;
     };
     if std::fs::create_dir_all(&dir).is_err() {
         return;
     }
     let line = format!(
-        "{}  INFO nmhost mdm_nmhost: {message}\n",
+        "{}  INFO nmhost odm_nmhost: {message}\n",
         chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.6fZ")
     );
     if let Ok(mut f) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(dir.join("mdm.log"))
+        .open(dir.join("odm.log"))
     {
         let _ = f.write_all(line.as_bytes());
     }
@@ -591,9 +591,9 @@ fn log_line(message: &str) {
 /// `why` and `error`).
 fn video_command(
     m: &Message,
-    rules: &mdm_ipc::capture::CaptureRules,
+    rules: &odm_ipc::capture::CaptureRules,
     browser: &str,
-) -> Result<mdm_ipc::Command, (&'static str, &'static str)> {
+) -> Result<odm_ipc::Command, (&'static str, &'static str)> {
     if !(m.url.starts_with("http://") || m.url.starts_with("https://")) {
         return Err(("refused", "not an http(s) page"));
     }
@@ -617,7 +617,7 @@ fn video_command(
     let origin = m.fetched_with.origin(src.as_deref());
     // The button over a plain file (#703): that file, as a file.
     let direct = m.direct && src.is_some();
-    Ok(mdm_ipc::Command {
+    Ok(odm_ipc::Command {
         video_direct: direct,
         // The type the plain file's server said when the tab loaded it (#800).
         mime: m.mime.clone().filter(|t| direct && !t.trim().is_empty()),
@@ -670,10 +670,10 @@ const TOKEN_MAX: usize = 128;
 fn menu_command(
     ask: MenuAsk,
     m: &Message,
-    rules: &mdm_ipc::capture::CaptureRules,
+    rules: &odm_ipc::capture::CaptureRules,
     browser: &str,
-) -> Result<mdm_ipc::Command, &'static str> {
-    use mdm_ipc::api::lookup;
+) -> Result<odm_ipc::Command, &'static str> {
+    use odm_ipc::api::lookup;
     let token =
         |t: &str| Some(t.trim().to_owned()).filter(|t| !t.is_empty() && t.len() <= TOKEN_MAX);
     let store = |s: &Option<String>| s.clone().filter(|s| !s.trim().is_empty());
@@ -702,8 +702,8 @@ fn menu_command(
                 .map(str::trim)
                 .filter(|t| !t.is_empty())
                 .map(|t| t.chars().take(TITLE_MAX).collect());
-            mdm_ipc::Command {
-                video_lookup: Some(mdm_ipc::VideoLookup {
+            odm_ipc::Command {
+                video_lookup: Some(odm_ipc::VideoLookup {
                     address: src.unwrap_or_else(|| l.page.clone()),
                     title,
                     store_id: store(&l.store_id),
@@ -723,15 +723,15 @@ fn menu_command(
         }
         MenuAsk::Poll => {
             let p = m.video_poll.as_ref().ok_or(lookup::GONE)?;
-            mdm_ipc::Command {
+            odm_ipc::Command {
                 video_poll: Some(token(&p.token).ok_or(lookup::GONE)?),
                 ..Default::default()
             }
         }
         MenuAsk::Pick => {
             let p = m.video_pick.as_ref().ok_or(lookup::USE_WINDOW)?;
-            mdm_ipc::Command {
-                video_pick: Some(mdm_ipc::VideoPick {
+            odm_ipc::Command {
+                video_pick: Some(odm_ipc::VideoPick {
                     token: token(&p.token).ok_or(lookup::USE_WINDOW)?,
                     choice: p.choice,
                     store_id: store(&p.store_id),
@@ -741,43 +741,43 @@ fn menu_command(
             }
         }
     };
-    Ok(mdm_ipc::Command {
+    Ok(odm_ipc::Command {
         startup: true,
         ..cmd
     })
 }
 
-fn video_cookies(m: &Message) -> mdm_ipc::VideoCookies {
+fn video_cookies(m: &Message) -> odm_ipc::VideoCookies {
     if m.use_site_cookies == Some(false) {
-        mdm_ipc::VideoCookies::None
+        odm_ipc::VideoCookies::None
     } else {
-        mdm_ipc::VideoCookies::Site
+        odm_ipc::VideoCookies::Site
     }
 }
 
 /// One of the quality menu's messages, asked of the running app (never started for it: a menu
-/// over a video isn't worth starting MDM unseen; the button's click does that).
+/// over a video isn't worth starting ODM unseen; the button's click does that).
 fn quality_menu(
     ask: MenuAsk,
     m: &Message,
-    rules: &mdm_ipc::capture::CaptureRules,
+    rules: &odm_ipc::capture::CaptureRules,
     browser: &str,
 ) -> Reply {
     let cmd = match menu_command(ask, m, rules, browser) {
         Ok(cmd) => cmd,
-        Err(state) => return Reply::lookup(mdm_ipc::api::VideoLookupAnswer::of(state)),
+        Err(state) => return Reply::lookup(odm_ipc::api::VideoLookupAnswer::of(state)),
     };
     // The choice brings its download's progress window up: the app may bring it to the front
     // (Windows only, as in `deliver`: Linux and macOS have no foreground lock for a host to
     // lift). A look-up and the questions about it open nothing.
     #[cfg(windows)]
     if ask == MenuAsk::Pick
-        && let Some(pid) = mdm_ipc::app_pid()
+        && let Some(pid) = odm_ipc::app_pid()
     {
         win32::allow_foreground(pid);
     }
     let token = cmd.video_poll.clone().unwrap_or_default();
-    let ask_app = || menu_answer(ask, mdm_ipc::request_checked(&cmd), &token);
+    let ask_app = || menu_answer(ask, odm_ipc::request_checked(&cmd), &token);
     let answer = match ask {
         MenuAsk::Poll => until_settled(ask_app, POLL_WAIT, POLL_EVERY),
         MenuAsk::Lookup | MenuAsk::Pick => ask_app(),
@@ -797,10 +797,10 @@ const POLL_EVERY: Duration = Duration::from_millis(100);
 /// `ask`'s answer once it is no longer `pending`, asked again every `every`, for `wait` at most
 /// (then `pending` as it is).
 fn until_settled(
-    ask: impl FnMut() -> mdm_ipc::api::VideoLookupAnswer,
+    ask: impl FnMut() -> odm_ipc::api::VideoLookupAnswer,
     wait: Duration,
     every: Duration,
-) -> mdm_ipc::api::VideoLookupAnswer {
+) -> odm_ipc::api::VideoLookupAnswer {
     let start = std::time::Instant::now();
     until_settled_on(ask, wait, every, || start.elapsed(), std::thread::sleep)
 }
@@ -809,15 +809,15 @@ fn until_settled(
 /// waits. The tests run it on a clock of their own, so how often it asks doesn't depend on how
 /// busy the machine is (a loaded CI runner oversleeps and asks less often).
 fn until_settled_on(
-    mut ask: impl FnMut() -> mdm_ipc::api::VideoLookupAnswer,
+    mut ask: impl FnMut() -> odm_ipc::api::VideoLookupAnswer,
     wait: Duration,
     every: Duration,
     elapsed: impl Fn() -> Duration,
     mut sleep: impl FnMut(Duration),
-) -> mdm_ipc::api::VideoLookupAnswer {
+) -> odm_ipc::api::VideoLookupAnswer {
     loop {
         let answer = ask();
-        if answer.state != mdm_ipc::api::lookup::PENDING || elapsed() + every > wait {
+        if answer.state != odm_ipc::api::lookup::PENDING || elapsed() + every > wait {
             return answer;
         }
         sleep(every);
@@ -828,17 +828,17 @@ fn until_settled_on(
 /// what its absence means. No app running, no answer, a refusal (`denied`, `gone`,
 /// `too-large`), or `ok` (an older app, which knows no quality menu): a look-up or a choice is
 /// left to the Download video window (`use-window`). `timeout` is different: the app's port
-/// says it only after handing the command over (`mdm_ipc`'s server queues it, then waits for
+/// says it only after handing the command over (`odm_ipc`'s server queues it, then waits for
 /// the answer), so the app has it and will act on it. A choice is then `sent` (downloading
 /// soon; the Download video window would download it twice), a look-up `busy` (its yt-dlp is
 /// running; another window would start another), and a question `pending` again. Anything
 /// else a question gets is `gone`.
 fn menu_answer(
     ask: MenuAsk,
-    got: Result<String, mdm_ipc::SendError>,
+    got: Result<String, odm_ipc::SendError>,
     token: &str,
-) -> mdm_ipc::api::VideoLookupAnswer {
-    use mdm_ipc::api::{VideoLookupAnswer, lookup};
+) -> odm_ipc::api::VideoLookupAnswer {
+    use odm_ipc::api::{VideoLookupAnswer, lookup};
     if let Ok(line) = &got
         && let Ok(answer) = serde_json::from_str::<VideoLookupAnswer>(line)
         && !answer.state.is_empty()
@@ -864,7 +864,7 @@ fn lookup_line(browser: &str, address: &str, private: bool, state: &str) -> Stri
     } else {
         browser
     };
-    let site = clean(&mdm_ipc::capture::host_of(address), 200);
+    let site = clean(&odm_ipc::capture::host_of(address), 200);
     let what = if private {
         "a video in a private window".to_owned()
     } else if site.trim().is_empty() {
@@ -879,7 +879,7 @@ fn lookup_line(browser: &str, address: &str, private: bool, state: &str) -> Stri
 }
 
 /// `cmd` handed to the app: the reply saying so, or why not.
-fn delivered(cmd: &mdm_ipc::Command) -> Reply {
+fn delivered(cmd: &odm_ipc::Command) -> Reply {
     match deliver(cmd) {
         Ok(()) => Reply::done(),
         Err(Undelivered::NotRunning(e)) => Reply::failed("not-running", e),
@@ -893,8 +893,8 @@ fn delivered(cmd: &mdm_ipc::Command) -> Reply {
 /// page the download came from (its `referrer`) is on no excluded site either (#1049).
 fn verdict(
     m: &Message,
-    rules: &mdm_ipc::capture::CaptureRules,
-) -> Result<(), mdm_ipc::capture::Declined> {
+    rules: &odm_ipc::capture::CaptureRules,
+) -> Result<(), odm_ipc::capture::Declined> {
     if m.explicit {
         return Ok(());
     }
@@ -903,11 +903,11 @@ fn verdict(
     rules.accepts(&m.url, &name, browser, page)?;
     // A .torrent only its type tells (a name of another listed type), as the app's Add torrent
     // would take it (#1058).
-    if !rules.takes_torrents() && mdm_ipc::capture::is_torrent(&m.url, &name, m.mime.as_deref()) {
-        return Err(mdm_ipc::capture::Declined::Torrents);
+    if !rules.takes_torrents() && odm_ipc::capture::is_torrent(&m.url, &name, m.mime.as_deref()) {
+        return Err(odm_ipc::capture::Declined::Torrents);
     }
     if rules.too_small(m.size) {
-        return Err(mdm_ipc::capture::Declined::Small);
+        return Err(odm_ipc::capture::Declined::Small);
     }
     match m.final_url.as_deref().filter(|f| *f != m.url) {
         Some(f) => rules.accepts(f, &name, browser, page),
@@ -929,7 +929,7 @@ fn read_message(r: &mut impl Read) -> io::Result<Option<Result<Vec<u8>, usize>>>
     // Browsers send at most 4 GB, but a download request is small: refuse anything silly (the
     // app's channel takes this much, so whatever is read here reaches it). Read past it, so
     // the extension hears why instead of a closed host.
-    if len > mdm_ipc::MAX_MESSAGE {
+    if len > odm_ipc::MAX_MESSAGE {
         io::copy(&mut r.take(len as u64), &mut io::sink())?;
         return Ok(Some(Err(len)));
     }
@@ -944,7 +944,7 @@ fn write_message(w: &mut impl Write, json: &[u8]) -> io::Result<()> {
     w.flush()
 }
 
-fn to_command(m: Message) -> mdm_ipc::Command {
+fn to_command(m: Message) -> odm_ipc::Command {
     let some = |s: Option<String>| s.filter(|s| !s.is_empty());
     // The browser's file name, without its folder; none when it is only the address's guess.
     let name = some(m.filename).filter(|_| !m.name_guessed).and_then(|f| {
@@ -953,7 +953,7 @@ fn to_command(m: Message) -> mdm_ipc::Command {
             .filter(|n| !n.is_empty())
             .map(str::to_owned)
     });
-    mdm_ipc::Command {
+    odm_ipc::Command {
         final_url: some(m.final_url).filter(|f| *f != m.url),
         url: Some(m.url),
         name,
@@ -977,7 +977,7 @@ fn to_command(m: Message) -> mdm_ipc::Command {
         post_type: m.post.as_ref().and(some(m.post_type)),
         post: m.post,
         private: m.private,
-        // The browser's own download handed over, not the user's explicit "Download with MDM"
+        // The browser's own download handed over, not the user's explicit "Download with ODM"
         // (right-click menu, toolbar list): that is an add of its own.
         browser_handoff: !m.explicit,
         proxy: m.proxy.as_deref().and_then(browser_proxy),
@@ -1049,17 +1049,17 @@ fn bundle_of(exe: &std::path::Path) -> Option<PathBuf> {
 }
 
 /// Hand `cmd` to Orbit Download Manager, starting it only if none is running.
-fn deliver(cmd: &mdm_ipc::Command) -> Result<(), Undelivered> {
+fn deliver(cmd: &odm_ipc::Command) -> Result<(), Undelivered> {
     // Whatever it asks may open a window: the app may bring it to the front (Windows only: Linux
     // and macOS have no foreground lock for a host to lift).
     #[cfg(windows)]
-    if let Some(pid) = mdm_ipc::app_pid() {
+    if let Some(pid) = odm_ipc::app_pid() {
         win32::allow_foreground(pid);
     }
-    match mdm_ipc::send(cmd) {
+    match odm_ipc::send(cmd) {
         Ok(()) => return Ok(()),
-        Err(mdm_ipc::SendError::Refused(e)) => return Err(Undelivered::Refused(e)),
-        Err(mdm_ipc::SendError::NotRunning(_)) => {}
+        Err(odm_ipc::SendError::Refused(e)) => return Err(Undelivered::Refused(e)),
+        Err(odm_ipc::SendError::NotRunning(_)) => {}
     }
     let dir = exe_dir().map_err(Undelivered::NotRunning)?;
     // Beside the app, or (an AppImage's host, copied out of its mount: unix.rs) the path
@@ -1094,10 +1094,10 @@ fn deliver(cmd: &mdm_ipc::Command) -> Result<(), Undelivered> {
     let started = std::time::Instant::now();
     while started.elapsed() < START_WAIT {
         std::thread::sleep(Duration::from_millis(100));
-        match mdm_ipc::send(cmd) {
+        match odm_ipc::send(cmd) {
             Ok(()) => return Ok(()),
-            Err(mdm_ipc::SendError::Refused(e)) => return Err(Undelivered::Refused(e)),
-            Err(mdm_ipc::SendError::NotRunning(_)) => {}
+            Err(odm_ipc::SendError::Refused(e)) => return Err(Undelivered::Refused(e)),
+            Err(odm_ipc::SendError::NotRunning(_)) => {}
         }
         // It quit (another copy took over, or it failed to start): that one may answer still.
         // (`open` returns at once, the app being another process.)
@@ -1174,8 +1174,8 @@ fn serve() -> io::Result<()> {
             // The rules as saved now: a change in Options applies to the next download.
             Ok(m) => {
                 // This browser has the extension: the app stops offering it (extension.rs).
-                mdm_ipc::extension::mark_seen(browser(&m), m.v.as_deref().unwrap_or_default());
-                answer(m, &mdm_ipc::capture::CaptureRules::load())
+                odm_ipc::extension::mark_seen(browser(&m), m.v.as_deref().unwrap_or_default());
+                answer(m, &odm_ipc::capture::CaptureRules::load())
             }
             Err(e) => Reply::failed("refused", e.to_string()),
         };
@@ -1224,7 +1224,7 @@ fn write_json(path: &std::path::Path, value: &serde_json::Value) -> Result<(), S
 }
 
 fn portable_refused() -> Result<(), String> {
-    if mdm_ipc::portable_dir().is_some() {
+    if odm_ipc::portable_dir().is_some() {
         return Err(
             "portable mode: browser integration is not registered (nothing is written outside \
              its folder); install Orbit Download Manager to use it"
@@ -1240,7 +1240,7 @@ fn portable_refused() -> Result<(), String> {
 /// would find no other copy.
 fn temporary_refused() -> Result<(), String> {
     let program = this_program()?;
-    if mdm_ipc::browsers::in_temporary_folder(&program) {
+    if odm_ipc::browsers::in_temporary_folder(&program) {
         return Err(format!(
             "{} is a temporary folder, deleted once it quits (an archive run without extracting \
              it first): browser integration is not registered. Extract Orbit Download Manager \
@@ -1321,7 +1321,7 @@ fn register(all_users: bool) -> Result<(), String> {
             "/t",
             "REG_SZ",
             "/d",
-            mdm_ipc::extension::STORE_UPDATE_URL,
+            odm_ipc::extension::STORE_UPDATE_URL,
             "/f",
             "/reg:32",
         ])?;
@@ -1338,20 +1338,20 @@ fn register(all_users: bool) -> Result<(), String> {
 /// Windows, at the app's start (#818): each browser's registration that leads nowhere (a copy
 /// run from inside a zip, whose temporary folder is gone; a copy moved or deleted) is pointed at
 /// this copy, for this user. One that works is left alone, whichever copy it names, and none is
-/// added where there was none (`mdm_ipc::browsers::windows_repair`).
+/// added where there was none (`odm_ipc::browsers::windows_repair`).
 #[cfg(windows)]
 fn repair() -> Result<(), String> {
     portable_refused()?;
     temporary_refused()?;
     let holder = |machine: bool, entry: &str| {
         win32::reg_string(machine, entry)
-            .map(|v| Holder::of(&mdm_ipc::browsers::registered_manifest(&v)))
+            .map(|v| Holder::of(&odm_ipc::browsers::registered_manifest(&v)))
     };
     let mut repaired = 0;
     for (key, family) in WINDOWS_HOST_KEYS {
         let entry = format!(r"{key}\{HOST_NAME}");
         let user = holder(false, &entry);
-        match mdm_ipc::browsers::windows_repair(user.as_ref(), holder(true, &entry).as_ref()) {
+        match odm_ipc::browsers::windows_repair(user.as_ref(), holder(true, &entry).as_ref()) {
             Repair::Keep => continue,
             Repair::Take => {
                 let manifest = own_manifest(family)?;
@@ -1403,7 +1403,7 @@ fn reg(args: &[&str]) -> Result<(), String> {
 }
 
 /// Linux and macOS: the folders the browsers there read host manifests from, for one user (in
-/// the home folder) or for everyone, each with whether it is Firefox's (`mdm_ipc::browsers`).
+/// the home folder) or for everyone, each with whether it is Firefox's (`odm_ipc::browsers`).
 /// With `host`, a user's folder is left out for a browser that reads a manifest for everyone
 /// naming it (the package's, #266).
 #[cfg(not(windows))]
@@ -1413,16 +1413,16 @@ fn host_dirs(all_users: bool, host: Option<&std::path::Path>) -> Vec<(PathBuf, b
         .map(PathBuf::from)
         .filter(|p| p.is_absolute())
         .unwrap_or_else(|| home.join(".config"));
-    mdm_ipc::browsers::host_dirs(&home, &config, cfg!(target_os = "macos"), all_users, host)
+    odm_ipc::browsers::host_dirs(&home, &config, cfg!(target_os = "macos"), all_users, host)
         .into_iter()
-        .map(|(d, f)| (d, f == mdm_ipc::browsers::Family::Gecko))
+        .map(|(d, f)| (d, f == odm_ipc::browsers::Family::Gecko))
         .collect()
 }
 
 /// Linux and macOS: the folders the browsers there read external extensions from (an
 /// `<id>.json` naming the store's update service makes the browser offer that extension at its
 /// next start), for those that are there, each with the service's address as that browser names
-/// it (`mdm_ipc::browsers::external_dirs`: Chrome's, and Helium's own, #685). Linux Chrome reads
+/// it (`odm_ipc::browsers::external_dirs`: Chrome's, and Helium's own, #685). Linux Chrome reads
 /// only the system's, so a per-user registration there leaves Chrome to the app's own offer
 /// (extension.rs).
 #[cfg(not(windows))]
@@ -1432,7 +1432,7 @@ fn external_dirs(all_users: bool) -> Vec<(PathBuf, &'static str)> {
         .map(PathBuf::from)
         .filter(|p| p.is_absolute())
         .unwrap_or_else(|| home.join(".config"));
-    mdm_ipc::browsers::external_dirs(&home, &config, cfg!(target_os = "macos"), all_users)
+    odm_ipc::browsers::external_dirs(&home, &config, cfg!(target_os = "macos"), all_users)
 }
 
 /// Linux: this program runs from inside an AppImage's mount (`APPDIR`), which is gone once the
@@ -1457,7 +1457,7 @@ fn register(all_users: bool) -> Result<(), String> {
 }
 
 /// Linux and macOS, at the app's start (#818): `--register` for this user, but a manifest that
-/// works naming another copy of MDM is left alone (two copies are both legitimate; neither takes
+/// works naming another copy of ODM is left alone (two copies are both legitimate; neither takes
 /// the other's at each start). A browser without one, or with one that leads nowhere (a copy
 /// moved or deleted, run from a temporary folder, an AppImage gone), gets this program's.
 #[cfg(not(windows))]
@@ -1478,15 +1478,15 @@ fn register_as(all_users: bool, at_start: bool) -> Result<(), String> {
     let keeps = |manifest: &std::path::Path| {
         at_start
             && manifest.is_file()
-            && !mdm_ipc::browsers::takes_over(
-                Some(&mdm_ipc::browsers::Holder::of(manifest)),
+            && !odm_ipc::browsers::takes_over(
+                Some(&odm_ipc::browsers::Holder::of(manifest)),
                 &program,
             )
     };
     // A browser that reads the package's manifest for everyone, naming this program, needs none
     // in the home folder: one written there before is taken away, so uninstalling the package
     // leaves nothing behind (#266). The browser reads a user's manifest first, so one naming
-    // another program (an earlier MDM, an AppImage's copy) would win over the package's: Set it
+    // another program (an earlier ODM, an AppImage's copy) would win over the package's: Set it
     // up takes it away too (at a start, one that works stays, #818).
     let mut covered = 0;
     if !all_users {
@@ -1571,19 +1571,19 @@ fn unregister(all_users: bool) -> Result<(), String> {
 const PACKAGED_HOST: &str = "/usr/bin/orbitdownloadmanager-nmhost";
 
 /// Linux (the .deb and .rpm build, tools/installer/build-linux.sh): the manifests for everyone,
-/// in each folder the browsers read them from (`mdm_ipc::browsers::LINUX_SYSTEM_HOST_DIRS`),
+/// in each folder the browsers read them from (`odm_ipc::browsers::LINUX_SYSTEM_HOST_DIRS`),
 /// under `root`, naming the packaged helper. The package owns them, so the package manager
 /// removes them with it (#266).
 #[cfg(target_os = "linux")]
 fn package_manifests(root: Option<&str>) -> Result<(), String> {
     let root = std::path::Path::new(root.ok_or("--package-manifests needs a folder")?);
     let program = std::path::Path::new(PACKAGED_HOST);
-    for (dir, family) in mdm_ipc::browsers::LINUX_SYSTEM_HOST_DIRS {
+    for (dir, family) in odm_ipc::browsers::LINUX_SYSTEM_HOST_DIRS {
         let dir = root.join(dir.trim_start_matches('/'));
         std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         let manifest = match family {
-            mdm_ipc::browsers::Family::Chromium => chromium_manifest(program),
-            mdm_ipc::browsers::Family::Gecko => firefox_manifest(program),
+            odm_ipc::browsers::Family::Chromium => chromium_manifest(program),
+            odm_ipc::browsers::Family::Gecko => firefox_manifest(program),
         };
         let path = dir.join(format!("{HOST_NAME}.json"));
         write_json(&path, &manifest)?;
@@ -1626,7 +1626,7 @@ fn main() {
     }
 }
 
-/// The addresses MDM downloads (mdm_engine::supported): http(s), and ftp links sent from a page
+/// The addresses ODM downloads (odm_engine::supported): http(s), and ftp links sent from a page
 /// (browsers no longer download ftp themselves).
 fn downloadable(url: &str) -> bool {
     let scheme = url.split_once("://").map_or("", |(s, _)| s);
@@ -1652,15 +1652,17 @@ mod tests {
         assert_eq!(bundle_of(std::path::Path::new("/usr/bin/nmhost")), None);
     }
 
-    /// The Chrome Web Store's copy and the app folder's (unpacked) both connect, and both are
-    /// served: the manifest's allowed_origins and the host's own caller check agree.
+    /// The manifest and the host's caller check agree for the unpacked and configured store IDs.
     #[test]
-    fn store_and_unpacked_extensions_both_allowed() {
+    fn supported_chromium_extensions_can_connect() {
         let manifest = chromium_manifest(&this_program().unwrap());
-        for id in [
-            "ejoleppdfgjdndddcjoehopknmlglojp",
-            "fkfgblheeckpmdnpbobhlbfcbloklcbn",
-        ] {
+        let supported = chromium_ids();
+        assert!(supported.contains(&odm_ipc::extension::UNPACKED_ID));
+        assert_eq!(
+            manifest["allowed_origins"].as_array().unwrap().len(),
+            supported.len()
+        );
+        for id in supported {
             let o = format!("chrome-extension://{id}/");
             assert!(
                 manifest["allowed_origins"]
@@ -1697,7 +1699,7 @@ mod tests {
 
     #[test]
     fn options_decide_what_is_taken() {
-        let mut rules = mdm_ipc::capture::CaptureRules::default();
+        let mut rules = odm_ipc::capture::CaptureRules::default();
         let ua = "Mozilla/5.0 (Windows NT 10.0) Chrome/141.0.0.0 Safari/537.36";
         let msg = |url: &str, name: &str| Message {
             url: url.into(),
@@ -1746,7 +1748,7 @@ mod tests {
     #[test]
     fn the_video_button_asks_the_rules() {
         let ua = "Mozilla/5.0 (Windows NT 10.0) Chrome/141.0.0.0 Safari/537.36";
-        let mut rules = mdm_ipc::capture::CaptureRules {
+        let mut rules = odm_ipc::capture::CaptureRules {
             video_panel_sites: "*.quiet.test".into(),
             ..Default::default()
         };
@@ -1801,7 +1803,7 @@ mod tests {
             src: Some("https://cdn.test/v/master.m3u8?t=1".into()),
             title: Some("A talk about download managers".into()),
             cookies: Some("cdn=1".into()),
-            cookie_jar: vec![mdm_ipc::BrowserCookie {
+            cookie_jar: vec![odm_ipc::BrowserCookie {
                 name: "cdn".into(),
                 value: "1".into(),
                 domain: ".cdn.test".into(),
@@ -1884,7 +1886,7 @@ mod tests {
     #[test]
     fn the_buttons_file_show_and_turn_on_reach_the_app() {
         let ua = "Mozilla/5.0 (Windows NT 10.0) Chrome/141.0.0.0 Safari/537.36";
-        let rules = mdm_ipc::capture::CaptureRules::default();
+        let rules = odm_ipc::capture::CaptureRules::default();
         // #703: a plain file is downloaded as one, its page the referrer.
         let m: Message = serde_json::from_str(&format!(
             r#"{{"video":true,"url":"https://videos.test/p","src":"https://cdn.test/a.mp4","direct":true,"userAgent":"{ua}"}}"#
@@ -1927,7 +1929,7 @@ mod tests {
     /// `hello` and `rules` say the host and its app have the quality menu; nothing else does.
     #[test]
     fn the_quality_menu_is_announced() {
-        let rules = mdm_ipc::capture::CaptureRules::default();
+        let rules = odm_ipc::capture::CaptureRules::default();
         let ua = Some("Mozilla/5.0 (Windows NT 10.0) Chrome/141.0.0.0 Safari/537.36".into());
         for m in [
             Message {
@@ -1966,18 +1968,18 @@ mod tests {
     /// no Origin goes. Only for a stream or file: a page looked up keeps its own referrer.
     #[test]
     fn a_stream_goes_with_the_referer_and_origin_the_browser_sent() {
-        let rules = mdm_ipc::capture::CaptureRules::default();
+        let rules = odm_ipc::capture::CaptureRules::default();
         let page = "https://anime.test/watch/12";
         let src = "https://cdn.video.test/manifest/x.m3u8?sec=abc";
         let fetched = r#""fetchedWith":{"referer":"https://player.video.test/","origin":"https://player.video.test"}"#;
-        let lookup = |extra: &str, src: &str| -> mdm_ipc::Command {
+        let lookup = |extra: &str, src: &str| -> odm_ipc::Command {
             let m: Message = serde_json::from_str(&format!(
                 r#"{{"videoLookup":{{"page":"{page}","src":"{src}","referrer":"https://search.test/"}}{extra}}}"#
             ))
             .unwrap();
             menu_command(MenuAsk::Lookup, &m, &rules, "").unwrap()
         };
-        let click = |extra: &str, src: &str| -> mdm_ipc::Command {
+        let click = |extra: &str, src: &str| -> odm_ipc::Command {
             let m: Message = serde_json::from_str(&format!(
                 r#"{{"video":true,"url":"{page}","src":"{src}","referrer":"https://search.test/"{extra}}}"#
             ))
@@ -2016,7 +2018,7 @@ mod tests {
     /// their own), become the app's questions, each with `startup` (an older app opens nothing).
     #[test]
     fn the_quality_menus_messages_become_the_apps_questions() {
-        let rules = mdm_ipc::capture::CaptureRules::default();
+        let rules = odm_ipc::capture::CaptureRules::default();
         let m: Message = serde_json::from_str(
             r#"{"videoLookup":{"page":"https://videos.test/watch?v=1","src":"https://cdn.test/v/master.m3u8?sig=1",
                 "title":"  A talk about download managers  ","referrer":"https://search.test/","storeId":"firefox-container-2"},
@@ -2030,7 +2032,7 @@ mod tests {
         assert!(cmd.startup && cmd.wants_reply());
         assert_eq!(
             cmd.video_lookup,
-            Some(mdm_ipc::VideoLookup {
+            Some(odm_ipc::VideoLookup {
                 address: "https://cdn.test/v/master.m3u8?sig=1".into(),
                 title: Some("A talk about download managers".into()),
                 store_id: Some("firefox-container-2".into()),
@@ -2096,7 +2098,7 @@ mod tests {
         let cmd = menu_command(MenuAsk::Pick, &pick, &rules, "").unwrap();
         assert_eq!(
             cmd.video_pick,
-            Some(mdm_ipc::VideoPick {
+            Some(odm_ipc::VideoPick {
                 token: "abc".into(),
                 choice: 2,
                 store_id: Some("firefox-private".into()),
@@ -2107,12 +2109,12 @@ mod tests {
         let blank: Message = serde_json::from_str(r#"{"videoPoll":{"token":" "}}"#).unwrap();
         assert_eq!(
             menu_command(MenuAsk::Poll, &blank, &rules, "").err(),
-            Some(mdm_ipc::api::lookup::GONE)
+            Some(odm_ipc::api::lookup::GONE)
         );
         let blank: Message = serde_json::from_str(r#"{"videoPick":{"choice":1}}"#).unwrap();
         assert_eq!(
             menu_command(MenuAsk::Pick, &blank, &rules, "").err(),
-            Some(mdm_ipc::api::lookup::USE_WINDOW)
+            Some(odm_ipc::api::lookup::USE_WINDOW)
         );
         assert_eq!(menu_ask(&Message::default()), None);
     }
@@ -2122,7 +2124,7 @@ mod tests {
     #[test]
     fn the_quality_menu_follows_options() {
         let ua = "Mozilla/5.0 (Windows NT 10.0) Chrome/141.0.0.0 Safari/537.36";
-        let mut rules = mdm_ipc::capture::CaptureRules {
+        let mut rules = odm_ipc::capture::CaptureRules {
             video_panel_sites: "*.quiet.test".into(),
             ..Default::default()
         };
@@ -2157,8 +2159,8 @@ mod tests {
     /// contract says: the window for a look-up or a choice, `pending` or `gone` for a question.
     #[test]
     fn answers_that_are_not_the_apps() {
-        use mdm_ipc::SendError;
-        use mdm_ipc::api::lookup;
+        use odm_ipc::SendError;
+        use odm_ipc::api::lookup;
         let line = |s: &str| Ok::<String, SendError>(s.to_owned());
         let a = menu_answer(
             MenuAsk::Lookup,
@@ -2255,8 +2257,8 @@ mod tests {
     /// browser as the app says it.
     #[test]
     fn a_question_waits_for_the_look_up() {
-        use mdm_ipc::SendError;
-        use mdm_ipc::api::lookup;
+        use odm_ipc::SendError;
+        use odm_ipc::api::lookup;
         let ready = r#"{"state":"ready","token":"t1","title":"A talk","choices":[{"label":"720p MP4","ext":"mp4","size":null,"audio":false},{"label":"Audio only MP3 320 kbps","ext":"mp3","size":null,"audio":true}]}"#;
         // A clock of the test's own: asking every 20 ms, the answer is ready at the third
         // question, 40 ms in.
@@ -2294,7 +2296,7 @@ mod tests {
         let answer = until_settled_on(
             || {
                 asked += 1;
-                mdm_ipc::api::VideoLookupAnswer::pending("t1")
+                odm_ipc::api::VideoLookupAnswer::pending("t1")
             },
             Duration::from_millis(300),
             Duration::from_millis(100),
@@ -2310,7 +2312,7 @@ mod tests {
         let gone = until_settled_on(
             || {
                 asked += 1;
-                mdm_ipc::api::VideoLookupAnswer::of(lookup::GONE)
+                odm_ipc::api::VideoLookupAnswer::of(lookup::GONE)
             },
             POLL_WAIT,
             POLL_EVERY,
@@ -2381,7 +2383,7 @@ mod tests {
 
     #[test]
     fn redirects_are_checked_at_both_ends() {
-        let rules = mdm_ipc::capture::CaptureRules::default();
+        let rules = odm_ipc::capture::CaptureRules::default();
         let ua = "Mozilla/5.0 (Windows NT 10.0) Chrome/141.0.0.0 Safari/537.36";
         let mut m = Message {
             url: "https://example.com/get/a.zip".into(),
@@ -2390,7 +2392,7 @@ mod tests {
             user_agent: Some(ua.into()),
             ..Default::default()
         };
-        assert_eq!(verdict(&m, &rules), Err(mdm_ipc::capture::Declined::Site));
+        assert_eq!(verdict(&m, &rules), Err(odm_ipc::capture::Declined::Site));
         m.final_url = Some("https://cdn.example.com/a.zip".into());
         assert_eq!(verdict(&m, &rules), Ok(()));
         // #1049: the page it came from (the referrer) on an excluded site leaves it to the
@@ -2400,7 +2402,7 @@ mod tests {
         m.final_url = None;
         m.url = "https://cdn.files.test/a.zip".into();
         m.referrer = Some("https://www.example.org/downloads".into());
-        assert_eq!(verdict(&m, &rules), Err(mdm_ipc::capture::Declined::Site));
+        assert_eq!(verdict(&m, &rules), Err(odm_ipc::capture::Declined::Site));
         m.explicit = true;
         assert_eq!(
             verdict(&m, &rules),
@@ -2416,7 +2418,7 @@ mod tests {
 
     #[test]
     fn rules_say_everything_the_extension_needs() {
-        let mut rules = mdm_ipc::capture::CaptureRules::default();
+        let mut rules = odm_ipc::capture::CaptureRules::default();
         let hello = || Message {
             hello: true,
             user_agent: Some("Mozilla/5.0 Firefox/145.0".into()),
@@ -2448,7 +2450,7 @@ mod tests {
 
     #[test]
     fn a_refusal_says_which_rule() {
-        let rules = mdm_ipc::capture::CaptureRules {
+        let rules = odm_ipc::capture::CaptureRules {
             browsers: vec![("Microsoft Edge".into(), false)],
             ..Default::default()
         };
@@ -2495,7 +2497,7 @@ mod tests {
             user_agent: Some(ua.into()),
             ..Default::default()
         };
-        let mut rules = mdm_ipc::capture::CaptureRules {
+        let mut rules = odm_ipc::capture::CaptureRules {
             torrent_handler: Some(false),
             ..Default::default()
         };
@@ -2507,7 +2509,7 @@ mod tests {
         // Only its type says so (named as another listed type): the app would open Add torrent.
         assert_eq!(
             verdict(&msg("Show.S01.bin", "application/x-bittorrent"), &rules),
-            Err(mdm_ipc::capture::Declined::Torrents)
+            Err(odm_ipc::capture::Declined::Torrents)
         );
         // Asked for (the right-click menu): taken.
         let explicit = Message {
@@ -2553,7 +2555,7 @@ mod tests {
 
     #[test]
     fn the_extensions_own_refusals_are_only_noted() {
-        let rules = mdm_ipc::capture::CaptureRules::default();
+        let rules = odm_ipc::capture::CaptureRules::default();
         let raw = r#"{"declined":{"why":"file-type","site":"x.test","name":"p.png"},"userAgent":"UA","brands":[],"v":"0.3.0"}"#;
         let m: Message = serde_json::from_str(raw).unwrap();
         assert_eq!(
@@ -2571,7 +2573,7 @@ mod tests {
         assert!(r.ok && r.error.is_none(), "noted, nothing delivered");
         assert_eq!(
             notice_reason("site"),
-            mdm_ipc::capture::Declined::Site.reason()
+            odm_ipc::capture::Declined::Site.reason()
         );
         assert!(notice_reason("site-access").contains("site access"));
         assert_eq!(notice_reason("x\ny"), r#""x y""#);
@@ -2579,7 +2581,7 @@ mod tests {
 
     #[test]
     fn log_lines_name_what_was_left_and_why() {
-        let reason = mdm_ipc::capture::Declined::FileType.reason();
+        let reason = odm_ipc::capture::Declined::FileType.reason();
         assert_eq!(
             left_line("Waterfox", "x.test", "p.png", reason, false),
             "browser integration: Waterfox keeps p.png from x.test: its type isn't in Options > File types"
@@ -2598,7 +2600,7 @@ mod tests {
     fn older_extensions_messages_still_work() {
         // As the Chrome Web Store's 0.2.4 extension sends a download (no browser name from
         // getBrowserInfo, no notices), and as 0.2.4's own extension did (no brands, no version).
-        let rules = mdm_ipc::capture::CaptureRules::default();
+        let rules = odm_ipc::capture::CaptureRules::default();
         for raw in [
             r#"{"url":"https://x.test/a.zip","finalUrl":"","referrer":"https://x.test/","cookies":"","filename":"a.zip","size":1048576,"mime":"application/zip","userAgent":"Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36","brands":["Not:A-Brand","Chromium","Google Chrome"],"v":"0.2.4"}"#,
             r#"{"url":"https://x.test/a.zip","referrer":"https://x.test/","cookies":"","userAgent":"Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36","filename":"a.zip"}"#,
@@ -2679,8 +2681,8 @@ mod tests {
     #[test]
     fn a_message_at_the_limit_is_read() {
         for (len, taken) in [
-            (mdm_ipc::MAX_MESSAGE, true),
-            (mdm_ipc::MAX_MESSAGE + 1, false),
+            (odm_ipc::MAX_MESSAGE, true),
+            (odm_ipc::MAX_MESSAGE + 1, false),
         ] {
             let mut input = (len as u32).to_le_bytes().to_vec();
             input.extend(vec![b' '; len]);
@@ -2692,7 +2694,7 @@ mod tests {
 
     /// A page's links: a whole list as before (an older extension's, or a short one), and a
     /// long one's parts, each handed over with its place and the page's referrer and cookies,
-    /// even a part with nothing MDM downloads (the app waits for every part). A part that
+    /// even a part with nothing ODM downloads (the app waits for every part). A part that
     /// doesn't add up is refused.
     #[test]
     fn a_pages_links_in_parts_reach_the_app_as_parts() {
@@ -2715,17 +2717,17 @@ mod tests {
         assert_eq!(cmd.links, ["https://x.test/c.zip"]);
         assert_eq!(
             cmd.links_part,
-            Some(mdm_ipc::LinksPart {
+            Some(odm_ipc::LinksPart {
                 batch: "6f1c2a9e-5b7d".into(),
                 index: 1,
                 count: 3
             })
         );
         assert!(cmd.private && cmd.referer.is_some() && cmd.cookies.is_some());
-        // Nothing MDM downloads in it: still handed over, to complete the list.
+        // Nothing ODM downloads in it: still handed over, to complete the list.
         let none = Message {
             links: vec!["mailto:a@b".into()],
-            links_part: Some(mdm_ipc::LinksPart {
+            links_part: Some(odm_ipc::LinksPart {
                 batch: "b".into(),
                 index: 2,
                 count: 3,
@@ -2734,7 +2736,7 @@ mod tests {
         };
         let cmd = links_command(&none).ok().unwrap();
         assert!(cmd.links.is_empty() && cmd.links_part.is_some());
-        // A whole list with nothing MDM downloads is refused, as before.
+        // A whole list with nothing ODM downloads is refused, as before.
         let r = links_command(&Message {
             links: vec!["mailto:a@b".into()],
             ..Default::default()
@@ -2743,10 +2745,10 @@ mod tests {
         .unwrap();
         assert_eq!(r.0, "refused");
         // A part out of its list, or of too many.
-        for (index, count) in [(3, 3), (0, 0), (0, mdm_ipc::MAX_LINK_PARTS + 1)] {
+        for (index, count) in [(3, 3), (0, 0), (0, odm_ipc::MAX_LINK_PARTS + 1)] {
             let bad = Message {
                 links: vec!["https://x.test/a.zip".into()],
-                links_part: Some(mdm_ipc::LinksPart {
+                links_part: Some(odm_ipc::LinksPart {
                     batch: "b".into(),
                     index,
                     count,
@@ -2773,7 +2775,7 @@ mod tests {
         assert_eq!(
             c.cookie_jar,
             [
-                mdm_ipc::BrowserCookie {
+                odm_ipc::BrowserCookie {
                     name: "SID".into(),
                     value: "1".into(),
                     domain: ".youtube.com".into(),
@@ -2782,7 +2784,7 @@ mod tests {
                     secure: true,
                     expires: Some(1893456000.5),
                 },
-                mdm_ipc::BrowserCookie {
+                odm_ipc::BrowserCookie {
                     name: "pref".into(),
                     value: "2".into(),
                     domain: "music.youtube.com".into(),
@@ -2795,7 +2797,7 @@ mod tests {
         );
         // To the app and back (its command line): the same.
         let line = serde_json::to_string(&c).unwrap();
-        let back: mdm_ipc::Command = serde_json::from_str(&line).unwrap();
+        let back: odm_ipc::Command = serde_json::from_str(&line).unwrap();
         assert_eq!(back.cookie_jar, c.cookie_jar);
         let old: Message =
             serde_json::from_str(r#"{"url":"https://x/a.zip","cookies":"a=1"}"#).unwrap();
@@ -2830,11 +2832,11 @@ mod tests {
     }
 
     /// #948: a name that is only the address's (Chromium's, for a video its rule made a
-    /// download) still passes Options' file types, and reaches the app as no name, so MDM names
+    /// download) still passes Options' file types, and reaches the app as no name, so ODM names
     /// the file from the server's answer (its Content-Disposition).
     #[test]
     fn a_guessed_name_is_checked_but_not_given() {
-        let rules = mdm_ipc::capture::CaptureRules::default();
+        let rules = odm_ipc::capture::CaptureRules::default();
         let raw = r#"{"url":"https://cdn.test/v/main.mp4","filename":"C:\\dl\\main.mp4","nameGuessed":true,"mime":"video/mp4","userAgent":"Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36"}"#;
         let m: Message = serde_json::from_str(raw).unwrap();
         assert!(m.name_guessed);

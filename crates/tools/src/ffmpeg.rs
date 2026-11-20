@@ -45,7 +45,7 @@ pub fn build() -> Option<&'static str> {
     build_for(std::env::consts::OS, std::env::consts::ARCH)
 }
 
-/// Whether MDM downloads an ffmpeg of its own on this system ([`build`]). Where it doesn't, the
+/// Whether ODM downloads an ffmpeg of its own on this system ([`build`]). Where it doesn't, the
 /// person's own (chosen in Helpers) or the system's is used.
 pub fn available() -> bool {
     build().is_some()
@@ -106,7 +106,7 @@ struct Paged {
 /// for `build` is taken from them, and its version is that line and the list's date (when the
 /// release was made again; `.0` when the server gives none, which never replaces a dated
 /// install).
-async fn from_pages(net: &mdm_engine::Options, web: &str, build: &str) -> Result<Paged, Error> {
+async fn from_pages(net: &odm_engine::Options, web: &str, build: &str) -> Result<Paged, Error> {
     let sums_url = github::download_url(web, REPO, LATEST_TAG, SUMS);
     let client = crate::client(net, &sums_url)?;
     let resp = client.get(&sums_url).send().await?.error_for_status()?;
@@ -240,7 +240,7 @@ fn scoop_version_path(path: &Path) -> Option<PathBuf> {
         .map(crate::proc::without_verbatim)
 }
 
-/// MDM's own install in `dir`.
+/// ODM's own install in `dir`.
 fn own(dir: &Path) -> Option<Installed> {
     std::fs::read(dir.join("ffmpeg").join("current.json"))
         .ok()
@@ -249,10 +249,10 @@ fn own(dir: &Path) -> Option<Installed> {
 }
 
 /// Install the newest stable LGPL build into `dir` unless the installed one is as new, the zip
-/// downloaded with MDM's engine (`net`), counted into `progress`.
+/// downloaded with ODM's engine (`net`), counted into `progress`.
 pub async fn install_latest(
     dir: &Path,
-    net: &mdm_engine::Options,
+    net: &odm_engine::Options,
     progress: Option<&crate::update::Progress>,
 ) -> Result<Installed, Error> {
     // The person's own copy: theirs to update (#51).
@@ -637,13 +637,13 @@ mod tests {
             .unwrap()
             .set_modified(made)
             .unwrap();
-        let lab = mdm_labserver::LabServer::start(mdm_labserver::Config {
+        let lab = odm_labserver::LabServer::start(odm_labserver::Config {
             files: Some(files.path().to_owned()),
             ..Default::default()
         })
         .await
         .unwrap();
-        let net = crate::net(mdm_engine::Proxy::None);
+        let net = crate::net(odm_engine::Proxy::None);
         let web = lab.url("/gh/web");
         let found = from_pages(&net, &web, "win64").await.unwrap();
         assert_eq!(found.name, names[2]);
