@@ -1991,7 +1991,7 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "parking_lot",
  "percent-encoding",
- "pollster 1.0.1",
+ "pollster",
  "profiling",
  "raw-window-handle",
  "send_wrapper",
@@ -4489,345 +4489,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "odm-app"
-version = "26.11.21"
-dependencies = [
- "arboard",
- "base64 0.23.1",
- "chrono",
- "craft-atomic",
- "craft-i18n",
- "dirs 7.0.0",
- "eframe",
- "egui",
- "egui-winit",
- "egui_extras",
- "egui_system_font_provider",
- "image",
- "odm-cli",
- "odm-cnl",
- "odm-crash",
- "odm-debrid",
- "odm-engine",
- "odm-extract",
- "odm-geo",
- "odm-ipc",
- "odm-labserver",
- "odm-remote",
- "odm-tools",
- "odm-torrent",
- "open",
- "percent-encoding",
- "qrcodegen",
- "raw-window-handle",
- "regex",
- "reqwest 0.13.5",
- "rfd",
- "roxmltree 0.20.0",
- "serde",
- "serde_json",
- "skrifa",
- "tempfile",
- "tokio",
- "toml 1.2.1+spec-1.1.0",
- "tracing",
- "tracing-subscriber",
- "tray-icon",
- "unicode-bidi",
- "unicode-segmentation",
- "url",
- "wgpu",
- "windows",
- "windows-sys 0.61.2",
- "winresource",
-]
-
-[[package]]
-name = "odm-cli"
-version = "26.11.21"
-dependencies = [
- "anyhow",
- "clap",
- "ctrlc",
- "odm-engine",
- "odm-ipc",
- "odm-tools",
- "odm-torrent",
- "reqwest 0.13.5",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-util",
- "url",
-]
-
-[[package]]
-name = "odm-cnl"
-version = "26.11.21"
-dependencies = [
- "aes",
- "axum",
- "base64 0.23.1",
- "reqwest 0.13.5",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "odm-crash"
-version = "26.11.21"
-dependencies = [
- "breakpad-symbols",
- "chrono",
- "crash-handler",
- "libc",
- "odm-engine",
- "minidump",
- "minidump-processor",
- "minidump-unwind",
- "minidumper",
- "reqwest 0.13.5",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "url",
- "windows-sys 0.61.2",
- "zip",
-]
-
-[[package]]
-name = "odm-debrid"
-version = "26.11.21"
-dependencies = [
- "bytes",
- "chrono",
- "futures",
- "odm-engine",
- "odm-labserver",
- "reqwest 0.13.5",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "url",
-]
-
-[[package]]
-name = "odm-engine"
-version = "26.11.21"
-dependencies = [
- "aes",
- "base64 0.23.1",
- "bytes",
- "cap",
- "core-foundation 0.10.1",
- "core-foundation-sys",
- "craft-atomic",
- "crc32fast",
- "futures",
- "hex",
- "hickory-resolver",
- "http",
- "httpdate",
- "hyper-util",
- "md-5",
- "odm-labserver",
- "network-interface",
- "percent-encoding",
- "proptest",
- "reqwest 0.13.5",
- "rquickjs",
- "rustix 1.1.6",
- "rustls",
- "rustls-native-certs",
- "rustls-platform-verifier",
- "serde",
- "serde_json",
- "sha1",
- "sha2",
- "socket2",
- "suppaftp",
- "sysinfo",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "tokio-rustls",
- "tokio-util",
- "tower-layer",
- "tower-service",
- "unicode-segmentation",
- "url",
- "webpki-root-certs",
- "windows-sys 0.61.2",
- "wreq",
- "wreq-util",
-]
-
-[[package]]
-name = "odm-extract"
-version = "26.11.21"
-dependencies = [
- "flate2",
- "lzma-rust2",
- "odm-engine",
- "tar",
- "tempfile",
- "tracing",
- "zip",
-]
-
-[[package]]
-name = "odm-geo"
-version = "26.11.21"
-dependencies = [
- "lzma-rust2",
- "png 0.18.1",
- "resvg",
-]
-
-[[package]]
-name = "odm-ipc"
-version = "26.11.21"
-dependencies = [
- "craft-atomic",
- "dirs 7.0.0",
- "schemars 1.2.3",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "odm-labserver"
-version = "26.11.21"
-dependencies = [
- "anyhow",
- "aws-lc-rs",
- "axum",
- "bytes",
- "clap",
- "futures",
- "hex",
- "http-range-header",
- "httpdate",
- "hyper-util",
- "percent-encoding",
- "rcgen",
- "reqwest 0.13.5",
- "rustls",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "sha2",
- "tempfile",
- "time",
- "tokio",
- "tokio-rustls",
- "url",
-]
-
-[[package]]
-name = "odm-mcp"
-version = "26.11.21"
-dependencies = [
- "odm-ipc",
- "rmcp",
- "schemars 1.2.3",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "url",
-]
-
-[[package]]
-name = "odm-nmhost"
-version = "26.11.21"
-dependencies = [
- "chrono",
- "odm-ipc",
- "serde",
- "serde_json",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "odm-remote"
-version = "26.11.21"
-dependencies = [
- "aws-lc-rs",
- "axum",
- "hex",
- "odm-engine",
- "odm-ipc",
- "rcgen",
- "reqwest 0.13.5",
- "rustls",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "tokio",
- "tokio-rustls",
- "tracing",
-]
-
-[[package]]
-name = "odm-tools"
-version = "26.11.21"
-dependencies = [
- "aws-lc-rs",
- "base64 0.23.1",
- "bytes",
- "craft-atomic",
- "futures",
- "hex",
- "odm-engine",
- "odm-ipc",
- "odm-labserver",
- "percent-encoding",
- "reqwest 0.13.5",
- "rustix 1.1.6",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "tokio-util",
- "tracing",
- "url",
- "win32job",
- "windows-registry",
- "zip",
-]
-
-[[package]]
-name = "odm-torrent"
-version = "26.11.21"
-dependencies = [
- "anyhow",
- "flate2",
- "librqbit",
- "librqbit-dualstack-sockets",
- "odm-engine",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "url",
-]
-
-[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5445,6 +5106,7 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-core-graphics",
  "objc2-foundation 0.3.2",
+ "objc2-uniform-type-identifiers 0.3.2",
 ]
 
 [[package]]
@@ -5657,7 +5319,7 @@ dependencies = [
  "objc2-link-presentation",
  "objc2-quartz-core",
  "objc2-symbols",
- "objc2-uniform-type-identifiers",
+ "objc2-uniform-type-identifiers 0.2.2",
  "objc2-user-notifications",
 ]
 
@@ -5682,6 +5344,16 @@ dependencies = [
  "block2 0.5.1",
  "objc2 0.5.3",
  "objc2-foundation 0.2.2",
+]
+
+[[package]]
+name = "objc2-uniform-type-identifiers"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7902ac02859fc1f7045f8b598c63f1ae0cc7efeaa06a9bc9f3d9a3c955974fa4"
+dependencies = [
+ "objc2 0.6.5",
+ "objc2-foundation 0.3.2",
 ]
 
 [[package]]
@@ -5715,6 +5387,345 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd229a0361b9d0d4396176e02d65897f487eebeab7caa6d443855ee152ca0b9c"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "odm-app"
+version = "26.11.21"
+dependencies = [
+ "arboard",
+ "base64 0.23.1",
+ "chrono",
+ "craft-atomic",
+ "craft-i18n",
+ "dirs 7.0.0",
+ "eframe",
+ "egui",
+ "egui-winit",
+ "egui_extras",
+ "egui_system_font_provider",
+ "image",
+ "odm-cli",
+ "odm-cnl",
+ "odm-crash",
+ "odm-debrid",
+ "odm-engine",
+ "odm-extract",
+ "odm-geo",
+ "odm-ipc",
+ "odm-labserver",
+ "odm-remote",
+ "odm-tools",
+ "odm-torrent",
+ "open",
+ "percent-encoding",
+ "qrcodegen",
+ "raw-window-handle",
+ "regex",
+ "reqwest 0.13.5",
+ "rfd",
+ "roxmltree 0.20.0",
+ "serde",
+ "serde_json",
+ "skrifa",
+ "tempfile",
+ "tokio",
+ "toml 1.2.1+spec-1.1.0",
+ "tracing",
+ "tracing-subscriber",
+ "tray-icon",
+ "unicode-bidi",
+ "unicode-segmentation",
+ "url",
+ "wgpu",
+ "windows",
+ "windows-sys 0.61.2",
+ "winresource",
+]
+
+[[package]]
+name = "odm-cli"
+version = "26.11.21"
+dependencies = [
+ "anyhow",
+ "clap",
+ "ctrlc",
+ "odm-engine",
+ "odm-ipc",
+ "odm-tools",
+ "odm-torrent",
+ "reqwest 0.13.5",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "url",
+]
+
+[[package]]
+name = "odm-cnl"
+version = "26.11.21"
+dependencies = [
+ "aes",
+ "axum",
+ "base64 0.23.1",
+ "reqwest 0.13.5",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "odm-crash"
+version = "26.11.21"
+dependencies = [
+ "breakpad-symbols",
+ "chrono",
+ "crash-handler",
+ "libc",
+ "minidump",
+ "minidump-processor",
+ "minidump-unwind",
+ "minidumper",
+ "odm-engine",
+ "reqwest 0.13.5",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "windows-sys 0.61.2",
+ "zip",
+]
+
+[[package]]
+name = "odm-debrid"
+version = "26.11.21"
+dependencies = [
+ "bytes",
+ "chrono",
+ "futures",
+ "odm-engine",
+ "odm-labserver",
+ "reqwest 0.13.5",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "odm-engine"
+version = "26.11.21"
+dependencies = [
+ "aes",
+ "base64 0.23.1",
+ "bytes",
+ "cap",
+ "core-foundation 0.10.1",
+ "core-foundation-sys",
+ "craft-atomic",
+ "crc32fast",
+ "futures",
+ "hex",
+ "hickory-resolver",
+ "http",
+ "httpdate",
+ "hyper-util",
+ "md-5",
+ "network-interface",
+ "odm-labserver",
+ "percent-encoding",
+ "proptest",
+ "reqwest 0.13.5",
+ "rquickjs",
+ "rustix 1.1.6",
+ "rustls",
+ "rustls-native-certs",
+ "rustls-platform-verifier",
+ "serde",
+ "serde_json",
+ "sha1",
+ "sha2",
+ "socket2",
+ "suppaftp",
+ "sysinfo",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-rustls",
+ "tokio-util",
+ "tower-layer",
+ "tower-service",
+ "unicode-segmentation",
+ "url",
+ "webpki-root-certs",
+ "windows-sys 0.61.2",
+ "wreq",
+ "wreq-util",
+]
+
+[[package]]
+name = "odm-extract"
+version = "26.11.21"
+dependencies = [
+ "flate2",
+ "lzma-rust2",
+ "odm-engine",
+ "tar",
+ "tempfile",
+ "tracing",
+ "zip",
+]
+
+[[package]]
+name = "odm-geo"
+version = "26.11.21"
+dependencies = [
+ "lzma-rust2",
+ "png 0.18.1",
+ "resvg",
+]
+
+[[package]]
+name = "odm-ipc"
+version = "26.11.21"
+dependencies = [
+ "craft-atomic",
+ "dirs 7.0.0",
+ "schemars 1.2.3",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "odm-labserver"
+version = "26.11.21"
+dependencies = [
+ "anyhow",
+ "aws-lc-rs",
+ "axum",
+ "bytes",
+ "clap",
+ "futures",
+ "hex",
+ "http-range-header",
+ "httpdate",
+ "hyper-util",
+ "percent-encoding",
+ "rcgen",
+ "reqwest 0.13.5",
+ "rustls",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "sha2",
+ "tempfile",
+ "time",
+ "tokio",
+ "tokio-rustls",
+ "url",
+]
+
+[[package]]
+name = "odm-mcp"
+version = "26.11.21"
+dependencies = [
+ "odm-ipc",
+ "rmcp",
+ "schemars 1.2.3",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "odm-nmhost"
+version = "26.11.21"
+dependencies = [
+ "chrono",
+ "odm-ipc",
+ "serde",
+ "serde_json",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "odm-remote"
+version = "26.11.21"
+dependencies = [
+ "aws-lc-rs",
+ "axum",
+ "hex",
+ "odm-engine",
+ "odm-ipc",
+ "rcgen",
+ "reqwest 0.13.5",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
+ "tokio-rustls",
+ "tracing",
+]
+
+[[package]]
+name = "odm-tools"
+version = "26.11.21"
+dependencies = [
+ "aws-lc-rs",
+ "base64 0.23.1",
+ "bytes",
+ "craft-atomic",
+ "futures",
+ "hex",
+ "odm-engine",
+ "odm-ipc",
+ "odm-labserver",
+ "percent-encoding",
+ "reqwest 0.13.5",
+ "rustix 1.1.6",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "url",
+ "win32job",
+ "windows-registry",
+ "zip",
+]
+
+[[package]]
+name = "odm-torrent"
+version = "26.11.21"
+dependencies = [
+ "anyhow",
+ "flate2",
+ "librqbit",
+ "librqbit-dualstack-sockets",
+ "odm-engine",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
@@ -6138,12 +6149,6 @@ dependencies = [
  "rustix 1.1.6",
  "windows-sys 0.61.2",
 ]
-
-[[package]]
-name = "pollster"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f3a9f18d041e6d0e102a0a46750538147e5e8992d3b4873aaafee2520b00ce3"
 
 [[package]]
 name = "pollster"
@@ -6897,9 +6902,9 @@ dependencies = [
 
 [[package]]
 name = "rfd"
-version = "0.17.2"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20dafead71c16a34e1ff357ddefc8afc11e7d51d6d2b9fbd07eaa48e3e540220"
+checksum = "c4b9d4857b10297ffb0f64cae711e983a7aeaee561848d56d429d3858bd8ed93"
 dependencies = [
  "block2 0.6.2",
  "dispatch2",
@@ -6910,8 +6915,9 @@ dependencies = [
  "objc2-app-kit 0.3.2",
  "objc2-core-foundation",
  "objc2-foundation 0.3.2",
+ "objc2-uniform-type-identifiers 0.3.2",
  "percent-encoding",
- "pollster 0.4.0",
+ "pollster",
  "raw-window-handle",
  "wasm-bindgen",
  "wasm-bindgen-futures",
