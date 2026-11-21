@@ -10,7 +10,7 @@
 ; Windows Credential Manager (orbitdownloadmanager --forget-sign-ins).
 
 #ifndef AppVersion
-  #define AppVersion "26.11.20"
+  #define AppVersion "26.11.21"
 #endif
 #define AppName "Orbit Download Manager"
 #define AppExe "orbitdownloadmanager.exe"

@@ -399,6 +399,11 @@ pub fn default_downloads<'a>(
         .unwrap_or(std::borrow::Cow::Borrowed(downloads))
 }
 
+/// The folder for MEGA partial files and resume data in the active Orbit profile.
+pub fn mega_cache_dir() -> Option<PathBuf> {
+    odm_ipc::data_dir().map(|dir| dir.join("cache").join("downloads"))
+}
+
 /// The name a download from `context` has before its server answers, when nobody named it: the
 /// address's ([`odm_engine::naming::answer_name`]), typed by the browser's own type for it and,
 /// for a page's media whose address names nothing (a script, a bare id), its page's title
@@ -1215,7 +1220,7 @@ impl Item {
     /// while that holds (`state_here`), else from the disk.
     pub fn owns_resume_state(&self) -> bool {
         if odm_engine::mega::is_mega(&self.url) {
-            let cache = odm_ipc::data_dir().map(|d| d.join("cache/downloads"));
+            let cache = mega_cache_dir();
             let base = odm_engine::mega::cache_base(&self.url, &self.dest, cache.as_deref());
             return odm_engine::state::ResumeState::load(&odm_engine::state::state_path(&base))
                 .is_ok_and(|s| s.url == self.url);

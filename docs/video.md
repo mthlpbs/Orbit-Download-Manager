@@ -7,7 +7,7 @@ ODM downloads videos from their web pages: YouTube, Vimeo, Dailymotion, Twitch, 
 ## Start a video download
 
 - Give the video's page address to **Add URL** (**Ctrl+N**). ODM recognises video pages and opens the video window, already looking the page up.
-- Or choose **Add video download** from the **Tasks** menu or the tray icon's right-click menu, paste the address into **Page address** and click **Look up**.
+- Or choose **Video download** under **Add download** in the **Tasks** menu or the tray menu, paste the address into **Page address** and click **Look up**.
 
 Any other page address that turns out to be a web page, not a file, is offered to the video window too. On a site yt-dlp has no reader of its own for, the video is the one the page says it is about, when it names one (in what it tells search engines and link previews: its JSON-LD, `og:video` or `twitter:player`), rather than the first player written in its HTML, and the file is named as the page names it.
 

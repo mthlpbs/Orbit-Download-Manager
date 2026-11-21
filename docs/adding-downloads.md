@@ -7,7 +7,7 @@ There are several ways to give ODM something to download. Most of them end in th
 ## Add URL
 
 1. Copy the file's address (in a browser: right-click the link → **Copy link**).
-2. Click **Add URL** on the toolbar, choose **Tasks → Add new download**, or press **Ctrl+N**.
+2. Click **Add URL** on the toolbar, choose **Tasks → Add download → URL**, or press **Ctrl+N**.
 3. **Enter new address to download** opens. If the clipboard holds a web address, it is already filled in. The arrow at the end of **Address** lists the last 20 addresses you entered; pick one to use it again. Right-click the box for **Cut**, **Copy**, **Paste**, **Delete** and **Select all**.
 4. If the server needs a user name and password, tick **Use authorization** and type them.
 5. Click **OK**.
@@ -127,7 +127,7 @@ More about queues in [Queues and the Scheduler](queues-and-scheduler.md).
 
 With **Options → General → Offer to download links copied to the clipboard** ticked (it is, unless you turned it off), when you copy a link to a file type in **Options → File types** (ZIP, EXE, MP4, PDF and many more), **Download File Info** opens with it filled in, ready for **Start Download**. Links to other pages are left alone. With **Options → Downloads → Show start download dialog** off, the download starts at once instead. Only links copied while ODM runs are taken, never one that was already there.
 
-Copied several links at once, a list or a whole forum post? Choose **Tasks → Add batch download from clipboard** (**Ctrl+B**, also in the tray icon's menu). ODM reads the clipboard then, and only then, and finds every download link in the text: `http`, `https`, `ftp` and magnet links, one per line or among other words, in Markdown (`[name](link)`) or between `<` and `>`. Each one is listed once in **Link grabber**, ticked and sorted into packages: pick a folder for each package, then **Start** or **Add to queue**. Downloads added together end with one **Downloads complete** summary. Magnet links are added as torrents with all their files once their files are known. A copied address with a number in its name, such as `https://example.com/show/ep01.mp4`, opens **Batch download** instead (below). If the clipboard holds no text, or no link, ODM says so.
+Copied several links at once, a list or a whole forum post? Choose **Tasks → Add download → Batch from clipboard** (**Ctrl+B**, also under **Add download** in the tray menu). ODM reads the clipboard then, and only then, and finds every download link in the text: `http`, `https`, `ftp` and magnet links, one per line or among other words, in Markdown (`[name](link)`) or between `<` and `>`. Each one is listed once in **Link grabber**, ticked and sorted into packages: pick a folder for each package, then **Start** or **Add to queue**. Downloads added together end with one **Downloads complete** summary. Magnet links are added as torrents with all their files once their files are known. A copied address with a number in its name, such as `https://example.com/show/ep01.mp4`, opens **Batch download** instead (below). If the clipboard holds no text, or no link, ODM says so.
 
 ## Drag and drop
 
@@ -140,7 +140,7 @@ You can also drop magnet links and `.torrent` files on it. Drag the box to move 
 
 For files whose names differ only by a number or a letter, such as `photo001.jpg` to `photo150.jpg`:
 
-1. Choose **Tasks → Add batch download**. Copied one address with a number in its file name, such as `https://example.com/show/ep01.mp4`? **Tasks → Add batch download from clipboard** (**Ctrl+B**) puts the asterisk where the number was, sets **From** and **Wildcard size** from it (`ep*.mp4`, from 1, size 2) and waits in **To** for the last number.
+1. Choose **Tasks → Add download → Batch download**. Copied one address with a number in its file name, such as `https://example.com/show/ep01.mp4`? **Tasks → Add download → Batch from clipboard** (**Ctrl+B**) puts the asterisk where the number was, sets **From** and **Wildcard size** from it (`ep*.mp4`, from 1, size 2) and waits in **To** for the last number.
 2. In **Address**, write the address with one asterisk where the number or letter changes: `https://example.com/photo*.jpg`.
 3. Under **Replace asterisk to**, choose **Numbers** or **Letters**, then **From** and **To**.
 4. For numbers, set **Wildcard size** to the number of digits. With 3, the files are `photo001.jpg`, `photo002.jpg` and so on.
@@ -157,18 +157,18 @@ The downloads go to a queue. As with Download Later, ODM asks which queue unless
 
 To add every link in a text file:
 
-1. Choose **Tasks → Import → From text file**.
+1. Choose **Tasks → Import → Link list**.
 2. Pick the file. **Link grabber** lists every web address ODM found in it, in packages. While ODM reads a long file, the strip under the list of downloads says **Reading** and the file's name; you can go on using ODM meanwhile. Import reads files of up to 64 MB, far more than any list of links holds: a larger file (a video, an archive, a backup picked by mistake) is refused with a message.
 3. Untick the addresses you don't want (**Check all** and **Uncheck all** help), then click **Add to queue**.
 
 ![Link grabber listing the links of a page in packages, with their names, sizes and whether they are online](images/help/link-grabber.webp)
 *Link grabber: untick what you don't want, then Add to queue.*
 
-The downloads join the **Main download queue**, ready to start (**Start** starts it too). **Tasks → Import → From IDM export file** reads an `.ef2` file, with each download's referrer and cookies.
+The downloads join the **Main download queue**, ready to start (**Start** starts it too). **Tasks → Import → IDM export (.ef2)** reads an `.ef2` file, with each download's referrer and cookies.
 
 **Tasks → Link grabber...** opens the same window empty: paste text with links in it (**Ctrl+V**). See [Link grabber and archives](link-grabber.md) for the packages, the archive password and extracting archives when they are downloaded.
 
-To save your own list, use **Tasks → Export → To text file** (one address per line) or **To IDM export file**.
+To save your own list, use **Tasks → Export → Link list (.txt)** (one address per line) or **IDM export (.ef2)**.
 
 ## When the address is already in the list
 

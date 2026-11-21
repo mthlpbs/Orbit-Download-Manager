@@ -922,7 +922,7 @@ const SHORTCUTS: [(&str, &str); 29] = [
     ("Ctrl+N", "Add a download (Add URL)"),
     (
         "Ctrl+B",
-        "Download the links in the clipboard (Add batch download from clipboard)",
+        "Download the links in the clipboard (Batch from clipboard)",
     ),
     ("Ctrl+F", "Find a download"),
     ("F3", "Find the next match"),

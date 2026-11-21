@@ -46,7 +46,7 @@ yet. See [browser integration](docs/browser-integration.md).
 
 ## MEGA downloads
 
-Use **Tasks → Add new download** and paste the complete public link, including the
+Use **Tasks → Add download → URL** and paste the complete public link, including the
 `#` decryption key. Public folders open in Link grabber so you can select their files.
 Classic `#!` and `#F!` links are supported too. Account-only and password-protected links
 require a public share link first.
@@ -88,7 +88,7 @@ Lookup metadata is reused when starting the download to avoid a second page look
 
 Category folders are available again under **Settings → Save to**. The Categories sidebar
 starts hidden and can be shown using **View → Show categories**. **Add new download** and
-**Add batch download from clipboard** extract links from surrounding prose; MEGA link
+**Batch from clipboard** extract links from surrounding prose; MEGA link
 fragments and keys are retained. MEGA partial data and resume metadata are kept in Orbit's
 `cache/downloads` folder. Only a verified, completed file is moved to its category folder.
 

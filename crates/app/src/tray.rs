@@ -439,34 +439,45 @@ impl Native {
         let mut items = Vec::new();
         let mut labels = Vec::new();
         // Labels are translated here and again by `relabel` when the language changes.
-        let mut add = |m: &Menu, label: &'static str, cmd: TrayCmd| {
+        let mut command = |label: &'static str, cmd: TrayCmd| {
             let item = MenuItem::new(crate::i18n::t(label), true, None);
             items.push((item.id().clone(), cmd));
-            m.append(&item).ok();
             labels.push((Entry::Item(item.clone()), label));
             item
         };
-        add(
-            &menu,
-            crate::i18n::mark("Open Orbit Download Manager"),
-            TrayCmd::Show,
-        );
-        menu.append(&PredefinedMenuItem::separator()).ok();
         let mark = crate::i18n::mark;
-        add(&menu, mark("Add new download"), TrayCmd::AddUrl);
-        add(&menu, mark("Add batch download"), TrayCmd::Batch);
-        // i18n: tray menu: the links copied to the clipboard, to tick in Link grabber (as Tasks → Add batch download from clipboard)
-        add(
-            &menu,
-            mark("Add batch download from clipboard"),
-            TrayCmd::BatchClipboard,
-        );
-        add(&menu, mark("Add video download"), TrayCmd::VideoPage);
+        menu.append(&command(mark("Open Orbit Download Manager"), TrayCmd::Show))
+            .ok();
+        menu.append(&PredefinedMenuItem::separator()).ok();
+        // i18n: tray submenu containing ways to add a download
+        let add_label = mark("Add download");
+        let add_menu = Submenu::new(crate::i18n::t(add_label), true);
+        add_menu
+            .append_items(&[
+                &command(mark("New download"), TrayCmd::AddUrl),
+                &command(mark("Video download"), TrayCmd::VideoPage),
+                &PredefinedMenuItem::separator(),
+                &command(mark("Batch download"), TrayCmd::Batch),
+                // i18n: tray menu: add a batch from links already copied to the clipboard
+                &command(mark("Batch from clipboard"), TrayCmd::BatchClipboard),
+            ])
+            .ok();
+        menu.append(&add_menu).ok();
         // i18n: tray menu: a submenu of the downloads now running; choosing one shows its progress window
         let downloads_label = mark("Downloads in progress");
         let downloads = Submenu::new(crate::i18n::t(downloads_label), false);
         menu.append(&downloads).ok();
-        menu.append(&PredefinedMenuItem::separator()).ok();
+        // i18n: tray submenu for starting, stopping and scheduling queues
+        let queue_label = mark("Queue");
+        let queue_menu = Submenu::new(crate::i18n::t(queue_label), true);
+        let start_queue = command(mark("Start main queue"), TrayCmd::StartQueue);
+        let stop_queue = command(mark("Stop main queue"), TrayCmd::StopQueue);
+        // i18n: noun: opens the Scheduler (the tool that starts queues on time)
+        let scheduler = command(mark("Scheduler"), TrayCmd::Scheduler);
+        queue_menu
+            .append_items(&[&start_queue, &stop_queue, &scheduler])
+            .ok();
+        menu.append(&queue_menu).ok();
         let limiter_label = mark("Speed Limiter");
         let limiter_menu = Submenu::new(crate::i18n::t(limiter_label), true);
         // i18n: verb: turn the Speed Limiter on
@@ -478,20 +489,13 @@ impl Native {
         limiter_menu.append(&limiter_on).ok();
         limiter_menu.append(&limiter_off).ok();
         menu.append(&limiter_menu).ok();
-        // i18n: noun: opens the Scheduler (the tool that starts queues on time)
-        add(&menu, mark("Scheduler"), TrayCmd::Scheduler);
-        let start_queue = add(
-            &menu,
-            mark("Start main download queue"),
-            TrayCmd::StartQueue,
-        );
-        let stop_queue = add(&menu, mark("Stop main download queue"), TrayCmd::StopQueue);
-        // i18n: plural noun: opens the Options window (settings)
-        add(&menu, mark("Settings"), TrayCmd::Options);
         menu.append(&PredefinedMenuItem::separator()).ok();
+        // i18n: plural noun: opens the Options window (settings)
+        menu.append(&command(mark("Settings"), TrayCmd::Options))
+            .ok();
         // i18n: verb: quit the app
-        add(&menu, mark("Exit"), TrayCmd::Exit);
-        drop(add);
+        menu.append(&command(mark("Exit"), TrayCmd::Exit)).ok();
+        drop(command);
         items.push((limiter_on.id().clone(), TrayCmd::LimiterOn));
         items.push((limiter_off.id().clone(), TrayCmd::LimiterOff));
 
@@ -583,6 +587,8 @@ impl Native {
                 menu_ctx.request_repaint();
             }
         }));
+        labels.push((Entry::Sub(add_menu), add_label));
+        labels.push((Entry::Sub(queue_menu), queue_label));
         labels.push((Entry::Sub(limiter_menu), limiter_label));
         labels.push((Entry::Sub(downloads.clone()), downloads_label));
         labels.push((Entry::Check(limiter_on.clone()), on_label));

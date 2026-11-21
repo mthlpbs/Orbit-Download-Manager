@@ -9,9 +9,9 @@
 ## Where links come from
 
 - **The browser.** Right-click a page for **Download all links with Orbit Download Manager**, or select part of it for **Download selected links with Orbit Download Manager**. The page's referrer and cookies go with each link.
-- **Tasks → Import → From text file** and **From IDM export file**. An `.ef2` file brings each download's referrer and cookies.
+- **Tasks → Import → Link list** and **IDM export (.ef2)**. An `.ef2` file brings each download's referrer and cookies.
 - Several links, or a `.txt` or `.ef2` list, dropped on the download list.
-- **The clipboard.** **Tasks → Add batch download from clipboard** (**Ctrl+B**, also in the tray icon's menu) reads the copied text when you choose it and lists every download link in it: `http`, `https`, `ftp` and magnet links, in a list, a forum post, Markdown or HTML, each once.
+- **The clipboard.** **Tasks → Add download → Batch from clipboard** (**Ctrl+B**, also under **Add download** in the tray menu) reads the copied text when you choose it and lists every download link in it: `http`, `https`, `ftp` and magnet links, in a list, a forum post, Markdown or HTML, each once.
 - **Pasting.** Choose **Tasks → Link grabber...** and press **Ctrl+V**: every download link in the copied text is added.
 - **A web page's address.** Paste or copy the address of a page (`https://example.com/downloads`) and ODM reads the page and lists the links on it, as the browser's **Download all links** does, in a package named after the page. The page itself is left unticked. This works for addresses that came on their own (pasted, copied, typed, in a list), not for the links found on a page, so ODM never wanders off through a site. ODM reads only what the page itself holds: links a page's scripts add after it loads come only through the browser.
 - **Click'n'Load** buttons on link sites, once you turn it on. See [Click'n'Load](#clicknload).

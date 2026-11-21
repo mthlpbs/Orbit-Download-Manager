@@ -45,7 +45,7 @@ See [Browser integration](browser-integration.md).
 - **Set file creation date as provided by the server** — give finished files the date the server reports, not the date you downloaded them.
 - **Mark downloaded files as coming from the internet** — on by default. Every file ODM downloads (from the browser, a link you add, a video, a gallery, a torrent, and the files extracted from an archive) carries the mark a browser's downloads carry. On Windows that is the Mark of the Web: SmartScreen checks a program before it first runs, and Office opens a document in Protected View. On a Mac it is the quarantine attribute Gatekeeper checks; on Linux, where the file came from, which file managers show. Unticked, no download is marked. On Windows, ODM also follows the Group Policy **Do not preserve zone information in file attachments**, as browsers do: when it is on (for the computer or for you), no download is marked, whatever this box says.
 
-ODM doesn't use a temporary folder: every connection writes straight into the final file's place, so there is nothing to put together at the end.
+- **MEGA download cache** — shows the active profile's cache directory. Click **Copy path** to copy the full path. MEGA keeps partial files and resume data here until verification. Regular downloads keep their partial files beside the destination file.
 
 ## Downloads
 

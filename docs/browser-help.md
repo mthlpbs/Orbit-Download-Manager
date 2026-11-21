@@ -92,7 +92,7 @@ ODM also takes the file types the browser would show or play itself (a PDF, an M
 ## No Download video button on YouTube in Chrome, Edge or Brave
 The copy of the extension from the Chrome Web Store showed no **Download video** button on YouTube before version 0.5.1. From 0.5.1 it shows it. Your browser updates extensions by itself; to get it sooner, open its extensions page and update them there.
 
-You can also save a video in Orbit. Choose **Add video download** from the **Tasks** menu or the tray icon's right-click menu, then paste the video's address.
+You can also save a video in Orbit. Choose **Video download** under **Add download** in the **Tasks** menu or the tray menu, then paste the video's address.
 
 <a id="site-access"></a>
 

@@ -1169,31 +1169,47 @@ impl OptionsDialog {
             true,
         )
         .on_hover_text(tip);
-        // Down by the row above it; its empty bottom shortened by as much.
-        group(ui, o, 21.0, 356.0, 380.0, 96.0, "Temporary directory");
-        // D-004: no temporary directory — parts are written next to the file, so there is
-        // nothing to assemble at the end.
-        let none = crate::i18n::t("Managed by Orbit for each download type");
-        let (browse_x, browse_w) =
-            winui::buttons_to_right(&p, 390.0, 0.0, &[("Browse", 73.0)], 160.0)[0];
-        readonly(ui, r(o, 30.0, 371.0, browse_x - 6.0 - 30.0, 23.0), none);
-        winui::button_light(
+        group(ui, o, 21.0, 356.0, 380.0, 96.0, "MEGA download cache");
+        let cache = crate::model::mega_cache_dir().map(|dir| dir.display().to_string());
+        let (copy_x, copy_w) =
+            winui::buttons_to_right(&p, 390.0, 0.0, &[("Copy path", 73.0)], 160.0)[0];
+        if let Some(path) = &cache {
+            readonly_ltr(ui, r(o, 30.0, 371.0, copy_x - 6.0 - 30.0, 23.0), path);
+        } else {
+            winui::text_in_window(
+                ui,
+                &p,
+                o.x + 30.0,
+                o.y + 386.0,
+                crate::i18n::t("Cache directory unavailable"),
+                LIGHT_DISABLED(),
+            );
+        }
+        if winui::button_light(
             ui,
-            r(o, browse_x, 372.0, browse_w, 21.0),
-            // i18n: verb: choose a folder
-            "Browse",
-            ButtonKind::Disabled,
+            r(o, copy_x, 372.0, copy_w, 21.0),
+            "Copy path",
+            if cache.is_some() {
+                ButtonKind::Normal
+            } else {
+                ButtonKind::Disabled
+            },
             false,
-        );
+        )
+        .clicked()
+            && let Some(path) = cache
+        {
+            crate::copy_text(ui.ctx(), path);
+        }
         winui::paragraph(
             &p,
             o.x + 30.0,
             o.y + 409.0,
             crate::i18n::t(
-                "Regular file parts are saved beside the destination file. MEGA partial\nfiles and resume data stay in Orbit's cache/downloads folder until\nthe completed file passes its integrity checks.",
+                "MEGA keeps partial files and resume data here until\nverification. Regular downloads keep their partial files\nbeside the destination file.",
             ),
             LIGHT_TEXT(),
-            o.x + 426.0,
+            o.x + 390.0,
             13.0,
         );
         // #93: the built-in categories by file type as shipped again (beside OK, on this page).

@@ -322,7 +322,7 @@ fn replaced(items: &[Item], id: u64, yt_dlp: bool) -> Option<crate::deleter::Doo
         .flatten()
         .map(|s| Box::new(move || s.find()) as crate::deleter::Later);
     let later = if odm_engine::mega::is_mega(&item.url) {
-        let cache = odm_ipc::data_dir().map(|d| d.join("cache/downloads"));
+        let cache = model::mega_cache_dir();
         let base = odm_engine::mega::cache_base(&item.url, &item.dest, cache.as_deref());
         Some(Box::new(move || {
             vec![
@@ -3752,7 +3752,7 @@ impl App {
         let own = self.settings.own_user_agent();
         let given = context.user_agent.as_deref().or(own);
         let opts = Options {
-            mega_cache: odm_ipc::data_dir().map(|d| d.join("cache/downloads")),
+            mega_cache: model::mega_cache_dir(),
             max_connections: self.settings.connections_for(url),
             proxy: self.settings.proxy_for(context),
             dns: self.settings.dns(),
@@ -3854,7 +3854,7 @@ impl App {
         load: crate::resumeread::Loader,
         wake: impl Fn() + Send + Sync + 'static,
     ) {
-        let cache_root = odm_ipc::data_dir().map(|d| d.join("cache/downloads"));
+        let cache_root = model::mega_cache_dir();
         let cached: std::collections::HashMap<PathBuf, PathBuf> = self
             .items
             .iter()
@@ -4414,7 +4414,7 @@ impl App {
             let later = LeftoverSearch::of(&self.items, id, false)
                 .map(|s| Box::new(move || s.find()) as crate::deleter::Later);
             let later = if odm_engine::mega::is_mega(&i.url) {
-                let cache = odm_ipc::data_dir().map(|d| d.join("cache/downloads"));
+                let cache = model::mega_cache_dir();
                 let base = odm_engine::mega::cache_base(&i.url, &i.dest, cache.as_deref());
                 Some(Box::new(move || {
                     vec![
@@ -5145,7 +5145,7 @@ impl App {
         else {
             return;
         };
-        let cache_root = odm_ipc::data_dir().map(|d| d.join("cache/downloads"));
+        let cache_root = model::mega_cache_dir();
         let state = self
             .items
             .iter()
@@ -8712,61 +8712,65 @@ impl App {
         #[allow(unused_mut)]
         let mut menu = match index {
             0 => vec![
-                I("&Add new download", Cmd::AddUrl, true, false),
-                I("Open &torrent file...", Cmd::OpenTorrentFile, true, false),
-                I("Add &magnet link...", Cmd::AddMagnet, true, false),
-                I("Add &batch download", Cmd::Batch, true, false),
-                I(
-                    "Add batch download from &clipboard",
-                    Cmd::BatchClipboard,
+                // i18n: Tasks submenu containing ways to add a download
+                Sub(
+                    "&Add download",
                     true,
-                    false,
+                    vec![
+                        I("&URL...", Cmd::AddUrl, true, false),
+                        I("&Torrent file...", Cmd::OpenTorrentFile, true, false),
+                        I("&Magnet link...", Cmd::AddMagnet, true, false),
+                        I("&Video download...", Cmd::VideoPage, true, false),
+                        Sep,
+                        I("&Batch download...", Cmd::Batch, true, false),
+                        I("Batch from &clipboard", Cmd::BatchClipboard, true, false),
+                    ],
                 ),
-                I("Add &video download", Cmd::VideoPage, true, false),
                 // i18n: Tasks menu: open Link grabber (links in packages, to tick before adding)
                 I("&Link grabber...", Cmd::LinkGrabber, true, false),
                 // i18n: Tasks menu: the RSS feeds window (feeds of torrents, and rules that add them)
                 I("&RSS feeds...", Cmd::RssFeeds(false), true, false),
                 Sep,
-                I(
-                    "Show &drop target",
-                    Cmd::ToggleDropTarget,
-                    true,
-                    self.settings.drop_target,
-                ),
-                Sep,
-                // i18n: verb: save the download list to a file
-                Sub(
-                    "E&xport",
-                    !self.items.is_empty(),
-                    vec![
-                        I(
-                            "To &IDM export file...",
-                            Cmd::Export { ef2: true },
-                            true,
-                            false,
-                        ),
-                        I("To &text file...", Cmd::Export { ef2: false }, true, false),
-                    ],
-                ),
                 // i18n: verb: load downloads from a file
                 Sub(
                     "&Import",
                     true,
                     vec![
                         I(
-                            "From &IDM export file...",
+                            "&IDM export (.ef2)...",
                             Cmd::Import { ef2: true },
                             true,
                             false,
                         ),
+                        // i18n: import a list of links from a text, CSV or HTML file
+                        I("&Link list...", Cmd::Import { ef2: false }, true, false),
+                    ],
+                ),
+                // i18n: verb: save the download list to a file
+                Sub(
+                    "E&xport",
+                    !self.items.is_empty(),
+                    vec![
                         I(
-                            "From &text file...",
-                            Cmd::Import { ef2: false },
+                            "&IDM export (.ef2)...",
+                            Cmd::Export { ef2: true },
+                            true,
+                            false,
+                        ),
+                        I(
+                            "&Link list (.txt)...",
+                            Cmd::Export { ef2: false },
                             true,
                             false,
                         ),
                     ],
+                ),
+                Sep,
+                I(
+                    "Show &drop target",
+                    Cmd::ToggleDropTarget,
+                    true,
+                    self.settings.drop_target,
                 ),
                 Sep,
                 I("&Exit", Cmd::Exit, true, false),

@@ -7,7 +7,7 @@ Save a video from YouTube, Vimeo, TikTok and many other sites, in the quality yo
 ## Steps
 
 1. Open the video in your browser and copy the page's address from the address bar.
-2. In Orbit, click **Add URL** (or press **Ctrl+N**) and click **OK**. If Orbit recognizes the video page, it opens **Download video from a page**. You can also choose **Tasks → Add video download**, paste the address and click **Look up**.
+2. In Orbit, click **Add URL** (or press **Ctrl+N**) and click **OK**. If Orbit recognizes the video page, it opens **Download video from a page**. You can also choose **Tasks → Add download → Video download**, paste the address and click **Look up**.
 3. The first time, ODM needs its video helper. Click **Install yt-dlp** (about 23 MB). ODM downloads it from its official release and checks it before use.
 4. Wait while ODM looks the page up. The list of qualities appears, best first, with **Audio only** at the end: the sound as the site has it, then, with ffmpeg (next step), as an MP3 at its best variable bitrate or at 320, 256, 192 or 128 kbps.
 5. For the best qualities and MP3, ODM needs **ffmpeg**, which joins the picture and the sound, and makes the MP3. On Windows ODM offers to install it (about 80 MB): click **Install ffmpeg** if you want them. On Linux and macOS ODM uses the system's ffmpeg. Without it, you get the qualities that come with their sound.

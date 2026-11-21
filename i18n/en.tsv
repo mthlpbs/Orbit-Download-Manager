@@ -270,9 +270,7 @@
 #. window title in the Options window
 #. window title: adding a debrid service account (Real-Debrid…)
 	Add an account	Add an account
-#. text in the tray icon's menu
-	Add batch download	Add batch download
-#. message or event log entry in the main window; text in the tray icon's menu
+#. message or event log entry in the main window
 #. title of the note when Tasks → Add batch download from clipboard finds nothing to download
 	Add batch download from clipboard	Add batch download from clipboard
 #. text in the Options window
@@ -280,13 +278,16 @@
 	Add browser...	Add browser...
 #. text in categories.rs
 	Add category	Add category
+#. text in the tray icon's menu
+#. tray submenu containing ways to add a download
+	Add download	Add download
 #. button in rssdlg.rs
 #. RSS feeds window: button that subscribes to the feed whose address is typed
 	Add feed	Add feed
 #. text in playlistdlg.rs
 #. title of the question asked before a playlist adds many downloads
 	Add many downloads	Add many downloads
-#. message or event log entry in the main window; text in the tray icon's menu
+#. message or event log entry in the main window
 #. link in the empty download list: opens Add URL
 	Add new download	Add new download
 #. window title in extension.rs
@@ -316,8 +317,6 @@
 	Add torrent	Add torrent
 #. window title in the Add torrent window
 	Add trackers	Add trackers
-#. text in the tray icon's menu
-	Add video download	Add video download
 #. text in playlistdlg.rs
 #. asked before a playlist adds many downloads at once; {n} is how many
 #. {n} = a number (keep the braces as they are)
@@ -562,8 +561,11 @@
 #. text in countries.rs
 #. a country's name (where a download's server is)
 	Barbados	Barbados
-#. window title in the Batch download window
+#. window title in the Batch download window; text in the tray icon's menu
 	Batch download	Batch download
+#. text in the tray icon's menu
+#. tray menu: add a batch from links already copied to the clipboard
+	Batch from clipboard	Batch from clipboard
 #. text in countries.rs
 #. a country's name (where a download's server is)
 	Belarus	Belarus
@@ -651,6 +653,8 @@
 #. text in countries.rs
 #. a country's name (where a download's server is)
 	Cabo Verde	Cabo Verde
+#. text in the Options window
+	Cache directory unavailable	Cache directory unavailable
 #. text in countries.rs
 #. a country's name (where a download's server is)
 	Cambodia	Cambodia
@@ -916,6 +920,8 @@
 #. button in the Options window
 #. button: copy the sign-in code
 	Copy code	Copy code
+#. button in the Options window
+	Copy path	Copy path
 #. button in crashui.rs
 #. crash report window button: copy the report's text
 	Copy report	Copy report
@@ -1149,7 +1155,7 @@
 #. Options → Accounts: checkbox: links of the file hosts these services support are downloaded through the accounts
 	Download supported file-host links through these accounts	Download supported file-host links through these accounts
 #. what a keyboard shortcut does in the Help menu's windows (About, updates, shortcuts, Tell a friend)
-	Download the links in the clipboard (Add batch download from clipboard)	Download the links in the clipboard (Add batch download from clipboard)
+	Download the links in the clipboard (Batch from clipboard)	Download the links in the clipboard (Batch from clipboard)
 #. text in a dialog box
 #. Download File Info: a check box, ticked when the download goes through the user's debrid account; {service} the service and the account, "Real-Debrid (labuser)". Unticked: downloaded directly
 	Download through {service}	Download through {service}
@@ -2118,8 +2124,6 @@
 #. a country's name (where a download's server is)
 	Malta	Malta
 #. text in the Options window
-	Managed by Orbit for each download type	Managed by Orbit for each download type
-#. text in the Options window
 	Manual proxy/socks configuration	Manual proxy/socks configuration
 #. text in the Add torrent window
 #. Torrent settings: the hover text of "Connect over uTP too (UDP)"
@@ -2166,34 +2170,14 @@
 #. text in countries.rs
 #. a country's name (where a download's server is)
 	Mayotte	Mayotte
-#. text in the Options window
-#. Options → Remote → Pair a device: the remote control isn't listening (no network, port taken): the Remote page says why
-	ODM can't be reached on the network now: Options → Remote says why.	ODM can't be reached on the network now: Options → Remote says why.
-#. text in remote.rs
-#. remote control page (on a phone): the address typed isn't one ODM downloads (not http, https, ftp or magnet)
-	ODM cannot download this address.	ODM cannot download this address.
-#. text in remote.rs
-#. remote control page (on a phone): adding a download failed
-	ODM could not add it.	ODM could not add it.
-#. text in remote.rs
-#. remote control page (on a phone): an action failed
-	ODM could not do it.	ODM could not do it.
-#. text in remote.rs
-#. remote control page (on a phone): ODM can't be reached while pairing
-	ODM does not answer. Check that it is running and on the same network.	ODM does not answer. Check that it is running and on the same network.
-#. text in remote.rs
-#. remote control page (on a phone): ODM can't be reached now; the page keeps trying by itself
-#. the trailing ... means it is still going on: keep it
-	ODM does not answer. Trying again...	ODM does not answer. Trying again...
-#. text in helpers.rs
-#. Video helpers: ODM can't download this helper on this Windows (ffmpeg on 32-bit Windows); "Use another program" is the button below
-	ODM has no copy for this system: install it, or use another program	ODM has no copy for this system: install it, or use another program
-#. text in remote.rs
-#. remote control page (on a phone): no pairing code is shown in ODM; "Pair a device" is ODM's button
-	ODM shows no code now. Click Pair a device there first.	ODM shows no code now. Click Pair a device there first.
 #. text in whereis.rs
 #. how far a download's server is, by its round trip (60 to 150 ms)
 	medium	medium
+#. group box title in the Options window
+	MEGA download cache	MEGA download cache
+#. text in the Options window
+#. \\n starts a new line: break lines where they fit the translation
+	MEGA keeps partial files and resume data here until\nverification. Regular downloads keep their partial files\nbeside the destination file.	MEGA keeps partial files and resume data here until\nverification. Regular downloads keep their partial files\nbeside the destination file.
 #. text in the download list (sizes, speeds, status)
 #. the list's Status column while a video's picture and sound are joined into one file (ffmpeg); {percent} how far, e.g. "45%". One short word: the column is narrow
 	Merging {percent}	Merging {percent}
@@ -2223,7 +2207,6 @@
 #. text in a download's progress window
 #. legend: pieces not downloaded yet
 	Missing	Missing
-#. window title in a dialog box
 #. text in the Scheduler window
 #. Monday, as short as a calendar's column head (two letters in English)
 	Mo	Mo
@@ -2358,6 +2341,8 @@
 #. button in the Options window
 #. Options → Remote → Pair a device: button: show a new code
 	New code	New code
+#. text in the tray icon's menu
+	New download	New download
 #. text in the Options window
 	New exception	New exception
 #. text in the Options window
@@ -2526,6 +2511,31 @@
 	Numbers	Numbers
 #. text in the Scheduler window
 	October	October
+#. text in the Options window
+#. Options → Remote → Pair a device: the remote control isn't listening (no network, port taken): the Remote page says why
+	ODM can't be reached on the network now: Options → Remote says why.	ODM can't be reached on the network now: Options → Remote says why.
+#. text in remote.rs
+#. remote control page (on a phone): the address typed isn't one ODM downloads (not http, https, ftp or magnet)
+	ODM cannot download this address.	ODM cannot download this address.
+#. text in remote.rs
+#. remote control page (on a phone): adding a download failed
+	ODM could not add it.	ODM could not add it.
+#. text in remote.rs
+#. remote control page (on a phone): an action failed
+	ODM could not do it.	ODM could not do it.
+#. text in remote.rs
+#. remote control page (on a phone): ODM can't be reached while pairing
+	ODM does not answer. Check that it is running and on the same network.	ODM does not answer. Check that it is running and on the same network.
+#. text in remote.rs
+#. remote control page (on a phone): ODM can't be reached now; the page keeps trying by itself
+#. the trailing ... means it is still going on: keep it
+	ODM does not answer. Trying again...	ODM does not answer. Trying again...
+#. text in helpers.rs
+#. Video helpers: ODM can't download this helper on this Windows (ffmpeg on 32-bit Windows); "Use another program" is the button below
+	ODM has no copy for this system: install it, or use another program	ODM has no copy for this system: install it, or use another program
+#. text in remote.rs
+#. remote control page (on a phone): no pairing code is shown in ODM; "Pair a device" is ODM's button
+	ODM shows no code now. Click Pair a device there first.	ODM shows no code now. Click Pair a device there first.
 #. option (radio button) in the Options window
 	Off	Off
 #. tooltip (why a control is greyed) in the Add torrent window
@@ -2859,6 +2869,9 @@
 	Qatar	Qatar
 #. text in the Download video window
 	Quality	Quality
+#. text in the tray icon's menu
+#. tray submenu for starting, stopping and scheduling queues
+	Queue	Queue
 #. text in the Scheduler window
 #. the name proposed for a new queue; {n} = its number
 #. {n} = a number (keep the braces as they are)
@@ -2925,9 +2938,6 @@
 #. text in rssdlg.rs
 #. RSS feeds window, Download rules: the two boxes above hold regular expressions
 	Regular expressions	Regular expressions
-#. text in the Options window
-#. \\n starts a new line: break lines where they fit the translation
-	Regular file parts are saved beside the destination file. MEGA partial\nfiles and resume data stay in Orbit's cache/downloads folder until\nthe completed file passes its integrity checks.	Regular file parts are saved beside the destination file. MEGA partial\nfiles and resume data stay in Orbit's cache/downloads folder until\nthe completed file passes its integrity checks.
 #. text in extracting archives (a download's log, the Archive password window)
 #. in Archive password: check box: keep the password typed in Options → Archives → Archive passwords, to try it on the next encrypted archives
 	Remember it for other archives	Remember it for other archives
@@ -3404,7 +3414,7 @@
 #. checkbox in the Options window
 	Start downloading immediately while displaying "Download File Info" dialog	Start downloading immediately while displaying "Download File Info" dialog
 #. text in the tray icon's menu
-	Start main download queue	Start main download queue
+	Start main queue	Start main queue
 #. text in remote.rs
 #. remote control page (on a phone): "When" choice: start the download at once
 	Start now	Start now
@@ -3453,7 +3463,7 @@
 #. button in Download video: stop listing a playlist's videos (those listed stay)
 	Stop listing	Stop listing
 #. text in the tray icon's menu
-	Stop main download queue	Stop main download queue
+	Stop main queue	Stop main queue
 #. text in the Add torrent window
 #. Torrent settings, under "Keep sharing": or stop sharing a finished torrent after sharing it for the number of minutes in the box after it
 	Stop sharing after sharing for	Stop sharing after sharing for
@@ -3543,8 +3553,6 @@
 	Tasks → Link grabber, or the browser's "Download all links": a split\narchive's volumes are one package, the other links of a page another.	Tasks → Link grabber, or the browser's "Download all links": a split\narchive's volumes are one package, the other links of a page another.
 #. window title in the Help menu's windows (About, updates, shortcuts, Tell a friend)
 	Tell a friend	Tell a friend
-#. group box title in the Options window
-	Temporary directory	Temporary directory
 #. button in the Options window
 #. button: asks the chosen DNS for an address, to see it works
 	Test	Test
@@ -4306,6 +4314,8 @@
 #. text in the download list (sizes, speeds, status); text in the Download video window
 #. category name: video files
 	Video	Video
+#. text in the tray icon's menu
+	Video download	Video download
 #. text in the Download video window
 	Video lookups use yt-dlp (about 23 MB, checked against its signature).	Video lookups use yt-dlp (about 23 MB, checked against its signature).
 #. text in playlistdlg.rs
@@ -4995,12 +5005,12 @@ extension	Open Orbit Download Manager	Open Orbit Download Manager
 #. button on the download button over a video in a feed: opens the post the video belongs to in a new tab; verb; very short
 extension	Open post	Open post
 #. text in the browser extension
-#. on the download button (amber) over a video in a feed (a social site's home page, a timeline) that can't be downloaded from there: the user should open the post the video belongs to; short
-extension	Open the post to download it	Open the post to download it
-#. text in the browser extension
 #. button in the toolbar button's popup: open the app's Options
 #. the trailing ... means it is still going on: keep it
 extension	Options...	Options...
+#. text in the browser extension
+#. on the download button (amber) over a video in a feed (a social site's home page, a timeline) that can't be downloaded from there: the user should open the post the video belongs to; short
+extension	Orbit couldn't identify this video in the feed	Orbit couldn't identify this video in the feed
 #. text in the browser extension
 #. on the download button over a video when the app isn't installed or didn't start; 'Get Orbit' and 'Retry' buttons follow; short
 extension	Orbit didn't answer	Orbit didn't answer
@@ -5211,12 +5221,20 @@ key	Up / Down	Up / Down
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
 menu	&About Orbit Download Manager	&About Orbit Download Manager
 #. menu command in the main window
+#. Tasks submenu containing ways to add a download
+#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
+menu	&Add download	&Add download
+#. menu command in the main window
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
 menu	&Add new download	&Add new download
 #. menu command in the main window
 #. View → Window system: ODM chooses the window system itself at each start
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
 menu	&Automatic	&Automatic
+#. menu command in the main window
+#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
+#. the trailing ... means it opens a window: keep it
+menu	&Batch download...	&Batch download...
 #. menu command in the main window
 #. View → Text: letters drawn the classic way, hinted to whole pixels (crisp, coarse on a dense screen)
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
@@ -5237,6 +5255,10 @@ menu	&Download Now	&Download Now
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
 menu	&Exit	&Exit
 #. menu command in the main window
+#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
+#. the trailing ... means it opens a window: keep it
+menu	&IDM export (.ef2)...	&IDM export (.ef2)...
+#. menu command in the main window
 #. verb: load downloads from a file
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
 menu	&Import	&Import
@@ -5252,6 +5274,19 @@ menu	&Keyboard shortcuts	&Keyboard shortcuts
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
 #. the trailing ... means it opens a window: keep it
 menu	&Link grabber...	&Link grabber...
+#. menu command in the main window
+#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
+#. the trailing ... means it opens a window: keep it
+menu	&Link list (.txt)...	&Link list (.txt)...
+#. menu command in the main window
+#. import a list of links from a text, CSV or HTML file
+#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
+#. the trailing ... means it opens a window: keep it
+menu	&Link list...	&Link list...
+#. menu command in the main window
+#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
+#. the trailing ... means it opens a window: keep it
+menu	&Magnet link...	&Magnet link...
 #. menu command in standard windows
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
 menu	&Paste	&Paste
@@ -5298,6 +5333,10 @@ menu	&Stop Download	&Stop Download
 #. menu command in the main window
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
 #. the trailing ... means it opens a window: keep it
+menu	&Torrent file...	&Torrent file...
+#. menu command in the main window
+#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
+#. the trailing ... means it opens a window: keep it
 menu	&Torrent...	&Torrent...
 #. menu command in the main window
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
@@ -5308,6 +5347,14 @@ menu	&Tutorials	&Tutorials
 #. menu command in standard windows
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
 menu	&Undo	&Undo
+#. menu command in the main window
+#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
+#. the trailing ... means it opens a window: keep it
+menu	&URL...	&URL...
+#. menu command in the main window
+#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
+#. the trailing ... means it opens a window: keep it
+menu	&Video download...	&Video download...
 #. menu command in the main window
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
 menu	&Video downloads	&Video downloads
@@ -5329,9 +5376,6 @@ menu	&X11 (XWayland)	&X11 (XWayland)
 menu	&yt-dlp...	&yt-dlp...
 #. menu command in the main window
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
-menu	Add &batch download	Add &batch download
-#. menu command in the main window
-#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
 #. the trailing ... means it opens a window: keep it
 menu	Add &magnet link...	Add &magnet link...
 #. menu command in the main window
@@ -5339,14 +5383,8 @@ menu	Add &magnet link...	Add &magnet link...
 #. the trailing ... means it opens a window: keep it
 menu	Add &new download...	Add &new download...
 #. menu command in the main window
-#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
-menu	Add &video download	Add &video download
-#. menu command in the main window
 #. View → Theme: picks a theme file or a Base16 or pywal colour scheme, copies it into the themes folder and uses it
 menu	Add a theme file…	Add a theme file…
-#. menu command in the main window
-#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
-menu	Add batch download from &clipboard	Add batch download from &clipboard
 #. menu command in the main window
 menu	Add category	Add category
 #. menu command in the main window
@@ -5366,6 +5404,9 @@ menu	Applies the next time ODM starts	Applies the next time ODM starts
 menu	Aqua	Aqua
 #. menu command in the main window
 menu	Arrange files	Arrange files
+#. menu command in the main window
+#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
+menu	Batch from &clipboard	Batch from &clipboard
 #. menu command in the main window
 #. View → Theme: a style theme's name (KDE Plasma's look, the Linux desktop), a name: keep "Breeze" as written
 menu	Breeze	Breeze
@@ -5483,14 +5524,6 @@ menu	First and last pieces first	First and last pieces first
 #. menu command in the main window
 #. noun: the list's font (submenu)
 menu	Font	Font
-#. menu command in the main window
-#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
-#. the trailing ... means it opens a window: keep it
-menu	From &IDM export file...	From &IDM export file...
-#. menu command in the main window
-#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
-#. the trailing ... means it opens a window: keep it
-menu	From &text file...	From &text file...
 #. menu command in the main window
 #. & marks the keyboard shortcut letter: keep one & before a letter of the translation
 menu	H&elp contents	H&elp contents
@@ -5666,14 +5699,6 @@ menu	The graphics card was lost twice in 10 minutes	The graphics card was lost t
 #. menu command in the main window
 #. View menu: submenu choosing ODM's look (colours, sizes, icons): Classic, Native…
 menu	Theme	Theme
-#. menu command in the main window
-#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
-#. the trailing ... means it opens a window: keep it
-menu	To &IDM export file...	To &IDM export file...
-#. menu command in the main window
-#. & marks the keyboard shortcut letter: keep one & before a letter of the translation
-#. the trailing ... means it opens a window: keep it
-menu	To &text file...	To &text file...
 #. menu command in the main window; menu command in the main window (menus, toolbar, Categories pane)
 #. noun: the toolbar (submenu of View with its settings)
 menu	Toolbar	Toolbar

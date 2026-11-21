@@ -154,7 +154,7 @@ On Linux this needs a tray, which most desktops have (KDE Plasma, Xfce, Cinnamon
 *The tray icon's menu on Ubuntu's GNOME.*
 
 - Click the tray icon to bring the window back.
-- Right-click it for **Add new download**, **Add batch download**, **Downloads in progress**, **Speed Limiter**, **Scheduler**, the main download queue, **Options** and **Exit**.
+- Right-click it for **Add download**, **Downloads in progress**, **Queue**, **Speed Limiter**, **Settings** and **Exit**. The **Queue** submenu starts or stops the main queue and opens **Scheduler**.
 - **Downloads in progress** lists the running downloads. Choose one to see its progress window.
 
 Minimize hides the main window there too, while **Minimize to the notification area** is on in **Options → General**. It is on by default; where the tray has no icon, Minimize sends the window to the taskbar instead.
